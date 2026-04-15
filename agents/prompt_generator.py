@@ -146,10 +146,6 @@ def main():
         response = call_openrouter(task, api_key)
         save("prompts", task[:60], response)
         print(response)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8")
-        print(f"ERROR HTTP {e.code}: {body}", file=sys.stderr)
-        sys.exit(1)
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)

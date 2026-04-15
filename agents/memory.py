@@ -7,10 +7,13 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-VAULT = Path(os.environ.get(
-    "AGENT_MEMORY_PATH",
-    "C:/Users/Alejandro/Documents/Obsidian Vault/AgentMemory"
-))
+def _default_vault() -> Path:
+    # En Railway/Linux usamos /tmp; en Windows la ruta local de Obsidian
+    if os.name == "nt":
+        return Path("C:/Users/Alejandro/Documents/Obsidian Vault/AgentMemory")
+    return Path("/tmp/agent_memory")
+
+VAULT = Path(os.environ.get("AGENT_MEMORY_PATH", "") or _default_vault())
 
 FOLDERS = {
     "deep_search":       VAULT / "deep-search",
@@ -26,19 +29,20 @@ def _ensure_dirs():
         folder.mkdir(parents=True, exist_ok=True)
 
 
-def save(agent: str, topic: str, content: str) -> Path:
-    """Guarda el output de un agente como nota en Obsidian."""
-    _ensure_dirs()
-    folder = FOLDERS.get(agent, VAULT / agent)
-    folder.mkdir(parents=True, exist_ok=True)
+def save(agent: str, topic: str, content: str) -> Path | None:
+    """Guarda el output de un agente como nota. No-fatal: si falla, solo avisa."""
+    try:
+        _ensure_dirs()
+        folder = FOLDERS.get(agent, VAULT / agent)
+        folder.mkdir(parents=True, exist_ok=True)
 
-    date = datetime.now().strftime("%Y-%m-%d")
-    slug = re.sub(r"[^\w\s-]", "", topic.lower()).strip()
-    slug = re.sub(r"[\s]+", "-", slug)[:50]
-    filename = f"{date}_{slug}.md"
-    filepath = folder / filename
+        date = datetime.now().strftime("%Y-%m-%d")
+        slug = re.sub(r"[^\w\s-]", "", topic.lower()).strip()
+        slug = re.sub(r"[\s]+", "-", slug)[:50]
+        filename = f"{date}_{slug}.md"
+        filepath = folder / filename
 
-    note = f"""---
+        note = f"""---
 fecha: {datetime.now().strftime("%Y-%m-%d %H:%M")}
 agente: {agent}
 tema: {topic}
@@ -49,8 +53,11 @@ tags: [agente, {agent}, auto-generado]
 
 {content}
 """
-    filepath.write_text(note, encoding="utf-8")
-    return filepath
+        filepath.write_text(note, encoding="utf-8")
+        return filepath
+    except Exception as e:
+        print(f"[memory] No se pudo guardar nota ({agent}): {e}", file=__import__("sys").stderr)
+        return None
 
 
 def read_recent(agent: str, max_notes: int = 3) -> str:
