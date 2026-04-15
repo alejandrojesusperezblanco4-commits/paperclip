@@ -289,8 +289,23 @@ El video tiene este concepto:
     jwt_secret = (
         os.environ.get("PAPERCLIP_AGENT_JWT_SECRET")
         or os.environ.get("BETTER_AUTH_SECRET", "")
-    )
+    ).strip()
     run_id = os.environ.get("PAPERCLIP_RUN_ID", "director-run")
+
+    # DEBUG: mostrar variables de entorno disponibles
+    print(f"🔍 DEBUG ENV:", flush=True)
+    print(f"   PAPERCLIP_ISSUE_ID   = '{issue_id}'", flush=True)
+    print(f"   PAPERCLIP_AGENT_ID   = '{agent_id}'", flush=True)
+    print(f"   PAPERCLIP_COMPANY_ID = '{company_id}'", flush=True)
+    print(f"   PAPERCLIP_API_URL    = '{api_url}'", flush=True)
+    print(f"   PAPERCLIP_RUN_ID     = '{run_id}'", flush=True)
+    print(f"   BETTER_AUTH_SECRET   = '{'SET' if jwt_secret else 'EMPTY'}'", flush=True)
+
+    # Si PAPERCLIP_ISSUE_ID no vino por env, buscar en todas las vars PAPERCLIP_*
+    if not issue_id:
+        for k, v in os.environ.items():
+            if "PAPERCLIP" in k:
+                print(f"   {k} = {v[:80]}", flush=True)
 
     if issue_id:
         # Generar JWT si tenemos el secret
