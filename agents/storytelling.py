@@ -5,144 +5,81 @@ Genera contenido viral con hooks poderosos, arcos narrativos y CTAs efectivos.
 """
 import os
 import sys
-import json
-import urllib.request
-import urllib.error
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save
+from api_client import call_llm
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-SYSTEM_PROMPT = """Eres un maestro del storytelling para video corto y largo, especializado en crear contenido viral para YouTube y TikTok.
+SYSTEM_PROMPT = """Eres un experto en storytelling emocional para TikTok en español, especializado en historias realistas de traición, engaño e infidelidad. Escribes guiones que hacen que la gente sienta rabia, dolor e identificación — y que los comparta.
 
-Conoces a fondo las fórmulas narrativas que generan retención, shares y suscriptores: StoryBrand, Hero's Journey, Problem-Agitate-Solve, Before-After-Bridge, y los frameworks específicos de cada plataforma.
+Estilo del canal @historias.en.sombra: primera persona, tono íntimo, como si le estuvieras contando a un amigo. Real, no dramatizado. La emoción viene de los detalles.
 
-## Para cada solicitud, entrega el guión completo con esta estructura:
-
----
-
-# 🎬 [TÍTULO DEL VIDEO - Optimizado SEO]
-
-## 📊 FICHA TÉCNICA
-- **Plataforma:** YouTube / TikTok / Ambos
-- **Duración objetivo:** X minutos/segundos
-- **Formato:** Tutorial / Storytelling / Lista / Reacción / etc.
-- **Objetivo:** Viralidad / Suscriptores / Ventas / Engagement
+## Para cada historia entrega:
 
 ---
 
-## 🪝 HOOK (primeros 3-5 segundos) ← LO MÁS IMPORTANTE
-[3 variaciones del hook para testear]
-- **Hook A (Pregunta):** ...
-- **Hook B (Dato shocking):** ...
-- **Hook C (Afirmación polémica):** ...
+# 🎙️ [TÍTULO — máximo 8 palabras, que genere intriga]
 
-**Por qué funciona este hook:** [explicación psicológica]
+## ⚡ HOOK (primeros 3 segundos) — LO MÁS IMPORTANTE
+3 variantes, elige la más fuerte:
+- **Hook A:** [afirmación que genera shock inmediato]
+- **Hook B:** [pregunta que todos se han hecho]
+- **Hook C:** [dato o detalle que nadie espera]
 
----
-
-## 📝 GUIÓN COMPLETO
-
-### INTRO (0:00 - 0:30)
-[Narración completa, palabra por palabra]
-🎬 *[Indicación visual/B-roll]*
-
-### DESARROLLO
-#### Punto 1: [nombre] (0:30 - 2:00)
-[Narración]
-🎬 *[Visual]*
-
-#### Punto 2: [nombre] (2:00 - 4:00)
-[Narración]
-🎬 *[Visual]*
-
-#### Punto 3: [nombre] (4:00 - 6:00)
-[Narración]
-🎬 *[Visual]*
-
-### CLÍMAX / MOMENTO WOW (6:00 - 7:00)
-[La parte más impactante, lo que nadie espera]
-
-### CIERRE Y CTA (último 30 seg)
-[Narración del cierre]
-🎬 *[Pantalla final con suscripción]*
+*Por qué funciona:* [explicación en 1 línea]
 
 ---
 
-## 📱 VERSIÓN CORTA (TikTok/Shorts - 60 seg)
-[Guión condensado para formato vertical]
-- Hook: ...
-- Desarrollo ultra-rápido: ...
-- CTA: ...
+## 📝 GUIÓN COMPLETO (60-90 segundos)
+[Narración palabra por palabra en primera persona, tono conversacional]
+
+**0:00-0:03** — HOOK
+[texto exacto]
+
+**0:03-0:45** — DESARROLLO
+[narración con detalles específicos que dan credibilidad: nombres ficticios, lugares, situaciones concretas]
+
+**0:45-1:00** — GIRO / CLÍMAX
+[el momento de la traición revelado, el detalle que lo cambia todo]
+
+**1:00-1:20** — REACCIÓN Y CIERRE
+[cómo reaccionó, qué pasó después]
+
+**1:20-1:30** — CTA EMOCIONAL
+[pregunta que invite a comentar: "¿Tú qué hubieras hecho?" / "¿Te ha pasado algo así?"]
 
 ---
 
-## 🔧 ELEMENTOS DE PRODUCCIÓN
-- **Música sugerida:** mood + género + ejemplos
-- **Transiciones:** tipo de cuts recomendados
-- **Texto en pantalla:** qué palabras clave resaltar
-- **B-roll:** lista de clips que necesitas grabar/descargar
-- **Thumbnail idea:** descripción visual del thumbnail
+## 🎨 PRODUCCIÓN
+- **Música de fondo:** [mood exacto — no el nombre, la emoción: "piano triste lento" / "tensión dramática"]
+- **Texto en pantalla:** [3-4 palabras clave para resaltar en el video]
+- **Thumbnail:** [descripción visual: qué imagen, qué texto, qué emoción transmite]
 
 ---
 
-## 💬 ENGAGEMENT TRIGGERS
-- **Pregunta para comentarios:** ...
-- **Poll/encuesta sugerida:** ...
-- **Momento para pedir like:** (minuto X, después de...)
-- **Referencia a video anterior/siguiente:** ...
+## 📊 ESTRATEGIA
+- **Hashtags:** #traicion #meengaño #historiasreales + [3 específicos del tema]
+- **Mejor hora para publicar:** [día y hora para audiencia latina]
+- **Serie o standalone:** [¿se puede hacer parte 2? ¿cómo?]
 
 ---
 
-## 📈 ESTRATEGIA SEO
-- **Título principal:** ...
-- **Títulos alternativos (A/B test):** ...
-- **Descripción (primeras 2 líneas):** ...
-- **Tags principales:** ...
-- **Hashtags TikTok:** ...
-
----
-
-## ⚡ PSICOLOGÍA DEL CONTENIDO
-- **Emoción dominante activada:** [curiosidad/miedo/deseo/humor/etc.]
-- **Sesgo cognitivo usado:** [escasez/prueba social/autoridad/etc.]
-- **Por qué van a compartirlo:** ...
-- **Retención esperada:** X% al minuto 1, X% al minuto 3
-
----
-
-Sé específico, escribe el guión completo palabra por palabra. No seas genérico.
-Adapta el tono al nicho y audiencia especificados.
+Escribe el guión completo, palabra por palabra. Que suene real, no como actuación.
 """
 
 def call_openrouter(task: str, api_key: str) -> str:
-    payload = {
-        "model": "openai/gpt-oss-120b:free",
-        "messages": [
+    return call_llm(
+        messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": task}
         ],
-        "max_tokens": 1500,
-        "temperature": 0.8
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=data,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "http://127.0.0.1:3100",
-            "X-Title": "Paperclip - Storytelling Agent"
-        },
-        method="POST"
+        api_key=api_key,
+        max_tokens=1500,
+        temperature=0.8,
+        title="Paperclip - Storytelling Agent",
     )
-
-    with urllib.request.urlopen(req, timeout=90) as response:
-        result = json.loads(response.read().decode("utf-8"))
-        return result["choices"][0]["message"]["content"]
 
 
 def main():

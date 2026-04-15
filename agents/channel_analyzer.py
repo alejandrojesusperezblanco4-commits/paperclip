@@ -5,83 +5,51 @@ Extrae su estrategia, frecuencia, formatos y puntos débiles que puedes aprovech
 """
 import os
 import sys
-import json
-import urllib.request
-import urllib.error
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save, append_channel
+from api_client import call_llm
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-SYSTEM_PROMPT = """Eres un analista experto en canales de YouTube y TikTok. Tu trabajo es hacer ingeniería inversa de canales exitosos para extraer su estrategia y encontrar brechas que otros creadores puedan aprovechar.
+SYSTEM_PROMPT = """Eres un analista de canales TikTok especializados en drama relacional en español. Haces ingeniería inversa de los canales más exitosos de historias de traición, engaño e infidelidad para encontrar brechas que @historias.en.sombra puede aprovechar.
 
-## Cuando analices un canal o nicho, entrega:
+## Analiza y entrega:
 
-### 1. PERFIL DEL CANAL
-- Nombre, nicho exacto, audiencia objetivo
-- Suscriptores / seguidores estimados y tasa de crecimiento
-- Frecuencia de publicación y mejores horarios
+### 1. CANALES COMPETIDORES EN TIKTOK HISPANO
+Identifica 3-5 canales TikTok que publican historias de drama relacional en español:
+- @nombre del canal, seguidores aproximados, views promedio por video
+- Su nicho exacto (¿infidelidad? ¿traición de amigos? ¿familia tóxica?)
+- Frecuencia de publicación y mejor horario
 
-### 2. ANATOMÍA DE SUS VIDEOS EXITOSOS
-- Duración promedio de los videos que más vistas tienen
-- Estructura del video: hook, desarrollo, CTA
-- Estilo de thumbnail: colores, texto, caras, expresiones
-- Fórmulas de títulos que repiten (patrones SEO)
+### 2. QUÉ ESTÁ FUNCIONANDO EN ESOS CANALES
+- Formato que más vistas genera: ¿narración directa a cámara? ¿texto animado? ¿voz en off con imágenes?
+- Duración que mejor retiene: ¿60s? ¿90s? ¿series de 3 partes?
+- Estilo de thumbnail: ¿foto del narrador? ¿texto dramático? ¿imagen generada por IA?
+- Hook más común en los videos con más vistas
 
-### 3. ESTRATEGIA DE CONTENIDO
-- Pilares de contenido (tipos de videos que publican)
-- Series o formatos recurrentes
-- Cómo usan shorts/reels para alimentar el canal principal
-- Engagement: cómo responden comentarios, comunidad
+### 3. DEBILIDADES QUE PODEMOS EXPLOTAR
+- ¿Qué tipos de historias NO están cubriendo pero la audiencia pide en comentarios?
+- ¿Qué emoción están dejando sin trabajar (sorpresa, vergüenza, orgullo, revancha)?
+- ¿Calidad de producción baja que podemos superar?
 
-### 4. DEBILIDADES Y OPORTUNIDADES
-- Temas que no cubren pero su audiencia pide (en comentarios)
-- Formatos que no usan pero funcionan en el nicho
-- Calidad de producción vs. competidores
-- SEO: keywords que se están perdiendo
+### 4. DIFERENCIADORES PARA @historias.en.sombra
+- 3 formas concretas de ser distintos y mejores
+- El ángulo único que nadie está usando en este nicho
 
-### 5. BENCHMARKS COMPETITIVOS
-- Tabla comparativa si analizas varios canales
-- Métricas: views/video promedio, ratio likes/views, comentarios
-- Quién está creciendo más rápido y por qué
-
-### 6. PLAN DE ATAQUE
-- Cómo diferenciarse de estos canales
-- Top 3 oportunidades concretas para superarlos
-- Contenido que puedes crear hoy para robarles audiencia
-
-## Formato
-Usa markdown estructurado. Sé específico con nombres, números y ejemplos reales.
-Usa tablas comparativas cuando analices múltiples canales.
+## Formato: markdown con tabla comparativa y emojis. Datos específicos.
 """
 
 def call_openrouter(task: str, api_key: str) -> str:
-    payload = {
-        "model": "openai/gpt-oss-120b:free",
-        "messages": [
+    return call_llm(
+        messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": task}
         ],
-        "max_tokens": 1200
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=data,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "http://127.0.0.1:3100",
-            "X-Title": "Paperclip - Channel Analyzer Agent"
-        },
-        method="POST"
+        api_key=api_key,
+        max_tokens=1200,
+        title="Paperclip - Channel Analyzer Agent",
     )
-
-    with urllib.request.urlopen(req, timeout=90) as response:
-        result = json.loads(response.read().decode("utf-8"))
-        return result["choices"][0]["message"]["content"]
 
 
 def main():

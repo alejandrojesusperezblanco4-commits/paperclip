@@ -3,7 +3,4 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-healthcheckPath = "/api/companies"
-healthcheckTimeout = 60
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
+restartPolicyType = "never"

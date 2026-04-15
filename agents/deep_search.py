@@ -5,76 +5,53 @@ Usa Perplexity (sonar-pro) via OpenRouter para acceso a internet.
 """
 import os
 import sys
-import json
-import urllib.request
-import urllib.error
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save, append_keywords
+from api_client import call_llm
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-SYSTEM_PROMPT = """Eres un experto en crecimiento de canales de YouTube y TikTok con acceso a internet en tiempo real.
+SYSTEM_PROMPT = """Eres un experto en contenido viral de TikTok en español, especializado en historias de drama relacional: traiciones, engaños, infidelidades y manipulaciones.
 
-Tu especialidad es el DEEP SEARCH: encontrar tendencias, keywords virales, nichos sin explotar y oportunidades de contenido.
+Tu trabajo es encontrar las historias y tendencias más virales de esta semana para el canal @historias.en.sombra.
 
-## Cuando hagas búsquedas, siempre entrega:
+## Entrega siempre:
 
-### 1. TENDENCIAS ACTUALES
-- Top 5 temas virales en YouTube/TikTok ahora mismo relacionados con la consulta
-- Hashtags con mayor crecimiento esta semana
-- Formatos de video que están explotando (duración, estilo, estructura)
+### 1. HISTORIAS VIRALES DE REDDIT ESTA SEMANA
+Busca en r/AITA, r/relationship_advice, r/survivinginfidelity, r/tifu, r/desahogo historias con:
+- Alto número de upvotes o comentarios
+- Temática de traición, engaño, infidelidad o manipulación
+- Fácil de narrar en 60-90 segundos
+Lista 3-5 historias con título, resumen de 2 líneas y por qué viralizaría en TikTok latino
 
-### 2. KEYWORDS DE OPORTUNIDAD
-- Keywords con alto volumen pero baja competencia
-- Long-tail keywords que los creadores grandes ignoran
-- Variaciones en español e inglés cuando aplica
+### 2. TENDENCIAS EN TIKTOK HISPANO
+- Hashtags de drama relacional con más volumen esta semana
+  (#meengaño #traicion #historiasreales #relacionestóxicas #infidelidad)
+- Formato que está funcionando: ¿narración directa? ¿texto en pantalla? ¿voz en off?
+- Duración óptima del momento (60s vs 90s vs series de partes)
 
-### 3. NICHOS Y ÁNGULOS
-- Sub-nichos específicos dentro del tema
-- Ángulos únicos que nadie está cubriendo
-- Preguntas frecuentes de la audiencia sin responder
+### 3. ÁNGULOS EMOCIONALES QUE ESTÁN PEGANDO
+- ¿Qué emoción genera más comentarios ahora? (rabia, identificación, shock, tristeza)
+- Tipo de traición que más comparte la gente (pareja, amigo, familiar, jefe)
+- Frase o hook que más se está usando para arrancar la historia
 
-### 4. DATOS Y MÉTRICAS
-- Estimado de búsquedas mensuales cuando disponible
-- Ejemplos de videos que están funcionando (títulos reales)
-- Patron de publicación de los canales exitosos
+### 4. 5 IDEAS DE VIDEO CONCRETAS
+Para cada una: título gancho + emoción dominante + por qué va a viralizar
 
-### 5. PLAN DE ACCIÓN
-- 5 ideas de videos concretas con títulos optimizados para SEO
-- Mejor momento para publicar
-- Thumbnails: qué elementos visuales están funcionando
-
-## Formato de respuesta
-Usa markdown con emojis para facilitar la lectura. Sé específico y accionable. No seas genérico.
+## Formato: markdown con emojis. Específico y accionable.
 """
 
 def call_openrouter(task: str, api_key: str) -> str:
-    payload = {
-        "model": "openai/gpt-oss-120b:free",
-        "messages": [
+    return call_llm(
+        messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": task}
         ],
-        "max_tokens": 1200
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=data,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "http://127.0.0.1:3100",
-            "X-Title": "Paperclip - Deep Search Agent"
-        },
-        method="POST"
+        api_key=api_key,
+        max_tokens=1200,
+        title="Paperclip - Deep Search Agent",
     )
-
-    with urllib.request.urlopen(req, timeout=90) as response:
-        result = json.loads(response.read().decode("utf-8"))
-        return result["choices"][0]["message"]["content"]
 
 
 def main():

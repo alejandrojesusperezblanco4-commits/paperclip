@@ -13,9 +13,9 @@ import os
 import sys
 import json
 import subprocess
-import urllib.request
-import urllib.error
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+from api_client import call_llm
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -23,51 +23,53 @@ sys.stderr.reconfigure(encoding="utf-8")
 AGENTS_DIR = Path(__file__).parent
 PYTHON = sys.executable
 
-SYNTHESIS_PROMPT = """Eres el Director de Contenido de un canal de YouTube/TikTok.
-Recibes los reportes de 4 agentes especializados y los sintetizas en un paquete ejecutivo de contenido.
+SYNTHESIS_PROMPT = """Eres el Director de Contenido del canal TikTok @historias.en.sombra.
+El canal publica historias REALISTAS con emociones fuertes: traiciones, engaños, infidelidades, manipulaciones.
+Estilo: narración en primera persona, tono íntimo y emocional, como si fuera real.
+Audiencia: latinos 18-35 años que disfrutan drama relacional y se sienten identificados.
 
-Tu output tiene esta estructura:
-
----
-
-# 🎯 PAQUETE DE CONTENIDO SEMANAL
-## Tema: {tema}
+Recibes los reportes de 4 agentes y los sintetizas en un paquete ejecutivo listo para producir.
 
 ---
 
-## 📋 RESUMEN EJECUTIVO (2-3 párrafos)
-[Síntesis de las oportunidades más importantes encontradas]
+# 🎯 PAQUETE SEMANAL — @historias.en.sombra
+## Historia seleccionada: {tema}
 
 ---
 
-## ⚡ TOP 3 ACCIONES INMEDIATAS
-1. [Acción concreta con deadline]
-2. [Acción concreta con deadline]
-3. [Acción concreta con deadline]
+## 📋 RESUMEN EJECUTIVO
+[Por qué esta historia va a viralizar: emoción, identificación, factor sorpresa]
 
 ---
 
-## 📅 CALENDARIO DE CONTENIDO (7 días)
-| Día | Plataforma | Tipo | Título | Hora |
-|-----|------------|------|--------|------|
-[llena la tabla con el plan de la semana]
+## ⚡ TOP 3 ACCIONES ESTA SEMANA
+1. [Acción concreta hoy]
+2. [Acción concreta mañana]
+3. [Acción para el fin de semana]
 
 ---
 
-## 🎬 VIDEO PRIORITARIO
-[Destaca el guión y prompts del video más importante de la semana]
+## 📅 CALENDARIO (7 días)
+| Día | Historia/Ángulo | Emoción principal | Hora sugerida |
+|-----|-----------------|-------------------|---------------|
+[Plan con 3-5 posts, variando entre traición, engaño, manipulación]
 
 ---
 
-## 📊 KPIs A MONITOREAR
-- Retención objetivo: X%
-- CTR miniatura objetivo: X%
-- Views objetivo día 1: X
-- Comentarios objetivo: X
+## 🎬 VIDEO PRIORITARIO DE LA SEMANA
+[El guión listo para grabar, con el hook más fuerte]
 
 ---
 
-Sé directo, accionable y específico. No repitas información entre secciones.
+## 📊 KPIs OBJETIVO
+- Retención al segundo 3: >85%
+- Comentarios esperados: "esto me pasó a mí" / "¿cómo se llama él/ella?"
+- Shares objetivo: que lo manden a alguien conocido
+- CTR del thumbnail: >8%
+
+---
+
+Sé directo y emocional. El contenido debe hacer que la gente sienta rabia, tristeza o identificación.
 """
 
 def sanitize(text: str) -> str:
@@ -99,18 +101,22 @@ def run_agent(script_name: str, task: str, api_key: str, label: str) -> str:
         )
         if result.returncode != 0:
             error_msg = result.stderr.strip()
-            print(f"⚠️  {label} falló: {error_msg}", file=sys.stderr, flush=True)
+            # stdout también para que aparezca en el log de la UI
+            print(f"⚠️  {label} falló (exit {result.returncode}): {error_msg[:300]}", flush=True)
             return f"[{label}: Error - {error_msg[:200]}]"
 
         output = sanitize(result.stdout.strip())
+        if not output:
+            print(f"⚠️  {label} devolvió respuesta vacía. Stderr: {result.stderr.strip()[:200]}", flush=True)
+            return f"[{label}: respuesta vacía]"
         print(f"✅ {label} completado ({len(output)} caracteres)", flush=True)
         return output
 
     except subprocess.TimeoutExpired:
-        print(f"⏱️  {label} timeout (180s)", file=sys.stderr, flush=True)
+        print(f"⏱️  {label} timeout (180s)", flush=True)
         return f"[{label}: Timeout - el agente tardó demasiado]"
     except Exception as e:
-        print(f"❌ {label} error: {e}", file=sys.stderr, flush=True)
+        print(f"❌ {label} error inesperado: {e}", flush=True)
         return f"[{label}: {str(e)}]"
 
 
@@ -133,32 +139,16 @@ def synthesize(tema: str, reports: dict, api_key: str) -> str:
 ---
 Con base en estos 4 reportes, crea el paquete ejecutivo de contenido semanal."""
 
-    payload = {
-        "model": "openai/gpt-oss-120b:free",
-        "messages": [
+    return call_llm(
+        messages=[
             {"role": "system", "content": SYNTHESIS_PROMPT.format(tema=tema)},
             {"role": "user", "content": content}
         ],
-        "max_tokens": 1500,
-        "temperature": 0.6
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=data,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "http://127.0.0.1:3100",
-            "X-Title": "Paperclip - Director de Contenido"
-        },
-        method="POST"
+        api_key=api_key,
+        max_tokens=1500,
+        temperature=0.6,
+        title="Paperclip - Director de Contenido",
     )
-
-    with urllib.request.urlopen(req, timeout=90) as response:
-        result = json.loads(response.read().decode("utf-8"))
-        return result["choices"][0]["message"]["content"]
 
 
 def main():
@@ -179,7 +169,7 @@ def main():
         objetivo = f"{issue_title}\n\n{issue_body or ''}"
 
     if not objetivo:
-        objetivo = "Inteligencia artificial y automatización para creadores de contenido hispanos"
+        objetivo = "historias realistas de traición, engaño e infidelidad para el canal @historias.en.sombra de TikTok en español"
 
     print(f"🎯 DIRECTOR DE CONTENIDO INICIANDO", flush=True)
     print(f"📌 Objetivo: {objetivo[:100]}...", flush=True)
@@ -262,6 +252,39 @@ El video tiene este concepto:
 </details>
 """
     print(output, flush=True)
+
+    # ── Publicar resultado como comentario en el issue (aparece en el inbox) ──
+    issue_id = os.environ.get("PAPERCLIP_ISSUE_ID", "")
+    api_url  = os.environ.get("PAPERCLIP_API_URL", "http://localhost:7777")
+
+    if issue_id:
+        # 1. Postear el resultado como comentario → aparece en el chat del issue
+        try:
+            comment_data = json.dumps({"body": output}).encode("utf-8")
+            comment_req = urllib.request.Request(
+                f"{api_url}/api/issues/{issue_id}/comments",
+                data=comment_data,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(comment_req, timeout=15) as r:
+                print(f"✅ Resultado publicado como comentario (HTTP {r.status})", flush=True)
+        except Exception as e:
+            print(f"⚠️  No se pudo publicar el comentario: {e}", flush=True)
+
+        # 2. Marcar issue como done para evitar re-ejecución
+        try:
+            patch_data = json.dumps({"status": "done"}).encode("utf-8")
+            patch_req = urllib.request.Request(
+                f"{api_url}/api/issues/{issue_id}",
+                data=patch_data,
+                headers={"Content-Type": "application/json"},
+                method="PATCH"
+            )
+            with urllib.request.urlopen(patch_req, timeout=10) as r:
+                print(f"✅ Issue marcado como done (HTTP {r.status})", flush=True)
+        except Exception as e:
+            print(f"⚠️  No se pudo cerrar el issue: {e}", flush=True)
 
 
 if __name__ == "__main__":

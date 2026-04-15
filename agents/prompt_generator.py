@@ -6,10 +6,9 @@ Compatible con Midjourney, DALL-E 3, Stable Diffusion, Flux y Leonardo.AI
 import os
 import sys
 import json
-import urllib.request
-import urllib.error
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save
+from api_client import call_llm
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -95,45 +94,29 @@ Tu trabajo es crear prompts JSON altamente optimizados para thumbnails, portadas
 """
 
 def call_openrouter(task: str, api_key: str) -> str:
-    payload = {
-        "model": "openai/gpt-oss-120b:free",
-        "messages": [
+    content = call_llm(
+        messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": task}
         ],
-        "max_tokens": 1200,
-        "temperature": 0.7
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=data,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "http://127.0.0.1:3100",
-            "X-Title": "Paperclip - Prompt Generator Agent"
-        },
-        method="POST"
+        api_key=api_key,
+        max_tokens=1200,
+        temperature=0.7,
+        title="Paperclip - Prompt Generator Agent",
     )
 
-    with urllib.request.urlopen(req, timeout=60) as response:
-        result = json.loads(response.read().decode("utf-8"))
-        content = result["choices"][0]["message"]["content"]
+    # Limpiar markdown code blocks si el modelo los incluye
+    if "```json" in content:
+        content = content.split("```json")[1].split("```")[0].strip()
+    elif "```" in content:
+        content = content.split("```")[1].split("```")[0].strip()
 
-        # Limpiar markdown code blocks si el modelo los incluye
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0].strip()
-
-        # Validar que sea JSON válido
-        try:
-            parsed = json.loads(content)
-            return json.dumps(parsed, indent=2, ensure_ascii=False)
-        except json.JSONDecodeError:
-            return content
+    # Validar que sea JSON válido
+    try:
+        parsed = json.loads(content)
+        return json.dumps(parsed, indent=2, ensure_ascii=False)
+    except json.JSONDecodeError:
+        return content
 
 
 def main():
