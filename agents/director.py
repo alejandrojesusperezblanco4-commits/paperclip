@@ -286,39 +286,29 @@ El video tiene este concepto:
     api_url    = os.environ.get("PAPERCLIP_API_URL", "http://localhost:7777")
     agent_id   = os.environ.get("PAPERCLIP_AGENT_ID", "")
     company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
-    jwt_secret = (
-        os.environ.get("PAPERCLIP_AGENT_JWT_SECRET")
-        or os.environ.get("BETTER_AUTH_SECRET", "")
-    ).strip()
-    run_id = os.environ.get("PAPERCLIP_RUN_ID", "director-run")
+    run_id     = os.environ.get("PAPERCLIP_RUN_ID", "director-run")
 
-    # DEBUG: mostrar variables de entorno disponibles
-    print(f"🔍 DEBUG ENV:", flush=True)
-    print(f"   PAPERCLIP_ISSUE_ID   = '{issue_id}'", flush=True)
-    print(f"   PAPERCLIP_AGENT_ID   = '{agent_id}'", flush=True)
-    print(f"   PAPERCLIP_COMPANY_ID = '{company_id}'", flush=True)
-    print(f"   PAPERCLIP_API_URL    = '{api_url}'", flush=True)
-    print(f"   PAPERCLIP_RUN_ID     = '{run_id}'", flush=True)
-    print(f"   BETTER_AUTH_SECRET   = '{'SET' if jwt_secret else 'EMPTY'}'", flush=True)
+    # Auth: preferir PAPERCLIP_API_KEY (JWT inyectado por Paperclip),
+    # luego generar uno con BETTER_AUTH_SECRET si no está disponible
+    api_key_token = os.environ.get("PAPERCLIP_API_KEY", "")
+    jwt_secret    = (os.environ.get("PAPERCLIP_AGENT_JWT_SECRET") or os.environ.get("BETTER_AUTH_SECRET", "")).strip()
 
-    # Si PAPERCLIP_ISSUE_ID no vino por env, buscar en todas las vars PAPERCLIP_*
-    if not issue_id:
-        for k, v in os.environ.items():
-            if "PAPERCLIP" in k:
-                print(f"   {k} = {v[:80]}", flush=True)
+    print(f"🔍 issue_id={issue_id!r}  api_key={'SET' if api_key_token else 'EMPTY'}  jwt_secret={'SET' if jwt_secret else 'EMPTY'}", flush=True)
 
     if issue_id:
-        # Generar JWT si tenemos el secret
         auth_headers: dict = {"Content-Type": "application/json"}
-        if jwt_secret and agent_id:
+        if api_key_token:
+            auth_headers["Authorization"] = f"Bearer {api_key_token}"
+            print("🔑 Usando PAPERCLIP_API_KEY para autenticación", flush=True)
+        elif jwt_secret and agent_id:
             try:
                 token = create_agent_jwt(agent_id, company_id, run_id, jwt_secret)
                 auth_headers["Authorization"] = f"Bearer {token}"
-                print("🔑 JWT generado para autenticación", flush=True)
+                print("🔑 JWT generado con BETTER_AUTH_SECRET", flush=True)
             except Exception as e:
                 print(f"⚠️  No se pudo generar JWT: {e}", flush=True)
         else:
-            print(f"⚠️  Sin JWT secret (BETTER_AUTH_SECRET vacío). Las llamadas API pueden fallar.", flush=True)
+            print("⚠️  Sin token de autenticación disponible", flush=True)
 
         # 1. Cerrar el issue PRIMERO → así el check de run_id se omite al postear comentario
         try:
