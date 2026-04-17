@@ -852,48 +852,83 @@ function mdToHtml(text) {
   return html;
 }
 
-/* ── Extract image URL from any text (no extension required) ── */
-function extractImageUrl(text) {
+/* ── Extract ALL image URLs from text (no extension required) ── */
+function extractImageUrls(text) {
+  const seen = new Set();
+  const push = u => { const c = u.split(')')[0].split('"')[0]; if (c && !seen.has(c)) { seen.add(c); } };
   // 1. Markdown image syntax: ![...](url)
-  const md = text.match(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/);
-  if (md) return md[1];
-  // 2. **URL:** line (from imagen.py output)
-  const urlLine = text.match(/\*\*URL:\*\*\s*(https?:\/\/[^\s\n)]+)/);
-  if (urlLine) return urlLine[1];
-  // 3. Any URL with image extension
-  const ext = text.match(/https?:\/\/[^\s)"'\]]+\.(?:png|jpg|jpeg|webp|gif)/i);
-  if (ext) return ext[0];
-  // 4. CDN/storage URLs likely to be images (Higgsfield, Google Storage, S3, CloudFront)
-  const cdn = text.match(/https?:\/\/(?:[^\s)"'\]]*(?:storage\.googleapis|higgsfield|cloudfront|s3\.amazonaws|cdn\.)[^\s)"'\]]*)/i);
-  if (cdn) return cdn[0];
-  return '';
+  for (const m of text.matchAll(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/g)) push(m[1]);
+  // 2. **URL:** lines
+  for (const m of text.matchAll(/\*\*URL:\*\*\s*(https?:\/\/[^\s\n)]+)/g)) push(m[1]);
+  // 3. URLs with common image extensions
+  for (const m of text.matchAll(/https?:\/\/[^\s)"'\]]+\.(?:png|jpg|jpeg|webp|gif)/gi)) push(m[0]);
+  return [...seen];
 }
+function extractImageUrl(text) { return extractImageUrls(text)[0] || ''; }
 
-/* Director: thumbnail + synthesis markdown */
+/* Director: gallery + synthesis + storytelling */
 function buildDirectorResult(raw) {
-  const imageUrl = extractImageUrl(raw);
+  const imageUrls = extractImageUrls(raw);
 
-  // Synthesis = everything before the <details> blocks
+  // Synthesis = everything before the first <details>
   const detailsIdx = raw.indexOf('<details>');
-  const synthesis = detailsIdx > 0 ? raw.slice(0, detailsIdx).trim() : raw;
+  const synthesis  = detailsIdx > 0 ? raw.slice(0, detailsIdx).trim() : raw;
+
+  // Extract individual <details> sections by summary label
+  function extractDetail(labelFragment) {
+    const re = new RegExp('<details>[\\s\\S]*?<summary>[^<]*' + labelFragment + '[^<]*<\\/summary>([\\s\\S]*?)<\\/details>', 'i');
+    const m = raw.match(re);
+    return m ? m[1].trim() : '';
+  }
+  const storyContent  = extractDetail('Storytelling');
+  const searchContent = extractDetail('Deep Search');
+  const analyzerContent = extractDetail('Channel Analyzer');
+
+  // Images gallery
+  const galleryHtml = imageUrls.length
+    ? `<div class="image-gallery" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
+        ${imageUrls.map((url, i) => `
+          <div>
+            <div class="gallery-item">
+              <img src="${url}" alt="Escena ${i+1}" onclick="window.open('${url}','_blank')"
+                title="Abrir escena ${i+1}"
+                onerror="this.parentElement.innerHTML='<div class=\\'gallery-error\\'>❌</div>'">
+            </div>
+            <div class="gallery-caption">Escena ${i+1}</div>
+          </div>`).join('')}
+      </div>`
+    : `<div style="color:var(--sub);font-size:12px;padding:12px 0">Sin imágenes generadas</div>`;
 
   return `
     <div class="result-grid">
-      <div class="card card-image">
-        <div class="card-header"><span class="card-icon">🖼️</span><span class="card-title">Thumbnail 9:16</span></div>
-        <div class="thumbnail-wrap">
-          ${imageUrl
-            ? `<img src="${imageUrl}" alt="Thumbnail" onclick="window.open('${imageUrl}','_blank')" style="cursor:pointer"
-                onerror="this.parentElement.innerHTML='<div class=\\'thumbnail-placeholder\\'><span>🖼️</span><span>Sin imagen</span></div>'">`
-            : `<div class="thumbnail-placeholder"><span>🖼️</span><span>Sin imagen generada</span></div>`}
-        </div>
+
+      <div class="card" style="grid-column:1/-1">
+        <div class="card-header"><span class="card-icon">🖼️</span><span class="card-title">Imágenes generadas · ${imageUrls.length} escenas</span></div>
+        ${galleryHtml}
       </div>
-      <div class="card card-synth">
-        <div class="card-header"><span class="card-icon">🎬</span><span class="card-title">Paquete de contenido</span></div>
-        <div class="md-render" style="max-height:420px;overflow-y:auto">${mdToHtml(synthesis)}</div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-icon">🎬</span><span class="card-title">Paquete ejecutivo</span></div>
+        <div class="md-render" style="max-height:460px;overflow-y:auto">${mdToHtml(synthesis)}</div>
       </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-icon">✍️</span><span class="card-title">Guión completo</span></div>
+        <div class="md-render" style="max-height:460px;overflow-y:auto">${mdToHtml(storyContent || '_(disponible en reportes completos)_')}</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-icon">🔍</span><span class="card-title">Tendencias · Deep Search</span></div>
+        <div class="md-render" style="max-height:300px;overflow-y:auto">${mdToHtml(searchContent || '_(ver reportes completos)_')}</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-icon">📊</span><span class="card-title">Competencia · Channel Analyzer</span></div>
+        <div class="md-render" style="max-height:300px;overflow-y:auto">${mdToHtml(analyzerContent || '_(ver reportes completos)_')}</div>
+      </div>
+
       <div class="card card-raw" style="grid-column:1/-1">
-        <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver reportes completos (Deep Search · Channel Analyzer · Storytelling · Prompts · Imágenes)</div>
+        <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver reportes completos (raw)</div>
         <div class="raw-body">${escHtml(raw)}</div>
       </div>
     </div>`;

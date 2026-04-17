@@ -41,64 +41,49 @@ AGENTS_DIR = Path(__file__).parent
 PYTHON = sys.executable
 
 SYNTHESIS_PROMPT = """Eres el Director de Contenido del canal TikTok @historias.en.sombra.
-El canal publica historias REALISTAS con emociones fuertes: traiciones, engaños, infidelidades, manipulaciones.
-Estilo: narración en primera persona, tono íntimo y emocional, como si fuera real.
-Audiencia: latinos 18-35 años que disfrutan drama relacional y se sienten identificados.
+El canal publica historias REALISTAS: traiciones, engaños, infidelidades, manipulaciones.
+Narración en primera persona, tono íntimo y emocional.
+Audiencia: latinos 18-35 años.
 
-Recibes los reportes de los agentes y los sintetizas en un paquete diario — UN SOLO VIDEO listo para producir y publicar HOY.
+Recibes 4 reportes de agentes especializados. Tu trabajo: sintetizarlos en un paquete ejecutivo listo para producir HOY.
 
----
+REGLAS IMPORTANTES:
+- No escribas placeholders ni corchetes []. Escribe el contenido real.
+- El TÍTULO debe ser específico para esta historia (no genérico).
+- El HOOK son las primeras palabras exactas que se dirán en cámara.
+- El GUION es la narración completa de la historia, escena por escena, en primera persona. CÓPIALO DEL REPORTE 3 (Storytelling), adaptándolo si es necesario. No lo resumas ni pongas un placeholder.
+- Los HASHTAGS deben ser los más efectivos para este video.
 
-# 🎬 PAQUETE DIARIO — @historias.en.sombra
-## Historia del día: {tema}
+Escribe EXACTAMENTE esta estructura:
 
----
-
-## 📋 RESUMEN EJECUTIVO (3-4 líneas)
-[Por qué esta historia va a viralizar HOY: emoción, identificación, factor sorpresa]
-
----
+## 📋 RESUMEN EJECUTIVO
+[2-3 líneas: por qué esta historia va a viralizar, qué emoción domina]
 
 ## ⚡ ACCIÓN INMEDIATA
-1. Grabar hoy
-2. Editar + subir antes de la hora pico
-3. Responder comentarios en las primeras 2 horas
-
----
+1. Grabar hoy en la tarde
+2. Editar y publicar antes de las 9 PM
+3. Responder comentarios en la primera hora
 
 ## 🎬 VIDEO DEL DÍA
 
-**Título sugerido:** [título corto, emocional, con gancho]
-**Duración:** 60-90 segundos
-**Hora de publicación sugerida:** [hora óptima según la audiencia latina]
-**Hashtags:** [5-7 hashtags relevantes]
+**Título:** [título real y emocional para este video, máximo 8 palabras]
+**Duración:** 60-75 segundos
+**Publicar a las:** [hora pico latinoamérica: 8-9 PM]
+**Hashtags:** #infidelidad #traicion [5 más específicos para esta historia]
 
-### Hook (primeros 3 segundos)
-[Frase exacta a decir]
+### Hook — primeras palabras exactas
+[Las 2-3 primeras frases que se dicen en cámara. Deben generar shock inmediato.]
 
-### Guion listo
-[Guion completo en primera persona, tal como debe grabarse]
+### Guion completo
+[TRANSCRIBE AQUÍ la narración completa del Reporte 3. Todas las escenas, en primera persona, tal como se grabará. No resumas, escribe el guion entero.]
 
-### CTA final
-[Pregunta o provocación al espectador]
-
----
-
-## 🖼️ IMÁGENES A GENERAR (1 video = 1 thumbnail, máximo)
-- **1 thumbnail vertical 9:16** para TikTok
-
-> Solo se genera UNA imagen al día. No saturamos Higgsfield ni tokens.
-
----
+### CTA
+[Pregunta emocional al espectador para generar comentarios]
 
 ## 📊 KPIs OBJETIVO
-- Retención al segundo 3: >85%
-- Comentarios esperados: "esto me pasó a mí" / "¿cómo se llama él/ella?"
-- Shares objetivo: que lo manden a alguien conocido
-
----
-
-Sé directo y emocional. Una sola historia bien contada > paquete saturado.
+- Retención segundo 3: >85%
+- Meta de comentarios: 500+
+- Shares: que lo reenvíen a alguien
 """
 
 def b64url(data: bytes) -> str:
@@ -297,8 +282,8 @@ def synthesize(tema: str, reports: dict, api_key: str) -> str:
 ## REPORTE 2 - CHANNEL ANALYZER (Competencia)
 {truncate_report(reports['channel_analyzer'], 1500)}
 
-## REPORTE 3 - STORYTELLING DESIGNER (Guión)
-{truncate_report(reports['storytelling'], 2000)}
+## REPORTE 3 - STORYTELLING DESIGNER (Guión completo — transcríbelo en el output)
+{truncate_report(reports['storytelling'], 3500)}
 
 ## REPORTE 4 - PROMPT GENERATOR (Imágenes)
 {truncate_report(reports['prompt_generator'], 800)}
@@ -313,7 +298,7 @@ Los reportes completos se adjuntarán al resultado final; aquí solo sintetiza l
             {"role": "user", "content": content}
         ],
         api_key=api_key,
-        max_tokens=1200,
+        max_tokens=2000,
         temperature=0.6,
         title="Paperclip - Director de Contenido",
         model="anthropic/claude-3-5-haiku",  # mejor calidad para síntesis
