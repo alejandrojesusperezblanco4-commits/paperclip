@@ -17,24 +17,23 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-HIGGSFIELD_API_URL = "https://cloud.higgsfield.ai/api"
-MODEL = "bytedance/seedream/v4/text-to-image"
+HIGGSFIELD_API_URL = "https://platform.higgsfield.ai"
+MODEL_PATH = "bytedance/seedream/v4/text-to-image"
+DONE_STATUSES = {"Completed", "completed", "Failed", "failed", "Cancelled", "cancelled", "NSFW"}
+SUCCESS_STATUSES = {"Completed", "completed"}
 
 
 def build_auth_header(api_key: str) -> str:
     """
-    Higgsfield usa HTTP Basic Authentication con base64(KEY_ID:KEY_SECRET).
-    El api_key viene en formato 'KEY_ID:KEY_SECRET' separado por ':'.
+    Higgsfield usa scheme de auth custom 'Key' (ni Bearer ni Basic).
+    El api_key viene en formato 'KEY_ID:KEY_SECRET'.
     """
-    # Base64 encode del string key_id:key_secret
-    encoded = base64.b64encode(api_key.encode("utf-8")).decode("ascii")
-    return f"Basic {encoded}"
+    return f"Key {api_key}"
 
 
 def submit_image(prompt: str, aspect_ratio: str, resolution: str, api_key: str) -> str:
     """Envía una solicitud de generación a Higgsfield y devuelve el request_id."""
     payload = {
-        "model": MODEL,
         "arguments": {
             "prompt": prompt,
             "resolution": resolution,
@@ -44,7 +43,7 @@ def submit_image(prompt: str, aspect_ratio: str, resolution: str, api_key: str) 
     }
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        f"{HIGGSFIELD_API_URL}/requests",
+        f"{HIGGSFIELD_API_URL}/{MODEL_PATH}",
         data=data,
         headers={
             "Authorization": build_auth_header(api_key),
@@ -53,9 +52,10 @@ def submit_image(prompt: str, aspect_ratio: str, resolution: str, api_key: str) 
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
+        body = resp.read().decode("utf-8")
+        result = json.loads(body)
 
-    request_id = result.get("id") or result.get("request_id")
+    request_id = result.get("request_id") or result.get("id")
     if not request_id:
         raise Exception(f"No se obtuvo request_id: {result}")
     print(f"  📤 Solicitud enviada → ID: {request_id}", flush=True)
@@ -65,33 +65,52 @@ def submit_image(prompt: str, aspect_ratio: str, resolution: str, api_key: str) 
 def poll_result(request_id: str, api_key: str, max_wait: int = 120) -> str:
     """Hace polling hasta obtener la URL de la imagen generada."""
     deadline = time.time() + max_wait
-    interval = 5
+    interval = 4
+    headers = {"Authorization": build_auth_header(api_key)}
 
     while time.time() < deadline:
+        # 1. Consultar status
         req = urllib.request.Request(
-            f"{HIGGSFIELD_API_URL}/requests/{request_id}",
-            headers={"Authorization": build_auth_header(api_key)},
+            f"{HIGGSFIELD_API_URL}/requests/{request_id}/status",
+            headers=headers,
             method="GET",
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
+            status_data = json.loads(resp.read().decode("utf-8"))
 
-        status = result.get("status", "unknown")
+        status = status_data.get("status", "unknown")
         print(f"  ⏳ Estado: {status}", flush=True)
 
-        if status == "completed":
-            # Buscar URL en distintos formatos posibles de respuesta
+        if status in SUCCESS_STATUSES:
+            # 2. Obtener el resultado
+            req_result = urllib.request.Request(
+                f"{HIGGSFIELD_API_URL}/requests/{request_id}/result",
+                headers=headers,
+                method="GET",
+            )
+            try:
+                with urllib.request.urlopen(req_result, timeout=15) as r:
+                    result = json.loads(r.read().decode("utf-8"))
+            except Exception:
+                # Fallback: el status a veces trae el resultado embebido
+                result = status_data
+
+            # Buscar URL en formatos posibles
+            images = result.get("images") or status_data.get("images") or []
+            if images and isinstance(images, list) and images[0].get("url"):
+                return images[0]["url"]
+
             url = (
-                result.get("result", {}).get("url")
-                or result.get("output", [None])[0]
-                or result.get("url")
+                result.get("url")
+                or (result.get("result") or {}).get("url")
+                or (result.get("output") or [None])[0]
             )
             if url:
                 return url
-            raise Exception(f"Completado pero sin URL: {result}")
+            raise Exception(f"Completado sin URL reconocible: {result}")
 
-        if status in ("failed", "error", "cancelled"):
-            raise Exception(f"Generación fallida: {result.get('error', result)}")
+        if status in DONE_STATUSES:
+            raise Exception(f"Generación fallida con status '{status}': {status_data}")
 
         time.sleep(interval)
 
