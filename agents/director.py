@@ -30,7 +30,7 @@ sys.stderr.reconfigure(encoding="utf-8")
 
 # ── IDs de los sub-agentes registrados en Paperclip ─────────────────────────
 SUB_AGENT_IDS = {
-    "source_reader":     "",  # registrar en Paperclip → completar ID
+    "source_reader":     "a6cc7b6e-cde3-4464-9cbf-3241b979dc6b",
     "deep_search":       "a1d8d0b8-9ada-4980-9b5f-663b34ba2c80",
     "channel_analyzer":  "0f784ca9-93b0-4384-ba7c-1e079bb8797b",
     "storytelling":      "061ed6b8-27b1-4a31-8758-19af856b45d3",
