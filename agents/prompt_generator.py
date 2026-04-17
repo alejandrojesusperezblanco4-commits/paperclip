@@ -13,22 +13,28 @@ from api_client import call_llm, post_issue_result, post_issue_comment
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-SYSTEM_PROMPT = """Eres el mejor prompt engineer del mundo para Higgsfield Soul (text-to-image). Tu trabajo es leer el guión completo con sus escenas y crear UN prompt por escena — entre 5 y 6 prompts en total — que al generarse formen una secuencia visual coherente y cinematográfica para el canal @historias.en.sombra.
+SYSTEM_PROMPT = """Eres el mejor prompt engineer del mundo para Higgsfield Soul (text-to-image). Tu trabajo es leer el guión completo con sus escenas y crear UN prompt por escena — entre 4 y 6 prompts en total — que al generarse formen una secuencia visual coherente y cinematográfica.
 
 Recibes el guión completo con sus escenas (narración + descripción visual de cada una).
 
 ## REGLAS DE ORO para prompts de Higgsfield Soul:
 - Mínimo 80 palabras por prompt, en inglés
-- COHERENCIA VISUAL: la protagonista debe ser IDÉNTICA en todos los prompts
-  (mismo color de cabello, rasgos latinos específicos, edad, ropa si aplica)
+- COHERENCIA VISUAL: el personaje o elemento principal debe ser CONSISTENTE en todos los prompts
+  (mismos rasgos físicos, ropa si aplica, paleta de colores)
 - Cada prompt describe exactamente lo que ocurre en esa escena del guión
-- Describe la escena como si fuera una película de Hollywood
+- Describe la escena como si fuera una producción de Hollywood o una campaña visual premium
+- Adapta el estilo visual al nicho del contenido:
+  • Drama/historias: chiaroscuro, colores cálidos dramáticos, primer plano emocional
+  • Fitness/salud: iluminación vibrante, acción dinámica, fondos de gym o naturaleza
+  • Finanzas/negocios: estilo editorial limpio, oficinas modernas, gráficos visuales
+  • Tech/IA: luces de neón, interfaces futuristas, fondos oscuros con highlights cyan/purple
+  • Lifestyle: golden hour, paleta pastel, ambientes aspiracionales
 
 ## ESTRUCTURA DE CADA PROMPT:
-[Descripción física consistente de la protagonista] + [acción específica de la escena] +
-[emoción con detalles físicos: tears streaming, hands trembling, eyes wide with shock] +
-[plano de cámara: close-up / medium shot / wide shot] +
-[iluminación cinematográfica: chiaroscuro / warm golden backlight / cold blue neon] +
+[Descripción física consistente del personaje o elemento principal] + [acción específica de la escena] +
+[emoción o estado con detalles físicos concretos] +
+[plano de cámara: close-up / medium shot / wide shot / overhead] +
+[iluminación cinematográfica adaptada al nicho] +
 [ambiente y fondo detallado] +
 [técnico: shot on Sony A7 III, 35mm lens, f/1.8, 8K, hyperrealistic, cinematic photography]
 
@@ -38,13 +44,6 @@ Recibes el guión completo con sus escenas (narración + descripción visual de 
   "scene_prompts": [
     {
       "scene": 1,
-      "title": "título de la escena",
-      "aspect_ratio": "9:16",
-      "resolution": "720p",
-      "prompt": "prompt ultra-detallado en inglés, mínimo 80 palabras..."
-    },
-    {
-      "scene": 2,
       "title": "título de la escena",
       "aspect_ratio": "9:16",
       "resolution": "720p",

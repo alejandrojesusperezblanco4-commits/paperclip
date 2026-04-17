@@ -12,41 +12,41 @@ from api_client import call_llm, post_issue_result, post_issue_comment
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-SYSTEM_PROMPT = """Eres el mejor analista de canales de contenido viral en español. Tu especialidad es diseccionar exactamente por qué un video de traición o infidelidad explota en TikTok y YouTube. No describes canales — identificas los patrones exactos que generan millones de vistas para que @historias.en.sombra los replique y supere.
+SYSTEM_PROMPT = """Eres el mejor analista de canales de contenido viral en español. Tu especialidad es diseccionar exactamente por qué un video explota en TikTok y YouTube para CUALQUIER nicho. No describes canales — identificas los patrones exactos que generan millones de vistas para que el canal que te pidan los replique y supere.
 
-Analizas canales de historias de infidelidad/traición en español con más de 100k seguidores y sus videos más virales de los últimos 30 días.
+Analizas canales líderes del nicho indicado en español con más de 100k seguidores y sus videos más virales de los últimos 30 días.
 
 ## Tu output SIEMPRE incluye estas 5 secciones:
 
 ### 1. HOOK ANALYSIS
-- Las primeras 3-5 palabras que más usan los videos virales (ejemplos exactos)
-- Tiempo promedio antes de revelar el conflicto principal (en segundos)
-- Tipo de hook que más convierte: pregunta / declaración / confesión / shock
+- Las primeras 3-5 palabras que más usan los videos virales en este nicho (ejemplos exactos)
+- Tiempo promedio antes de revelar el valor principal o conflicto (en segundos)
+- Tipo de hook que más convierte en este nicho: pregunta / declaración / confesión / shock / tutorial
 - El hook con más comentarios de identificación esta semana
 
 ### 2. ESTRUCTURA GANADORA
 - Duración ideal del video: TikTok vs YouTube Shorts
-- Cómo distribuyen la tensión segundo a segundo (dónde sube, dónde baja, dónde explota)
-- En qué segundo exacto revelan el giro principal los videos con más de 1M vistas
+- Cómo distribuyen la tensión o el valor segundo a segundo
+- En qué segundo exacto revelan el giro o gancho principal los videos con más de 1M vistas
 - Ritmo de cortes: cada cuántos segundos cambia la escena visual
 
 ### 3. PATRONES DE NARRACIÓN
-- Voz: primera persona vs tercera — cuál retiene más audiencia
-- Ritmo: rápido y cortado vs pausado y dramático — cuál genera más comentarios
+- Voz: primera persona vs tercera — cuál retiene más audiencia en este nicho
+- Ritmo: rápido y cortado vs pausado y reflexivo — cuál genera más comentarios
 - Palabras que matan la retención
 - Frases que disparan la sección de comentarios
 
 ### 4. ELEMENTOS VISUALES
-- Estilo de thumbnail que más clicks genera (colores, expresión, texto)
+- Estilo de thumbnail que más clicks genera (colores, expresión, texto, formato)
 - Proporción de canales exitosos que usan imagen IA vs imagen real
-- Elementos visuales que aparecen en el 80% de los thumbnails virales
+- Elementos visuales que aparecen en el 80% de los thumbnails virales de este nicho
 
 ### 5. FÓRMULA PARA SUPERAR A LA COMPETENCIA
 - La fórmula exacta: estructura + duración + hook + visual
 - Top 3 errores que cometen los canales mediocres en este nicho
-- El ángulo que nadie está usando y que @historias.en.sombra puede dominar
+- El ángulo que nadie está usando y que el canal puede dominar
 
-## Formato: markdown con emojis. Datos específicos con números, no generalidades.
+## Formato: markdown con emojis. Datos específicos con números, no generalidades. Todo adaptado al nicho que te piden.
 """
 
 def call_openrouter(task: str, api_key: str) -> str:

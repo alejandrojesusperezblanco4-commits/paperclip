@@ -40,50 +40,48 @@ SUB_AGENT_IDS = {
 AGENTS_DIR = Path(__file__).parent
 PYTHON = sys.executable
 
-SYNTHESIS_PROMPT = """Eres el Director de Contenido del canal TikTok @historias.en.sombra.
-El canal publica historias REALISTAS: traiciones, engaños, infidelidades, manipulaciones.
-Narración en primera persona, tono íntimo y emocional.
-Audiencia: latinos 18-35 años.
-
-Recibes 4 reportes de agentes especializados. Tu trabajo: sintetizarlos en un paquete ejecutivo listo para producir HOY.
+SYNTHESIS_PROMPT = """Eres el Director de Contenido de un canal de TikTok/YouTube en español.
+Recibes 4 reportes de agentes especializados sobre cualquier nicho o tema.
+Tu trabajo: sintetizarlos en un paquete ejecutivo listo para producir HOY.
 
 REGLAS IMPORTANTES:
 - No escribas placeholders ni corchetes []. Escribe el contenido real.
-- El TÍTULO debe ser específico para esta historia (no genérico).
+- Adapta el tono, el hook y el estilo al nicho del contenido que te llega en los reportes.
+- El TÍTULO debe ser específico para este video (no genérico).
 - El HOOK son las primeras palabras exactas que se dirán en cámara.
-- El GUION es la narración completa de la historia, escena por escena, en primera persona. CÓPIALO DEL REPORTE 3 (Storytelling), adaptándolo si es necesario. No lo resumas ni pongas un placeholder.
-- Los HASHTAGS deben ser los más efectivos para este video.
+- El GUION es la narración completa, escena por escena. CÓPIALO DEL REPORTE 3 (Storytelling), adaptándolo si es necesario. No lo resumas ni pongas un placeholder — escribe el guion entero.
+- Los HASHTAGS deben ser los más efectivos para este video y nicho específico.
 
 Escribe EXACTAMENTE esta estructura:
 
 ## 📋 RESUMEN EJECUTIVO
-[2-3 líneas: por qué esta historia va a viralizar, qué emoción domina]
+[2-3 líneas: por qué este video va a viralizar, qué emoción o valor aporta, para quién es]
 
 ## ⚡ ACCIÓN INMEDIATA
-1. Grabar hoy en la tarde
-2. Editar y publicar antes de las 9 PM
+1. Grabar/producir hoy
+2. Editar y publicar en el horario pico para la audiencia latina
 3. Responder comentarios en la primera hora
 
 ## 🎬 VIDEO DEL DÍA
 
-**Título:** [título real y emocional para este video, máximo 8 palabras]
-**Duración:** 60-75 segundos
-**Publicar a las:** [hora pico latinoamérica: 8-9 PM]
-**Hashtags:** #infidelidad #traicion [5 más específicos para esta historia]
+**Título:** [título específico para este video, máximo 8 palabras]
+**Duración:** [duración recomendada según el nicho]
+**Publicar a las:** [hora pico latinoamérica según el tipo de contenido]
+**Hashtags:** [8 hashtags específicos para este nicho y video]
 
 ### Hook — primeras palabras exactas
-[Las 2-3 primeras frases que se dicen en cámara. Deben generar shock inmediato.]
+[Las 2-3 primeras frases que se dicen en cámara. Deben generar shock, curiosidad o promesa de valor inmediata según el nicho.]
 
 ### Guion completo
-[TRANSCRIBE AQUÍ la narración completa del Reporte 3. Todas las escenas, en primera persona, tal como se grabará. No resumas, escribe el guion entero.]
+[TRANSCRIBE AQUÍ la narración completa del Reporte 3 — Storytelling. Todas las escenas tal como se grabarán. No resumas, escribe el guion entero.]
 
 ### CTA
-[Pregunta emocional al espectador para generar comentarios]
+[Pregunta o llamada a la acción adaptada al nicho para generar comentarios]
 
 ## 📊 KPIs OBJETIVO
 - Retención segundo 3: >85%
-- Meta de comentarios: 500+
-- Shares: que lo reenvíen a alguien
+- Meta de comentarios: 200+
+- Shares: que lo reenvíen a alguien relevante
 """
 
 def b64url(data: bytes) -> str:
@@ -327,18 +325,17 @@ def main():
         objetivo = f"{issue_title}\n\n{issue_body or ''}"
         post_issue_comment(
             f"🎬 Perfecto, me pongo en marcha con: **{issue_title}**\n\n"
-            f"Voy a coordinar 5 agentes en secuencia:\n"
-            f"1️⃣ **Deep Search** — busco qué está viral ahora mismo\n"
-            f"2️⃣ **Channel Analyzer** — analizo a la competencia\n"
-            f"3️⃣ **Storytelling** — diseño el guión con 4-5 escenas\n"
-            f"4️⃣ **Prompt Generator** — creo los prompts de imagen\n"
-            f"5️⃣ **Imagen Generator** — genero las imágenes con Higgsfield Soul\n\n"
-            f"Cada paso aparecerá como tarea en tu inbox. "
+            f"Coordino 5 agentes especializados:\n"
+            f"1️⃣ **Deep Search** — qué está viral ahora mismo en este nicho\n"
+            f"2️⃣ **Channel Analyzer** — qué hace la competencia y cómo superarla\n"
+            f"3️⃣ **Storytelling** — guión completo adaptado al nicho\n"
+            f"4️⃣ **Prompt Generator** — prompts de imagen para cada escena\n"
+            f"5️⃣ **Imagen Generator** — imágenes generadas con Higgsfield Soul\n\n"
             f"El paquete completo estará listo en ~5 minutos. 🚀"
         )
 
     if not objetivo:
-        objetivo = "historias realistas de traición, engaño e infidelidad para el canal @historias.en.sombra de TikTok en español"
+        objetivo = "crea contenido viral para TikTok y YouTube en español"
 
     print(f"🎯 DIRECTOR DE CONTENIDO INICIANDO", flush=True)
     print(f"📌 Objetivo: {objetivo[:100]}...", flush=True)
