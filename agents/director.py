@@ -35,6 +35,9 @@ SUB_AGENT_IDS = {
     "storytelling":      "061ed6b8-27b1-4a31-8758-19af856b45d3",
     "prompt_generator":  "64e2cb07-75e1-4ca2-8b6c-05a78b66613f",
     "imagen_generator":  "2492962a-b9f0-4611-90e2-c7ccca5aa281",
+    # TTS y Video Assembler — sin ID de Paperclip aún (corren como subprocess)
+    "tts":               "",
+    "video_assembler":   "",
 }
 
 AGENTS_DIR = Path(__file__).parent
@@ -400,15 +403,19 @@ def main():
     # ── Construir objetivo final ───────────────────────────────
     if issue_title:
         objetivo = f"{issue_title}\n\n{issue_body}" if issue_body else issue_title
+        has_tts   = bool(os.environ.get("ELEVENLABS_API_KEY", ""))
+        has_hf    = bool(os.environ.get("HIGGSFIELD_API_KEY", ""))
         post_issue_comment(
             f"🎬 Perfecto, me pongo en marcha con: **{issue_title}**\n\n"
-            f"Coordino 5 agentes especializados:\n"
+            f"Coordino {7 if has_tts else 5} agentes especializados:\n"
             f"1️⃣ **Deep Search** — qué está viral ahora mismo en este nicho\n"
             f"2️⃣ **Channel Analyzer** — qué hace la competencia y cómo superarla\n"
             f"3️⃣ **Storytelling** — guión completo adaptado al nicho\n"
-            f"4️⃣ **Prompt Generator** — prompts de imagen para cada escena\n"
-            f"5️⃣ **Imagen Generator** — imágenes generadas con Higgsfield Soul\n\n"
-            f"El paquete completo estará listo en ~5 minutos. 🚀"
+            + (f"4️⃣ **TTS** — voz en off con ElevenLabs\n" if has_tts else "")
+            + f"{'5️⃣' if has_tts else '4️⃣'} **Prompt Generator** — prompts de imagen para cada escena\n"
+            + (f"{'6️⃣' if has_tts else '5️⃣'} **Imagen Generator** — imágenes con Higgsfield Soul\n" if has_hf else "")
+            + (f"7️⃣ **Video Assembler** — MP4 final con imágenes + voz en off\n" if has_tts and has_hf else "")
+            + f"\nEl paquete completo estará listo en ~{'8' if has_tts and has_hf else '5'} minutos. 🚀"
         )
     elif not objetivo:
         objetivo = "crea contenido viral para TikTok y YouTube en español"
@@ -509,19 +516,21 @@ def main():
 
         return result
 
+    import re as _re
+
     # ── Fase 1: Investigación ──────────────────────────────────
     search_task   = f"Busca tendencias virales y keywords de oportunidad para el tema: {objetivo}"
     analyzer_task = f"Analiza los canales más exitosos de YouTube y TikTok sobre: {objetivo}. Encuentra sus debilidades."
 
-    post_issue_comment("🔍 **Fase 1/5 — Deep Search** en progreso…")
+    post_issue_comment("🔍 **Fase 1 — Deep Search** en progreso…")
     deep_search_result = run_tracked("deep_search.py", search_task,
                                      "Deep Search — Tendencias", "deep_search")
 
-    post_issue_comment("📊 **Fase 2/5 — Channel Analyzer** en progreso…")
+    post_issue_comment("📊 **Fase 2 — Channel Analyzer** en progreso…")
     channel_result     = run_tracked("channel_analyzer.py", analyzer_task,
                                      "Channel Analyzer — Competencia", "channel_analyzer")
 
-    # ── Fase 2: Creación de contenido ──────────────────────────
+    # ── Fase 2: Guión ─────────────────────────────────────────
     storytelling_task = sanitize(f"""Crea un guion viral con 4-5 escenas para el tema: {objetivo}
 
 Contexto de tendencias encontradas:
@@ -530,41 +539,87 @@ Contexto de tendencias encontradas:
 Diferenciacion vs competencia:
 {channel_result[:250]}""")
 
-    post_issue_comment("✍️ **Fase 3/5 — Storytelling** en progreso…")
+    post_issue_comment("✍️ **Fase 3 — Storytelling** en progreso…")
     storytelling_result = run_tracked("storytelling.py", storytelling_task,
                                       "Storytelling — Guión 4-5 escenas", "storytelling")
 
+    # ── Fase 3: TTS (voz en off) ──────────────────────────────
+    tts_result      = ""
+    audio_path      = ""
+    elevenlabs_key  = os.environ.get("ELEVENLABS_API_KEY", "")
+    if elevenlabs_key:
+        post_issue_comment("🎙️ **Fase 4 — TTS (voz en off)** en progreso…")
+        tts_result = run_tracked(
+            "tts.py", storytelling_result,
+            "TTS — Voz en off", "tts",
+            extra_env={"ELEVENLABS_API_KEY": elevenlabs_key}
+        )
+        # Extraer audio_path del JSON que devuelve tts.py
+        try:
+            _tts_data = json.loads(tts_result)
+            audio_path = _tts_data.get("audio_path", "")
+        except Exception:
+            pass
+        print(f"🎙️ Audio path: {audio_path or 'no disponible'}", flush=True)
+    else:
+        print("⚠️  ELEVENLABS_API_KEY no encontrada — saltando TTS", flush=True)
+
+    # ── Fase 4: Imágenes ──────────────────────────────────────
     prompt_task = sanitize(f"""Genera 5-6 prompts JSON (uno por escena) para el guión de: {objetivo}
 
 Guión completo:
 {storytelling_result[:2500]}""")
 
-    post_issue_comment("🎨 **Fase 4/5 — Prompt Generator** en progreso…")
+    post_issue_comment("🎨 **Fase 5 — Prompt Generator** en progreso…")
     prompt_result = run_tracked("prompt_generator.py", prompt_task,
                                 "Prompt Generator — 5-6 imágenes", "prompt_generator")
 
-    # ── Fase 2b: Generación de imágenes reales con Higgsfield ──
     imagen_result  = "[Imagen Generator: HIGGSFIELD_API_KEY no configurada — omitido]"
     higgsfield_key = os.environ.get("HIGGSFIELD_API_KEY", "")
     if higgsfield_key:
-        post_issue_comment("🖼️ **Fase 5/5 — Imagen Generator** en progreso… (puede tardar 2-3 min)")
+        post_issue_comment("🖼️ **Fase 6 — Imagen Generator** en progreso… (puede tardar 2-3 min)")
         imagen_result = run_tracked("imagen.py", prompt_result,
                                     "Imagen Generator — Higgsfield Soul", "imagen_generator",
                                     extra_env={"HIGGSFIELD_API_KEY": higgsfield_key})
     else:
         print("⚠️  HIGGSFIELD_API_KEY no encontrada — saltando Imagen Generator", flush=True)
 
-    # ── Fase 3: Síntesis ejecutiva ─────────────────────────────
+    # ── Fase 5: Video (imágenes + voz) ───────────────────────
+    video_result = ""
+    video_url    = ""
+    if elevenlabs_key and higgsfield_key:
+        # Extraer URLs de imágenes para pasarlas al video assembler
+        _img_urls = list(dict.fromkeys(
+            _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
+        ))
+        if _img_urls and audio_path:
+            video_task = sanitize(json.dumps({
+                "image_urls": _img_urls,
+                "audio_path": audio_path,
+                "tema": objetivo[:100],
+            }, ensure_ascii=False))
+            post_issue_comment("🎬 **Fase 7 — Video Assembler** en progreso… ensamblando MP4 final…")
+            video_result = run_tracked("video_assembler.py", video_task,
+                                       "Video Assembler — MP4 final", "video_assembler")
+            try:
+                _vid_data = json.loads(video_result)
+                video_url = _vid_data.get("video_url", "")
+            except Exception:
+                pass
+        else:
+            print("⚠️  Sin imágenes o audio — saltando Video Assembler", flush=True)
+
+    # ── Síntesis ejecutiva ────────────────────────────────────
     print(f"\n{'='*60}", flush=True)
-    print(f"🧠 Sintetizando paquete ejecutivo...", flush=True)
+    print("🧠 Sintetizando paquete ejecutivo...", flush=True)
     print(f"{'='*60}", flush=True)
 
     reports = {
-        "deep_search":     deep_search_result,
+        "deep_search":      deep_search_result,
         "channel_analyzer": channel_result,
-        "storytelling":    storytelling_result,
+        "storytelling":     storytelling_result,
         "prompt_generator": prompt_result,
-        "imagen":          imagen_result,
+        "imagen":           imagen_result,
     }
 
     try:
@@ -572,13 +627,11 @@ Guión completo:
     except Exception as e:
         synthesis = f"[Error en síntesis: {e}]"
 
-    # ── Extraer URLs de imágenes para incluirlas en el preamble ──
-    import re as _re
-    # Deduplicar: la misma URL aparece varias veces en el output de imagen.py
-    # (línea de status, **URL:**, markdown image y bloque JSON → hasta 4x la misma URL)
-    _raw_urls = _re.findall(r'https?://[^\s)"\']+\.png', imagen_result)
-    imagen_urls = list(dict.fromkeys(_raw_urls))  # preserva orden, elimina duplicados
+    # ── Extraer URLs de imágenes ──────────────────────────────
+    _raw_urls  = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg)", imagen_result)
+    imagen_urls = list(dict.fromkeys(_raw_urls))
 
+    # ── Construir output final ────────────────────────────────
     imagen_gallery = ""
     if imagen_urls:
         imagen_gallery = "\n## 🖼️ IMÁGENES GENERADAS\n"
@@ -586,11 +639,23 @@ Guión completo:
             imagen_gallery += f"![Imagen {i}]({url})\n"
         imagen_gallery += "\n"
 
-    # ── Output final ───────────────────────────────────────────
+    video_section = ""
+    if video_url:
+        video_section = f"\n## 🎬 VIDEO GENERADO\n📥 [Descargar MP4]({video_url})\n\n"
+
+    tts_section = ""
+    if tts_result:
+        try:
+            _tts = json.loads(tts_result)
+            if _tts.get("audio_url"):
+                tts_section = f"\n## 🎙️ VOZ EN OFF\n📥 [Descargar MP3]({_tts['audio_url']}) — {_tts.get('duration_estimate','')}\n\n"
+        except Exception:
+            pass
+
     output = f"""# 🎬 PAQUETE COMPLETO DE CONTENIDO
 **Tema:** {objetivo}
-**Generado por:** Director de Contenido (5 agentes coordinados)
-{imagen_gallery}
+**Generado por:** Director de Contenido ({7 if elevenlabs_key and higgsfield_key else 5} agentes coordinados)
+{video_section}{tts_section}{imagen_gallery}
 {synthesis}
 
 ---
@@ -626,6 +691,8 @@ Guión completo:
 
 {imagen_result}
 </details>
+{"<details><summary>🎙️ TTS - Audio narración</summary>" + chr(10) + tts_result + chr(10) + "</details>" if tts_result else ""}
+{"<details><summary>🎬 Video Assembler - Video final</summary>" + chr(10) + video_result + chr(10) + "</details>" if video_result else ""}
 """
     print(output, flush=True)
 
