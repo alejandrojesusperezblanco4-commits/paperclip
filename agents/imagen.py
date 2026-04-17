@@ -16,7 +16,7 @@ import urllib.request
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
-from api_client import post_issue_result, post_issue_comment
+from api_client import post_issue_result, post_issue_comment, resolve_issue_context
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -129,6 +129,7 @@ def generate_image(prompt: str, aspect_ratio: str, label: str, api_key: str) -> 
 
 def extract_prompts(input_text: str) -> list:
     """Extrae scene_prompts[] del JSON del prompt_generator, o usa fallback."""
+    import re as _re
     json_str = None
     if "```json" in input_text:
         json_str = input_text.split("```json")[1].split("```")[0].strip()
@@ -136,6 +137,14 @@ def extract_prompts(input_text: str) -> list:
         json_str = input_text.split("```")[1].split("```")[0].strip()
     elif input_text.strip().startswith("{"):
         json_str = input_text.strip()
+    else:
+        # Buscar JSON embebido en texto mixto (ej: título + cuerpo del issue)
+        m = _re.search(r'\{[\s\S]*?"scene_prompts"[\s\S]*?\}(?:\s*$|\n)', input_text)
+        if not m:
+            # Intentar extraer cualquier bloque JSON que empiece con {
+            m = _re.search(r'(\{[\s\S]*\})', input_text)
+        if m:
+            json_str = m.group(0).strip()
 
     if json_str:
         try:
@@ -154,15 +163,15 @@ def extract_prompts(input_text: str) -> list:
         except (json.JSONDecodeError, KeyError) as e:
             print(f"  ⚠️  No se pudo parsear JSON: {e} — usando fallback", flush=True)
 
-    print("  ℹ️  Usando prompt de fallback", flush=True)
+    print("  ℹ️  Usando prompt de fallback (sin JSON válido en el input)", flush=True)
     lines = [l.strip() for l in input_text.split("\n") if l.strip()]
-    concept = " ".join(lines[:5])[:250]
+    concept = " ".join(lines[:5])[:300]
     return [{
         "prompt": (
-            "Cinematic vertical TikTok thumbnail, dramatic Latin telenovela style. "
-            "A Latin woman with tears streaming down her face, eyes wide with shock and betrayal, "
-            "close-up portrait. Chiaroscuro lighting, deep red and orange tones, bokeh background, "
-            f"hyperrealistic, 8K quality. Scene: {concept}"
+            f"Cinematic vertical TikTok thumbnail for: {concept}. "
+            "Epic action scene, dramatic lighting, cinematic photography. "
+            "Close-up portrait with intense expression, moody atmosphere, "
+            "hyperrealistic, 8K quality, shot on Sony A7 III, 35mm lens, f/1.8."
         ),
         "aspect_ratio": "9:16",
         "label": "Escena 1: Thumbnail",
@@ -180,10 +189,11 @@ def main():
     else:
         script_input = sys.stdin.read().strip()
 
-    issue_title = os.environ.get("PAPERCLIP_ISSUE_TITLE", "")
-    issue_body  = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
+    issue_title, issue_body = resolve_issue_context()
     if issue_title:
-        script_input = f"{issue_title}\n\n{issue_body or ''}"
+        # Usar issue_body como input principal si existe (contiene el JSON de prompts del prompt_generator)
+        # NO anteponer el título porque extract_prompts busca JSON que empiece con "{"
+        script_input = issue_body if issue_body else issue_title
         post_issue_comment(
             f"🖼️ Recibido. Voy a generar las imágenes para: **{issue_title}**\n\n"
             f"Mando las escenas a Higgsfield Soul ahora mismo — las proceso en paralelo "
@@ -192,7 +202,7 @@ def main():
         )
 
     if not script_input:
-        script_input = "Historia de traición: ella descubre que su pareja la engañó con su mejor amiga"
+        script_input = "Genera imágenes cinematográficas para contenido viral en TikTok y YouTube"
 
     print("🖼️  IMAGEN GENERATOR INICIANDO", flush=True)
     print(f"📌 Input: {script_input[:100]}…", flush=True)
