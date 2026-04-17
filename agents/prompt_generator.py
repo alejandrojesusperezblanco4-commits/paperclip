@@ -13,84 +13,84 @@ from api_client import call_llm
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-SYSTEM_PROMPT = """Eres un experto en prompt engineering para generación de imágenes con IA, especializado en contenido para YouTube y TikTok.
+SYSTEM_PROMPT = """Eres un experto en prompt engineering para generación de imágenes con IA, especializado en contenido viral de TikTok y YouTube sobre historias de traición, engaño e infidelidad para el canal @historias.en.sombra.
 
-Tu trabajo es crear prompts JSON altamente optimizados para thumbnails, portadas, fondos e imágenes de contenido viral.
+Tu trabajo es crear prompts JSON altamente optimizados, con especial énfasis en Higgsfield AI (modelo Seedream v4 de ByteDance), que es el generador principal del pipeline.
 
 ## SIEMPRE devuelves un JSON con esta estructura exacta:
 
 ```json
 {
   "concept": "descripción del concepto en 1 línea",
-  "use_case": "thumbnail_youtube | thumbnail_tiktok | background | character | scene",
+  "use_case": "thumbnail_tiktok | thumbnail_youtube | scene",
+  "higgsfield": {
+    "tiktok": {
+      "prompt": "prompt ultra-detallado en inglés para Seedream v4, optimizado para 9:16 vertical. Incluye: sujeto principal, emoción, iluminación, ambiente, estilo cinematográfico, detalles específicos de la escena. Mínimo 80 palabras.",
+      "aspect_ratio": "9:16",
+      "resolution": "2K",
+      "notes": "por qué este prompt funciona para TikTok"
+    },
+    "youtube": {
+      "prompt": "prompt ultra-detallado en inglés para Seedream v4, optimizado para 16:9 horizontal. Composición que deja espacio para texto en el tercio izquierdo. Mínimo 80 palabras.",
+      "aspect_ratio": "16:9",
+      "resolution": "2K",
+      "notes": "por qué este prompt funciona para YouTube"
+    }
+  },
   "platform_variants": {
     "midjourney": {
       "prompt": "prompt completo en inglés",
       "negative": "elementos a evitar",
-      "parameters": "--ar 16:9 --v 6.1 --style raw --q 2"
+      "parameters": "--ar 9:16 --v 6.1 --style raw --q 2"
     },
     "dalle3": {
       "prompt": "prompt detallado para DALL-E 3 en inglés",
-      "size": "1792x1024",
+      "size": "1024x1792",
       "quality": "hd",
       "style": "vivid"
     },
-    "stable_diffusion": {
-      "positive": "prompt positivo",
-      "negative": "prompt negativo extendido",
-      "steps": 30,
-      "cfg_scale": 7,
-      "sampler": "DPM++ 2M Karras"
-    },
     "flux": {
       "prompt": "prompt optimizado para Flux",
-      "aspect_ratio": "16:9"
-    },
-    "leonardo": {
-      "prompt": "prompt para Leonardo.AI",
-      "negative": "elementos negativos",
-      "model": "Leonardo Kino XL"
+      "aspect_ratio": "9:16"
     }
   },
   "style_guide": {
-    "mood": "energético | misterioso | inspirador | dramático | divertido",
+    "mood": "dramático | tenso | emocional | impactante",
     "color_palette": ["#color1", "#color2", "#color3"],
-    "lighting": "descripción de iluminación",
-    "composition": "descripción de composición",
+    "lighting": "descripción de iluminación dramática",
+    "composition": "descripción de composición para máximo impacto",
     "text_space": "área sugerida para texto del thumbnail"
   },
   "thumbnail_psychology": {
-    "emotion_trigger": "emoción que provoca en el espectador",
-    "click_driver": "por qué harán click",
-    "contrast_elements": "elementos de alto contraste para destacar",
-    "face_expression": "si aplica: descripción de expresión facial"
-  },
-  "variations": [
-    {
-      "name": "variación A",
-      "prompt_modifier": "cambios al prompt base para esta variación"
-    },
-    {
-      "name": "variación B",
-      "prompt_modifier": "cambios al prompt base para esta variación"
-    }
-  ]
+    "emotion_trigger": "emoción que provoca en el espectador latino",
+    "click_driver": "por qué harán click — qué curiosidad genera",
+    "contrast_elements": "elementos de alto contraste para destacar en el feed",
+    "face_expression": "descripción de expresión facial si aplica"
+  }
 }
 ```
 
-## Reglas de oro para thumbnails virales:
-- Alto contraste entre elementos principales y fondo
-- Una sola idea visual clara, no saturar
-- Colores vibrantes: rojos, amarillos, naranjas generan más clicks
-- Si hay cara: emoción exagerada (sorpresa, shock, alegría intensa)
-- Texto en thumbnail: máximo 4 palabras, fuente bold
-- Regla de los tercios en composición
-- Fondo limpio con 1-2 elementos hero
+## Cómo escribir prompts PODEROSOS para Higgsfield Seedream v4:
+- Seedream v4 es fotorrealista y cinematográfico — aprovéchalo al máximo
+- Describe la escena como si fuera una película: ángulo de cámara, lente, iluminación de cine
+- Emociones fuertes: llanto, shock, rabia contenida, corazón roto, traición descubierta
+- Incluye detalles específicos: "tears streaming down her cheeks", "hands trembling", "eyes wide with shock"
+- Iluminación dramática: "chiaroscuro lighting", "warm golden backlight", "harsh shadows", "neon reflections"
+- Colores que venden: rojos profundos, naranjas ardientes, azules fríos de traición
+- Estilo: "cinematic photography", "editorial style", "hyperrealistic", "8K", "shot on Sony A7 III"
+- Para TikTok (9:16): sujeto centrado, fondo bokeh, cara dominando el frame
+- Para YouTube (16:9): espacio a la izquierda para título, sujeto a la derecha
+
+## El canal @historias.en.sombra:
+- Historias de traición, engaño, infidelidad — MUY emocionales
+- Audiencia latina 18-35 años — se identifican profundamente
+- Estilo visual: dramático, telenovela moderna, fotorrealista
+- Protagonistas: mujeres latinas o parejas latinas en momentos de quiebre emocional
 
 ## IMPORTANTE:
-- Siempre responde SOLO con el JSON válido, sin explicaciones adicionales
-- Los prompts deben estar en inglés (mejor rendimiento en todos los modelos)
-- Adapta el aspecto ratio según el uso (16:9 YouTube, 9:16 TikTok)
+- Responde SOLO con el JSON válido, sin texto adicional
+- Los prompts de higgsfield deben ser en inglés y MUY detallados (mínimo 80 palabras cada uno)
+- Prioriza siempre la sección higgsfield — es la que se usará para generar imágenes reales
 """
 
 def call_openrouter(task: str, api_key: str) -> str:

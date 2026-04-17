@@ -267,13 +267,13 @@ El video tiene este concepto:
     prompt_result = run_agent("prompt_generator.py", prompt_task, api_key, "Prompt Generator")
 
     # ── Fase 2b: Generación de imágenes reales con Higgsfield ──
+    # Pasa el JSON del prompt_generator → imagen.py extrae los prompts Higgsfield optimizados
     imagen_result = "[Imagen Generator: HIGGSFIELD_API_KEY no configurada — omitido]"
     higgsfield_key = os.environ.get("HIGGSFIELD_API_KEY", "")
     if higgsfield_key:
-        imagen_task = sanitize(f"""Genera imágenes para este guión:\n{storytelling_result[:500]}""")
         imagen_env = os.environ.copy()
         imagen_env["HIGGSFIELD_API_KEY"] = higgsfield_key
-        imagen_result = run_agent_with_env("imagen.py", imagen_task, imagen_env, "Imagen Generator")
+        imagen_result = run_agent_with_env("imagen.py", prompt_result, imagen_env, "Imagen Generator")
     else:
         print("⚠️  HIGGSFIELD_API_KEY no encontrada — saltando Imagen Generator", flush=True)
 

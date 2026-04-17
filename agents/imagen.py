@@ -109,32 +109,73 @@ def generate_image(prompt: str, aspect_ratio: str, label: str, api_key: str) -> 
         return {"label": label, "aspect_ratio": aspect_ratio, "prompt": prompt, "url": None, "status": f"error: {e}"}
 
 
-def build_prompts_from_script(script_text: str) -> list:
+def extract_higgsfield_prompts(input_text: str) -> list:
     """
-    Extrae el concepto visual del guión y genera 2 prompts:
-    - Thumbnail TikTok (9:16)
-    - Portada/Cover YouTube (16:9)
+    Intenta parsear el JSON del prompt_generator y extraer los prompts de Higgsfield.
+    Si no hay JSON válido o no tiene sección higgsfield, cae al fallback.
     """
-    # Tomar las primeras líneas del guión para contexto
-    lines = [l.strip() for l in script_text.split("\n") if l.strip()]
-    concept = " ".join(lines[:5])[:400]
+    # Intentar extraer JSON del input
+    json_str = None
+    if "```json" in input_text:
+        json_str = input_text.split("```json")[1].split("```")[0].strip()
+    elif "```" in input_text:
+        json_str = input_text.split("```")[1].split("```")[0].strip()
+    elif input_text.strip().startswith("{"):
+        json_str = input_text.strip()
 
-    tiktok_prompt = (
-        f"Cinematic vertical thumbnail for TikTok, dramatic Latin telenovela style. "
-        f"Betrayal and infidelity emotional scene. Close-up of a woman with tear-filled eyes, "
-        f"shocked expression, discovering betrayal. Dark dramatic lighting with warm tones. "
-        f"High contrast. Photorealistic. Context: {concept[:200]}"
-    )
+    if json_str:
+        try:
+            data = json.loads(json_str)
+            hf = data.get("higgsfield", {})
+            prompts = []
+            if hf.get("tiktok", {}).get("prompt"):
+                prompts.append({
+                    "prompt": hf["tiktok"]["prompt"],
+                    "aspect_ratio": hf["tiktok"].get("aspect_ratio", "9:16"),
+                    "resolution": hf["tiktok"].get("resolution", "2K"),
+                    "label": "Thumbnail TikTok",
+                })
+            if hf.get("youtube", {}).get("prompt"):
+                prompts.append({
+                    "prompt": hf["youtube"]["prompt"],
+                    "aspect_ratio": hf["youtube"].get("aspect_ratio", "16:9"),
+                    "resolution": hf["youtube"].get("resolution", "2K"),
+                    "label": "Portada YouTube",
+                })
+            if prompts:
+                print(f"  ✅ Prompts extraídos del prompt_generator ({len(prompts)} imágenes)", flush=True)
+                return prompts
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"  ⚠️  No se pudo parsear JSON del prompt_generator: {e} — usando fallback", flush=True)
 
-    youtube_prompt = (
-        f"Cinematic horizontal YouTube thumbnail. Dramatic betrayal scene inspired by: {concept[:200]}. "
-        f"Bold colors, red and orange tones, high contrast. One clear emotional face showing shock or rage. "
-        f"Space for text overlay on left third. Photorealistic. 16:9 composition."
-    )
+    # Fallback: construir prompts básicos desde el texto del guión
+    print("  ℹ️  Usando prompts de fallback", flush=True)
+    lines = [l.strip() for l in input_text.split("\n") if l.strip()]
+    concept = " ".join(lines[:5])[:300]
 
     return [
-        {"prompt": tiktok_prompt, "aspect_ratio": "9:16", "label": "Thumbnail TikTok"},
-        {"prompt": youtube_prompt, "aspect_ratio": "16:9", "label": "Portada YouTube"},
+        {
+            "prompt": (
+                f"Cinematic vertical TikTok thumbnail, dramatic Latin telenovela style, 9:16. "
+                f"A Latin woman with tears streaming down her face, eyes wide with shock and betrayal, "
+                f"trembling hands, close-up portrait. Chiaroscuro lighting, deep red and orange tones, "
+                f"bokeh background, hyperrealistic, shot on Sony A7 III, 8K quality. Scene: {concept[:150]}"
+            ),
+            "aspect_ratio": "9:16",
+            "resolution": "2K",
+            "label": "Thumbnail TikTok",
+        },
+        {
+            "prompt": (
+                f"Cinematic horizontal YouTube thumbnail, 16:9. Dramatic betrayal scene. "
+                f"Emotional Latin woman on right side, expression of rage and heartbreak, tears. "
+                f"Empty space on left third for title text. Deep red background, harsh shadows, "
+                f"high contrast, photorealistic, editorial photography style, 8K. Context: {concept[:150]}"
+            ),
+            "aspect_ratio": "16:9",
+            "resolution": "2K",
+            "label": "Portada YouTube",
+        },
     ]
 
 
@@ -159,9 +200,9 @@ def main():
         script_input = "Historia de traición: ella descubre que su pareja la engañó con su mejor amiga"
 
     print(f"🖼️  IMAGEN GENERATOR INICIANDO", flush=True)
-    print(f"📌 Concepto: {script_input[:100]}...", flush=True)
+    print(f"📌 Input: {script_input[:100]}...", flush=True)
 
-    prompts = build_prompts_from_script(script_input)
+    prompts = extract_higgsfield_prompts(script_input)
     results = []
 
     for item in prompts:
