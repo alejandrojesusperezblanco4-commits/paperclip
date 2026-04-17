@@ -500,15 +500,15 @@ Guión completo:
 
     # ── Publicar resultado en el issue principal ───────────────
     if issue_id and "Authorization" in auth_headers:
-        # 1. Cerrar el issue principal
-        _api_request("PATCH", f"{api_url}/api/issues/{issue_id}",
-                     {"status": "done"}, auth_headers)
-        print("✅ Issue principal cerrado", flush=True)
-
-        # 2. Postear el resultado como comentario
+        # 1. Postear el resultado PRIMERO como comentario
         _api_request("POST", f"{api_url}/api/issues/{issue_id}/comments",
                      {"body": output}, auth_headers)
         print("✅ Resultado publicado en el inbox", flush=True)
+
+        # 2. Cerrar el issue DESPUÉS (el frontend detecta 'done' y ya hay comentario)
+        _api_request("PATCH", f"{api_url}/api/issues/{issue_id}",
+                     {"status": "done"}, auth_headers)
+        print("✅ Issue principal cerrado", flush=True)
     elif issue_id:
         print("⚠️  Sin auth — issue no se pudo cerrar", flush=True)
 
