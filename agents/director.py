@@ -402,35 +402,61 @@ def main():
                 print(f"📥 Título obtenido de la API: {issue_title!r}", flush=True)
 
     # ── Construir objetivo final ───────────────────────────────
+    import re as _re  # importar aquí para que esté disponible en todo el scope de main()
+
     if issue_title:
         objetivo = f"{issue_title}\n\n{issue_body}" if issue_body else issue_title
-        has_tts   = bool(os.environ.get("ELEVENLABS_API_KEY", ""))
-        has_hf    = bool(os.environ.get("HIGGSFIELD_API_KEY", ""))
+        has_tts = bool(os.environ.get("ELEVENLABS_API_KEY", ""))
+        has_hf  = bool(os.environ.get("HIGGSFIELD_API_KEY", ""))
+
         # Detectar URLs en el body para saber si hay source ingestion
         _body_urls = _re.findall(r"https?://[^\s<>\"'\)\]]+", issue_body) if issue_body else []
         _has_src   = len(_body_urls) > 0
         _total_agents = (1 if _has_src else 0) + (7 if has_tts and has_hf else 5)
-        _phase = 1
+
+        # ── Kickoff message ──────────────────────────────────────
+        _phase  = 1
         _phases = ""
         if _has_src:
-            _phases += f"{_phase}️⃣ **Source Reader** — extraigo el contenido real de tus {len(_body_urls)} fuente(s)\n"
+            _src_types = []
+            for _u in _body_urls:
+                if "youtube.com" in _u or "youtu.be" in _u:
+                    _src_types.append("YouTube")
+                elif _u.endswith(".pdf"):
+                    _src_types.append("PDF")
+                else:
+                    _src_types.append("web")
+            _src_label = ", ".join(dict.fromkeys(_src_types)) or "web"
+            _phases += f"{_phase}️⃣ **Source Reader** — extraigo contenido real de {len(_body_urls)} fuente(s) ({_src_label})\n"
             _phase += 1
-        _phases += f"{_phase}️⃣ **Deep Search** — qué está viral ahora mismo en este nicho\n"; _phase += 1
-        _phases += f"{_phase}️⃣ **Channel Analyzer** — qué hace la competencia y cómo superarla\n"; _phase += 1
-        _phases += f"{_phase}️⃣ **Storytelling** — guión completo{'basado en tus fuentes' if _has_src else 'adaptado al nicho'}\n"; _phase += 1
+        _phases += f"{_phase}️⃣ **Deep Search** — tendencias virales del nicho\n"; _phase += 1
+        _phases += f"{_phase}️⃣ **Channel Analyzer** — análisis de la competencia\n"; _phase += 1
+        _phases += f"{_phase}️⃣ **Storytelling** — guión {'basado en tus fuentes' if _has_src else 'adaptado al nicho'}\n"; _phase += 1
         if has_tts:
             _phases += f"{_phase}️⃣ **TTS** — voz en off con ElevenLabs\n"; _phase += 1
-        _phases += f"{_phase}️⃣ **Prompt Generator** — prompts de imagen para cada escena\n"; _phase += 1
+        _phases += f"{_phase}️⃣ **Prompt Generator** — prompts de imagen por escena\n"; _phase += 1
         if has_hf:
             _phases += f"{_phase}️⃣ **Imagen Generator** — imágenes con Higgsfield Soul\n"; _phase += 1
         if has_tts and has_hf:
-            _phases += f"{_phase}️⃣ **Video Assembler** — MP4 final con imágenes + voz en off\n"; _phase += 1
+            _phases += f"{_phase}️⃣ **Video Assembler** — MP4 final con voz en off\n"; _phase += 1
+
         _eta = 10 if _has_src and has_tts and has_hf else (8 if has_tts and has_hf else 5)
+
+        _src_tip = (
+            f"\n\n📌 **Fuentes detectadas ({len(_body_urls)}):**\n"
+            + "\n".join(f"  - `{u[:70]}`" for u in _body_urls[:5])
+            + ("\n  - ..." if len(_body_urls) > 5 else "")
+        ) if _has_src else (
+            "\n\n💡 **Tip:** Pega URLs en la descripción del issue para activar el **Source Reader**"
+            " — artículos web, videos de YouTube o PDFs se convierten en la base factual del video."
+        )
+
         post_issue_comment(
             f"🎬 Perfecto, me pongo en marcha con: **{issue_title}**\n\n"
-            f"Coordino {_total_agents} agentes especializados:\n"
+            f"Coordino **{_total_agents} agentes** en secuencia:\n"
             + _phases
-            + f"\nEl paquete completo estará listo en ~{_eta} minutos. 🚀"
+            + f"\n⏱️ Listo en ~{_eta} minutos."
+            + _src_tip
         )
     elif not objetivo:
         objetivo = "crea contenido viral para TikTok y YouTube en español"
