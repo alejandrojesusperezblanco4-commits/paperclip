@@ -363,6 +363,17 @@ def main():
     else:
         print("⚠️  Sin token de autenticación disponible — sub-issues no se crearán", flush=True)
 
+    # ── Marcar issue como in_progress al inicio ───────────────
+    # El issue vive en 'backlog' durante el run (el process adapter solo setea checkoutRunId).
+    # Si al final hacemos PATCH backlog→done, Paperclip dispara statusChangedFromBacklog→wakeup→re-run.
+    # Al pasar a in_progress AQUÍ, el PATCH final es in_progress→done → sin wakeup extra.
+    if issue_id and "Authorization" in auth_headers:
+        try:
+            _api_request("PATCH", f"{api_url}/api/issues/{issue_id}", {"status": "in_progress"}, auth_headers)
+            print("✅ Issue marcado in_progress — evita re-trigger por statusChangedFromBacklog", flush=True)
+        except Exception as _e:
+            print(f"⚠️  No se pudo marcar in_progress: {_e}", flush=True)
+
     # ── Helper: ejecuta un agente + gestiona su sub-issue ─────
     def run_tracked(script: str, task: str, label: str, agent_key: str,
                     extra_env: dict = None) -> str:
