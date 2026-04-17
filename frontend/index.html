@@ -638,7 +638,7 @@ async function startRun() {
   showRunningPanel(cfg, topic);
 
   try {
-    const body = { title: topic, projectId: PROJECT_ID };
+    const body = { title: topic, description: topic, projectId: PROJECT_ID };
     if (cfg.agentId) body.assigneeAgentId = cfg.agentId;
 
     const res = await fetch(`${API_BASE}/api/companies/${COMPANY_ID}/issues`, {

@@ -16,7 +16,7 @@ import urllib.request
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
-from api_client import post_issue_result
+from api_client import post_issue_result, post_issue_comment
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -184,6 +184,12 @@ def main():
     issue_body  = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
     if issue_title:
         script_input = f"{issue_title}\n\n{issue_body or ''}"
+        post_issue_comment(
+            f"🖼️ Recibido. Voy a generar las imágenes para: **{issue_title}**\n\n"
+            f"Mando las escenas a Higgsfield Soul ahora mismo — las proceso en paralelo "
+            f"para que no tengas que esperar. Puede tardar 2-3 minutos dependiendo de "
+            f"cuántas escenas tenga el guión."
+        )
 
     if not script_input:
         script_input = "Historia de traición: ella descubre que su pareja la engañó con su mejor amiga"

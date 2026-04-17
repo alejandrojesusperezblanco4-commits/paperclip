@@ -23,7 +23,7 @@ import time
 import urllib.request
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from api_client import call_llm
+from api_client import call_llm, post_issue_comment
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -335,9 +335,20 @@ def main():
         objetivo = sys.stdin.read().strip()
 
     issue_title = os.environ.get("PAPERCLIP_ISSUE_TITLE", "")
-    issue_body = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
+    issue_body  = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
     if issue_title:
         objetivo = f"{issue_title}\n\n{issue_body or ''}"
+        post_issue_comment(
+            f"🎬 Perfecto, me pongo en marcha con: **{issue_title}**\n\n"
+            f"Voy a coordinar 5 agentes en secuencia:\n"
+            f"1️⃣ **Deep Search** — busco qué está viral ahora mismo\n"
+            f"2️⃣ **Channel Analyzer** — analizo a la competencia\n"
+            f"3️⃣ **Storytelling** — diseño el guión con 4-5 escenas\n"
+            f"4️⃣ **Prompt Generator** — creo los prompts de imagen\n"
+            f"5️⃣ **Imagen Generator** — genero las imágenes con Higgsfield Soul\n\n"
+            f"Cada paso aparecerá como tarea en tu inbox. "
+            f"El paquete completo estará listo en ~5 minutos. 🚀"
+        )
 
     if not objetivo:
         objetivo = "historias realistas de traición, engaño e infidelidad para el canal @historias.en.sombra de TikTok en español"

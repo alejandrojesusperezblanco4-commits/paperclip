@@ -8,7 +8,7 @@ import sys
 import json
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save
-from api_client import call_llm, post_issue_result
+from api_client import call_llm, post_issue_result, post_issue_comment
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -94,9 +94,16 @@ def main():
         task = sys.stdin.read().strip()
 
     issue_title = os.environ.get("PAPERCLIP_ISSUE_TITLE", "")
-    issue_body = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
+    issue_body  = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
     if issue_title:
-        task = f"Genera prompts para: {issue_title}\n\nContexto adicional: {issue_body or 'ninguno'}"
+        context = issue_body if issue_body and len(issue_body) > len(issue_title) else issue_title
+        task = f"Genera prompts para: {context}\n\nContexto adicional: {issue_body or 'ninguno'}"
+        post_issue_comment(
+            f"🎨 Entendido. Voy a crear los prompts de imagen para: **{issue_title}**\n\n"
+            f"Genero uno por escena — protagonista consistente en todas las imágenes, "
+            f"descripción cinematográfica, iluminación dramática. "
+            f"El JSON estará listo en segundos."
+        )
 
     if not task:
         task = "Genera prompts JSON para un thumbnail de YouTube sobre '5 herramientas de IA que cambiaran tu vida en 2025'. Canal tech moderno, audiencia hispana 18-35 anos."
