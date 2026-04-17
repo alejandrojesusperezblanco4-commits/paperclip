@@ -9,6 +9,7 @@ import os
 import sys
 import json
 import time
+import base64
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -22,10 +23,12 @@ MODEL = "bytedance/seedream/v4/text-to-image"
 
 def build_auth_header(api_key: str) -> str:
     """
-    Higgsfield usa formato KEY_ID:KEY_SECRET como Bearer token.
-    Acepta tanto el string combinado como solo el KEY_ID.
+    Higgsfield usa HTTP Basic Authentication con base64(KEY_ID:KEY_SECRET).
+    El api_key viene en formato 'KEY_ID:KEY_SECRET' separado por ':'.
     """
-    return f"Bearer {api_key}"
+    # Base64 encode del string key_id:key_secret
+    encoded = base64.b64encode(api_key.encode("utf-8")).decode("ascii")
+    return f"Basic {encoded}"
 
 
 def submit_image(prompt: str, aspect_ratio: str, resolution: str, api_key: str) -> str:
