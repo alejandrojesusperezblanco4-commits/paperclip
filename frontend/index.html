@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Historias en Sombra — Studio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0d0f;
+      --surface:  #161618;
+      --border:   #2a2a2e;
+      --muted:    #3a3a40;
+      --text:     #e8e8ec;
+      --sub:      #8888a0;
+      --accent:   #a855f7;
+      --accent2:  #7c3aed;
+      --green:    #22c55e;
+      --yellow:   #eab308;
+      --red:      #ef4444;
+      --blue:     #3b82f6;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(13,13,15,0.92);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .logo-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .badge {
+      font-size: 11px;
+      color: var(--sub);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    /* ── Layout ── */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      grid-template-rows: 1fr;
+      height: calc(100vh - 57px);
+    }
+
+    /* ── Left panel ── */
+    .panel-left {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-section {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    /* Input */
+    .input-area {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      padding: 12px 14px;
+      resize: none;
+      height: 100px;
+      outline: none;
+      transition: border-color 0.2s;
+      line-height: 1.5;
+    }
+    .input-area::placeholder { color: var(--muted); }
+    .input-area:focus { border-color: var(--accent); }
+
+    .btn-generate {
+      margin-top: 10px;
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 11px 0;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+      letter-spacing: 0.02em;
+    }
+    .btn-generate:hover:not(:disabled) { background: var(--accent2); }
+    .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Pipeline stages */
+    .stages { display: flex; flex-direction: column; gap: 6px; }
+
+    .stage {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      transition: border-color 0.3s, background 0.3s;
+      font-size: 13px;
+    }
+    .stage.active  { border-color: var(--accent); background: rgba(168,85,247,0.08); }
+    .stage.done    { border-color: var(--green);  background: rgba(34,197,94,0.06); }
+    .stage.error   { border-color: var(--red);    background: rgba(239,68,68,0.06); }
+    .stage.waiting { opacity: 0.45; }
+
+    .stage-icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      background: var(--muted);
+    }
+    .stage.active  .stage-icon { background: rgba(168,85,247,0.25); }
+    .stage.done    .stage-icon { background: rgba(34,197,94,0.2); }
+    .stage.error   .stage-icon { background: rgba(239,68,68,0.2); }
+
+    .stage-info { flex: 1; min-width: 0; }
+    .stage-name { font-weight: 500; color: var(--text); font-size: 12.5px; }
+    .stage-sub  { font-size: 11px; color: var(--sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .stage-status {
+      font-size: 10px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .stage.waiting .stage-status { background: var(--surface); color: var(--sub); border: 1px solid var(--border); }
+    .stage.active  .stage-status { background: rgba(168,85,247,0.2); color: #c084fc; }
+    .stage.done    .stage-status { background: rgba(34,197,94,0.15); color: #4ade80; }
+    .stage.error   .stage-status { background: rgba(239,68,68,0.15); color: #f87171; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid rgba(168,85,247,0.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    /* History */
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 20px;
+    }
+    .history-list::-webkit-scrollbar { width: 4px; }
+    .history-list::-webkit-scrollbar-track { background: transparent; }
+    .history-list::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+
+    .history-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      font-size: 12px;
+    }
+    .history-item:hover { border-color: var(--muted); }
+    .history-item.active-run { border-color: var(--accent); }
+    .history-title { font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-meta  { color: var(--sub); font-size: 11px; margin-top: 3px; }
+
+    /* ── Right panel ── */
+    .panel-right {
+      overflow-y: auto;
+      padding: 28px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .panel-right::-webkit-scrollbar { width: 6px; }
+    .panel-right::-webkit-scrollbar-track { background: transparent; }
+    .panel-right::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 3px; }
+
+    /* Empty state */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 12px;
+      color: var(--sub);
+      padding: 40px;
+    }
+    .empty-icon { font-size: 40px; opacity: 0.4; }
+    .empty-state h2 { font-size: 17px; font-weight: 600; color: var(--text); opacity: 0.5; }
+    .empty-state p  { font-size: 13px; max-width: 320px; line-height: 1.6; }
+
+    /* Result cards */
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) { .result-grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .card-icon { font-size: 16px; }
+    .card-title { font-size: 13px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.06em; }
+
+    /* Imagen card */
+    .card-image {
+      grid-row: 1 / 3;
+    }
+    .thumbnail-wrap {
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--muted);
+      aspect-ratio: 9/16;
+      max-height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .thumbnail-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .thumbnail-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: var(--sub);
+      font-size: 12px;
+    }
+    .thumbnail-placeholder span { font-size: 28px; opacity: 0.3; }
+
+    /* Script card */
+    .card-script {
+      grid-column: 2;
+    }
+    .script-content {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      max-height: 380px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .script-content::-webkit-scrollbar { width: 3px; }
+    .script-content::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+
+    /* Metadata card */
+    .card-meta {
+      grid-column: 2;
+    }
+    .meta-rows { display: flex; flex-direction: column; gap: 10px; }
+    .meta-row  { display: flex; gap: 10px; align-items: flex-start; }
+    .meta-key  { font-size: 11px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.05em; min-width: 90px; flex-shrink: 0; padding-top: 1px; }
+    .meta-val  { font-size: 13px; color: var(--text); line-height: 1.5; }
+
+    /* Raw card (for debug) */
+    .card-raw { grid-column: 1 / -1; }
+    .raw-toggle {
+      font-size: 12px;
+      color: var(--sub);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    .raw-toggle:hover { color: var(--text); }
+    .raw-body {
+      margin-top: 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 11.5px;
+      font-family: 'Menlo', 'Consolas', monospace;
+      color: var(--sub);
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+      display: none;
+    }
+    .raw-body.visible { display: block; }
+
+    /* Progress bar */
+    @keyframes progress-glow {
+      0%   { opacity: 0.6; }
+      50%  { opacity: 1; }
+      100% { opacity: 0.6; }
+    }
+    .progress-bar-wrap {
+      height: 2px;
+      background: var(--border);
+      border-radius: 1px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 1px;
+      transition: width 0.5s ease;
+      animation: progress-glow 1.5s infinite;
+    }
+
+    /* Running log */
+    .running-log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+    .log-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .log-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    .log-line {
+      font-size: 12px;
+      color: var(--sub);
+      font-family: 'Menlo', monospace;
+      line-height: 1.5;
+    }
+    .log-line.accent { color: #c084fc; }
+    .log-line.green  { color: #4ade80; }
+    .log-line.red    { color: #f87171; }
+
+    /* Dot pulse */
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+    .dot-pulse {
+      display: inline-flex;
+      gap: 3px;
+      align-items: center;
+    }
+    .dot-pulse span {
+      width: 4px; height: 4px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .dot-pulse span:nth-child(2) { animation-delay: 0.2s; }
+    .dot-pulse span:nth-child(3) { animation-delay: 0.4s; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    historias.en.sombra — Studio
+  </div>
+  <div class="badge">Pipeline IA</div>
+</header>
+
+<main>
+
+  <!-- ── LEFT PANEL ── -->
+  <div class="panel-left">
+
+    <!-- Input -->
+    <div class="panel-section">
+      <div class="panel-label">Nueva historia</div>
+      <textarea
+        id="topicInput"
+        class="input-area"
+        placeholder="Ej: Ella descubre que su esposo la engañó con su mejor amiga el día de su aniversario…"
+      ></textarea>
+      <div class="progress-bar-wrap" id="progressWrap" style="display:none">
+        <div class="progress-bar" id="progressBar" style="width:5%"></div>
+      </div>
+      <button class="btn-generate" id="btnGenerate" onclick="startPipeline()">
+        ✦ Generar contenido
+      </button>
+    </div>
+
+    <!-- Pipeline stages -->
+    <div class="panel-section">
+      <div class="panel-label">Pipeline</div>
+      <div class="stages" id="stages">
+        <div class="stage waiting" id="stage-director">
+          <div class="stage-icon">🎬</div>
+          <div class="stage-info">
+            <div class="stage-name">Director</div>
+            <div class="stage-sub" id="sub-director">Esperando</div>
+          </div>
+          <div class="stage-status">En espera</div>
+        </div>
+        <div class="stage waiting" id="stage-search">
+          <div class="stage-icon">🔍</div>
+          <div class="stage-info">
+            <div class="stage-name">Deep Search</div>
+            <div class="stage-sub" id="sub-search">Reddit · TikTok</div>
+          </div>
+          <div class="stage-status">En espera</div>
+        </div>
+        <div class="stage waiting" id="stage-analyzer">
+          <div class="stage-icon">📊</div>
+          <div class="stage-info">
+            <div class="stage-name">Channel Analyzer</div>
+            <div class="stage-sub" id="sub-analyzer">Competencia</div>
+          </div>
+          <div class="stage-status">En espera</div>
+        </div>
+        <div class="stage waiting" id="stage-story">
+          <div class="stage-icon">✍️</div>
+          <div class="stage-info">
+            <div class="stage-name">Storytelling</div>
+            <div class="stage-sub" id="sub-story">Guión</div>
+          </div>
+          <div class="stage-status">En espera</div>
+        </div>
+        <div class="stage waiting" id="stage-prompt">
+          <div class="stage-icon">🎨</div>
+          <div class="stage-info">
+            <div class="stage-name">Prompt Generator</div>
+            <div class="stage-sub" id="sub-prompt">Thumbnail</div>
+          </div>
+          <div class="stage-status">En espera</div>
+        </div>
+        <div class="stage waiting" id="stage-imagen">
+          <div class="stage-icon">🖼️</div>
+          <div class="stage-info">
+            <div class="stage-name">Imagen AI</div>
+            <div class="stage-sub" id="sub-imagen">Higgsfield</div>
+          </div>
+          <div class="stage-status">En espera</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="panel-label" style="padding: 16px 20px 4px;">Historial</div>
+    <div class="history-list" id="historyList">
+      <!-- items added by JS -->
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT PANEL ── -->
+  <div class="panel-right" id="rightPanel">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">✦</div>
+      <h2>Todo listo para generar</h2>
+      <p>Escribe el tema de tu historia y pulsa Generar. El pipeline hará todo el trabajo.</p>
+    </div>
+  </div>
+
+</main>
+
+<script>
+/* ──────────────────────────────────────────
+   CONFIG
+────────────────────────────────────────── */
+const API_BASE   = 'https://spirited-charm-production.up.railway.app';
+const COMPANY_ID = '4d39bc9c-a76c-4558-a3b0-2a3267124dc0';
+const POLL_MS    = 3000;
+
+/* ──────────────────────────────────────────
+   STATE
+────────────────────────────────────────── */
+let currentIssueId = null;
+let pollTimer      = null;
+let startTime      = null;
+let history        = JSON.parse(localStorage.getItem('hs_history') || '[]');
+
+/* ──────────────────────────────────────────
+   STAGE MANAGEMENT
+────────────────────────────────────────── */
+const STAGE_ORDER = ['director','search','analyzer','story','prompt','imagen'];
+const STAGE_TIMING = {
+  director: [0,    5],
+  search:   [5,    25],
+  analyzer: [25,   45],
+  story:    [45,   65],
+  prompt:   [65,   80],
+  imagen:   [80,   100],
+};
+
+function setStage(id, state, sub='') {
+  const el = document.getElementById(`stage-${id}`);
+  if (!el) return;
+  el.className = `stage ${state}`;
+  const statusEl = el.querySelector('.stage-status');
+  const subEl    = document.getElementById(`sub-${id}`);
+  const labels   = { waiting:'En espera', active:'Procesando…', done:'Listo', error:'Error' };
+  if (statusEl) statusEl.textContent = labels[state] || state;
+  if (subEl && sub) subEl.textContent = sub;
+}
+
+function setActiveStage(idx) {
+  STAGE_ORDER.forEach((id, i) => {
+    if (i < idx)      setStage(id, 'done');
+    else if (i === idx) setStage(id, 'active');
+    else               setStage(id, 'waiting');
+  });
+}
+
+function setAllDone()  { STAGE_ORDER.forEach(id => setStage(id, 'done')); }
+function setAllWaiting(){ STAGE_ORDER.forEach(id => setStage(id, 'waiting')); }
+
+/* Progress bar based on elapsed time */
+function tickProgress() {
+  if (!startTime) return;
+  const elapsed = (Date.now() - startTime) / 1000;
+  // ~120s expected total
+  const pct = Math.min(92, Math.round((elapsed / 120) * 100));
+  document.getElementById('progressBar').style.width = pct + '%';
+
+  // Infer stage from time
+  const idx = elapsed < 10 ? 0
+    : elapsed < 30 ? 1
+    : elapsed < 50 ? 2
+    : elapsed < 70 ? 3
+    : elapsed < 90 ? 4 : 5;
+  setActiveStage(idx);
+}
+
+/* ──────────────────────────────────────────
+   PIPELINE
+────────────────────────────────────────── */
+async function startPipeline() {
+  const topic = document.getElementById('topicInput').value.trim();
+  if (!topic) { flashInput(); return; }
+
+  // UI: disable
+  document.getElementById('btnGenerate').disabled = true;
+  document.getElementById('btnGenerate').innerHTML = '<span class="spinner"></span> Generando…';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressBar').style.width = '5%';
+  setAllWaiting();
+  setStage('director','active','Iniciando…');
+  startTime = Date.now();
+  showRunningPanel(topic);
+
+  // Kick off pipeline
+  try {
+    const res = await fetch(`${API_BASE}/api/companies/${COMPANY_ID}/issues`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: topic, body: '' }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    currentIssueId = data.id || data.issueId || data.issue?.id;
+    if (!currentIssueId) throw new Error('No se obtuvo ID del issue');
+    addLog(`Issue creado: #${currentIssueId}`, 'accent');
+    pollTimer = setInterval(pollIssue, POLL_MS);
+    tickProgress();
+    const progressTick = setInterval(() => {
+      if (!startTime) { clearInterval(progressTick); return; }
+      tickProgress();
+    }, 2000);
+  } catch (e) {
+    showError(`No se pudo iniciar el pipeline: ${e.message}`);
+    resetUI();
+  }
+}
+
+async function pollIssue() {
+  if (!currentIssueId) return;
+  try {
+    const res  = await fetch(`${API_BASE}/api/issues/${currentIssueId}`);
+    const data = await res.json();
+    const status = (data.status || '').toLowerCase();
+    addLog(`Estado: ${status}`);
+
+    if (status === 'completed' || status === 'done' || status === 'finished') {
+      clearInterval(pollTimer);
+      startTime = null;
+      setAllDone();
+      document.getElementById('progressBar').style.width = '100%';
+      const raw = extractResult(data);
+      showResults(raw, data);
+      saveHistory({ id: currentIssueId, topic: document.getElementById('topicInput').value.trim(), ts: Date.now(), raw });
+      resetUI(false);
+    } else if (status === 'failed' || status === 'error') {
+      clearInterval(pollTimer);
+      startTime = null;
+      showError('El pipeline falló. Revisa los logs en Railway.');
+      resetUI();
+    }
+  } catch(e) {
+    addLog(`Error polling: ${e.message}`, 'red');
+  }
+}
+
+function extractResult(data) {
+  // Try multiple locations where the result may live
+  if (data.result) return typeof data.result === 'string' ? data.result : JSON.stringify(data.result);
+  if (data.comments?.length) return data.comments[data.comments.length - 1].body || '';
+  if (data.output) return data.output;
+  return JSON.stringify(data, null, 2);
+}
+
+/* ──────────────────────────────────────────
+   PARSER  — extract structured info from raw markdown
+────────────────────────────────────────── */
+function parseResult(raw) {
+  const out = { title: '', hook: '', script: '', imageUrl: null, imagePrompt: '', trends: '', analysis: '' };
+
+  // Image URL — look for markdown image or URL line
+  const imgMd   = raw.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+  const imgUrl  = raw.match(/\*\*URL:\*\*\s*(https?:\/\/\S+)/);
+  const imgLine = raw.match(/https?:\/\/\S+\.(jpg|jpeg|png|webp)/i);
+  out.imageUrl  = (imgMd?.[1] || imgUrl?.[1] || imgLine?.[0] || '').split(')')[0];
+
+  // Prompt de imagen
+  const promptMatch = raw.match(/\*\*Prompt usado:\*\*\s*(.+?)(?:\n|$)/);
+  if (promptMatch) out.imagePrompt = promptMatch[1].replace(/\.\.\.$/, '');
+
+  // Title / hook
+  const titleMatch = raw.match(/(?:título|title|tiktok title)[:\s]+["«]?([^"»\n]+)["»]?/i);
+  if (titleMatch) out.title = titleMatch[1].trim();
+
+  const hookMatch = raw.match(/(?:hook|ggancho|primer frase)[:\s]+["«]?([^"»\n]+)["»]?/i);
+  if (hookMatch) out.hook = hookMatch[1].trim();
+
+  // Script section
+  const scriptSection = raw.match(/##\s*(?:🎬|guión|script|video)[^\n]*\n([\s\S]+?)(?=\n##\s|$)/i);
+  if (scriptSection) {
+    out.script = scriptSection[1].replace(/\*\*/g, '').trim().slice(0, 2000);
+  } else {
+    // fallback: take the largest paragraph block
+    const lines = raw.split('\n').filter(l => !l.startsWith('#') && !l.startsWith('```') && l.trim().length > 40);
+    out.script = lines.slice(0, 20).join('\n').slice(0, 1500);
+  }
+
+  // Trends
+  const trendsSection = raw.match(/##\s*(?:🔍|tendencias|trends|reddit)[^\n]*\n([\s\S]+?)(?=\n##\s|$)/i);
+  if (trendsSection) out.trends = trendsSection[1].replace(/\*\*/g, '').trim().slice(0, 600);
+
+  // Analysis
+  const analysisSection = raw.match(/##\s*(?:📊|análisis|analysis|competencia)[^\n]*\n([\s\S]+?)(?=\n##\s|$)/i);
+  if (analysisSection) out.analysis = analysisSection[1].replace(/\*\*/g, '').trim().slice(0, 600);
+
+  return out;
+}
+
+/* ──────────────────────────────────────────
+   UI — SHOW RESULTS
+────────────────────────────────────────── */
+function showResults(raw, data) {
+  const p = parseResult(raw);
+  const right = document.getElementById('rightPanel');
+  const elapsed = data._elapsed ? `${data._elapsed}s` : formatMs(Date.now() - (startTime || Date.now()));
+
+  right.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div style="font-size:18px;font-weight:700;color:var(--text);">Resultado generado</div>
+      <div style="font-size:12px;color:var(--sub);background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:20px;">${elapsed}</div>
+    </div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:4px;">Issue #${currentIssueId}</div>
+
+    <div class="result-grid">
+
+      <!-- IMAGEN -->
+      <div class="card card-image">
+        <div class="card-header">
+          <span class="card-icon">🖼️</span>
+          <span class="card-title">Thumbnail TikTok 9:16</span>
+        </div>
+        <div class="thumbnail-wrap">
+          ${p.imageUrl
+            ? `<img src="${p.imageUrl}" alt="Thumbnail" onerror="this.parentElement.innerHTML='<div class=\\'thumbnail-placeholder\\'><span>🖼️</span><span>Imagen no disponible</span></div>'">`
+            : `<div class="thumbnail-placeholder"><span>⏳</span><span>Sin imagen generada</span></div>`
+          }
+        </div>
+        ${p.imagePrompt ? `<div style="margin-top:10px;font-size:11px;color:var(--sub);line-height:1.5;">${p.imagePrompt.slice(0,180)}…</div>` : ''}
+      </div>
+
+      <!-- GUIÓN -->
+      <div class="card card-script">
+        <div class="card-header">
+          <span class="card-icon">✍️</span>
+          <span class="card-title">Guión del video</span>
+        </div>
+        <div class="script-content">${escHtml(p.script) || '<span style="color:var(--sub)">No se pudo extraer el guión.</span>'}</div>
+      </div>
+
+      <!-- META -->
+      <div class="card card-meta">
+        <div class="card-header">
+          <span class="card-icon">📌</span>
+          <span class="card-title">Datos clave</span>
+        </div>
+        <div class="meta-rows">
+          ${p.title ? `<div class="meta-row"><div class="meta-key">Título</div><div class="meta-val">${escHtml(p.title)}</div></div>` : ''}
+          ${p.hook  ? `<div class="meta-row"><div class="meta-key">Hook</div><div class="meta-val">${escHtml(p.hook)}</div></div>` : ''}
+          ${p.trends ? `<div class="meta-row"><div class="meta-key">Tendencias</div><div class="meta-val">${escHtml(p.trends.slice(0,200))}</div></div>` : ''}
+          ${p.analysis ? `<div class="meta-row"><div class="meta-key">Análisis</div><div class="meta-val">${escHtml(p.analysis.slice(0,200))}</div></div>` : ''}
+          ${(!p.title && !p.hook && !p.trends && !p.analysis) ? '<div class="meta-row"><div class="meta-val" style="color:var(--sub)">Sin metadatos estructurados</div></div>' : ''}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RAW -->
+    <div class="card card-raw">
+      <div class="raw-toggle" onclick="toggleRaw(this)">
+        <span>▸</span> Ver salida completa del Director
+      </div>
+      <div class="raw-body">${escHtml(raw)}</div>
+    </div>
+  `;
+}
+
+function showRunningPanel(topic) {
+  const right = document.getElementById('rightPanel');
+  right.innerHTML = `
+    <div style="font-size:18px;font-weight:700;margin-bottom:4px;">Generando…</div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:20px;">"${escHtml(topic.slice(0, 80))}"</div>
+    <div class="running-log">
+      <div class="log-header"><span class="dot-pulse"><span></span><span></span><span></span></span>&nbsp;Pipeline en vivo</div>
+      <div class="log-lines" id="logLines">
+        <div class="log-line accent">▸ Iniciando pipeline…</div>
+      </div>
+    </div>
+  `;
+}
+
+function showError(msg) {
+  const right = document.getElementById('rightPanel');
+  right.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">⚠️</div>
+      <h2>Algo salió mal</h2>
+      <p>${escHtml(msg)}</p>
+    </div>`;
+}
+
+function addLog(msg, cls='') {
+  const el = document.getElementById('logLines');
+  if (!el) return;
+  const line = document.createElement('div');
+  line.className = `log-line ${cls}`;
+  line.textContent = `▸ ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function toggleRaw(btn) {
+  const body = btn.nextElementSibling;
+  body.classList.toggle('visible');
+  btn.querySelector('span').textContent = body.classList.contains('visible') ? '▾' : '▸';
+}
+
+/* ──────────────────────────────────────────
+   HISTORY
+────────────────────────────────────────── */
+function saveHistory(item) {
+  history.unshift(item);
+  if (history.length > 20) history = history.slice(0, 20);
+  localStorage.setItem('hs_history', JSON.stringify(history));
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (!history.length) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--sub);padding:4px 0;">Sin historial aún</div>';
+    return;
+  }
+  list.innerHTML = history.map((h, i) => `
+    <div class="history-item ${h.id === currentIssueId ? 'active-run' : ''}" onclick="loadHistoryItem(${i})">
+      <div class="history-title">${escHtml(h.topic.slice(0, 60))}</div>
+      <div class="history-meta">${relTime(h.ts)} · #${h.id || '?'}</div>
+    </div>
+  `).join('');
+}
+
+function loadHistoryItem(idx) {
+  const h = history[idx];
+  if (!h) return;
+  currentIssueId = h.id;
+  setAllDone();
+  showResults(h.raw, { _elapsed: '' });
+}
+
+/* ──────────────────────────────────────────
+   UTILS
+────────────────────────────────────────── */
+function resetUI(withWaiting=true) {
+  document.getElementById('btnGenerate').disabled  = false;
+  document.getElementById('btnGenerate').innerHTML = '✦ Generar contenido';
+  document.getElementById('progressWrap').style.display = 'none';
+  if (withWaiting) setAllWaiting();
+}
+
+function flashInput() {
+  const inp = document.getElementById('topicInput');
+  inp.style.borderColor = 'var(--red)';
+  setTimeout(() => { inp.style.borderColor = ''; }, 1000);
+}
+
+function escHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function relTime(ts) {
+  const sec = Math.floor((Date.now() - ts) / 1000);
+  if (sec < 60)   return 'Hace un momento';
+  if (sec < 3600) return `Hace ${Math.floor(sec/60)} min`;
+  if (sec < 86400)return `Hace ${Math.floor(sec/3600)} h`;
+  return `Hace ${Math.floor(sec/86400)} días`;
+}
+
+function formatMs(ms) {
+  const s = Math.floor(ms / 1000);
+  return s > 60 ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`;
+}
+
+/* ── Init ── */
+renderHistory();
+</script>
+</body>
+</html>
