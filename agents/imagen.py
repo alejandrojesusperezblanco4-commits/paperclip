@@ -14,6 +14,7 @@ import json
 import time
 import urllib.request
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -125,7 +126,7 @@ def generate_image(prompt: str, aspect_ratio: str, label: str, api_key: str) -> 
 
 
 def extract_prompts(input_text: str) -> list:
-    """Extrae prompts del JSON del prompt_generator, o usa fallback."""
+    """Extrae scene_prompts[] del JSON del prompt_generator, o usa fallback."""
     json_str = None
     if "```json" in input_text:
         json_str = input_text.split("```json")[1].split("```")[0].strip()
@@ -137,16 +138,16 @@ def extract_prompts(input_text: str) -> list:
     if json_str:
         try:
             data = json.loads(json_str)
-            hf = data.get("higgsfield", {})
-            prompts = []
-            if hf.get("tiktok", {}).get("prompt"):
-                prompts.append({
-                    "prompt": hf["tiktok"]["prompt"],
-                    "aspect_ratio": "9:16",
-                    "label": "Thumbnail TikTok",
-                })
-            if prompts:
-                print(f"  ✅ {len(prompts)} prompt(s) extraídos del prompt_generator", flush=True)
+            scenes = data.get("scene_prompts", [])
+            if scenes:
+                prompts = []
+                for s in scenes:
+                    prompts.append({
+                        "prompt": s["prompt"],
+                        "aspect_ratio": s.get("aspect_ratio", "9:16"),
+                        "label": f"Escena {s['scene']}: {s.get('title', '')}",
+                    })
+                print(f"  ✅ {len(prompts)} escenas extraídas del prompt_generator", flush=True)
                 return prompts
         except (json.JSONDecodeError, KeyError) as e:
             print(f"  ⚠️  No se pudo parsear JSON: {e} — usando fallback", flush=True)
@@ -162,7 +163,7 @@ def extract_prompts(input_text: str) -> list:
             f"hyperrealistic, 8K quality. Scene: {concept}"
         ),
         "aspect_ratio": "9:16",
-        "label": "Thumbnail TikTok",
+        "label": "Escena 1: Thumbnail",
     }]
 
 
@@ -189,16 +190,25 @@ def main():
     print(f"📌 Input: {script_input[:100]}…", flush=True)
 
     prompts = extract_prompts(script_input)
-    results = []
+    results = [None] * len(prompts)
 
-    for item in prompts:
-        result = generate_image(
+    print(f"\n🚀 Generando {len(prompts)} imágenes en paralelo...", flush=True)
+
+    def run(idx, item):
+        return idx, generate_image(
             prompt=item["prompt"],
             aspect_ratio=item["aspect_ratio"],
             label=item["label"],
             api_key=api_key,
         )
-        results.append(result)
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {executor.submit(run, i, item): i for i, item in enumerate(prompts)}
+        for future in as_completed(futures):
+            idx, result = future.result()
+            results[idx] = result
+            status = "✅" if result["status"] == "ok" else "❌"
+            print(f"  {status} {result['label']} completada", flush=True)
 
     # Output estructurado
     lines = ["# 🖼️ IMÁGENES GENERADAS\n"]
