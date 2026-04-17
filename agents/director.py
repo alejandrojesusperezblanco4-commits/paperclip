@@ -142,13 +142,14 @@ def create_sub_issue(title: str, agent_key: str, parent_issue_id: str,
         return None
 
     payload = {
-        "title":    title,
-        "status":   "in_progress",
-        "parentId": parent_issue_id,
-        # NO assigneeAgentId — los sub-issues son solo para visibilidad/tracking.
-        # El Director ya ejecuta cada agente como subprocess directamente.
-        # Poner assigneeAgentId hace que Paperclip dispare el agente POR SEPARADO
-        # además del subprocess → doble ejecución + imágenes de fallback sin input.
+        "title":  title,
+        "status": "in_progress",
+        # NO parentId: si los sub-issues son hijos del Director, Paperclip llama a
+        # getWakeableParentAfterChildCompletion cuando el último hijo se cierra como
+        # "done" → reactiva el Director (que sigue corriendo) → segunda ejecución completa.
+        # Sin parentId los sub-issues aparecen como issues independientes en el inbox.
+        # NO assigneeAgentId: Paperclip dispararía el agente por separado además del
+        # subprocess del Director → doble ejecución + imágenes de fallback sin input.
     }
 
     # Ruta correcta: /api/companies/:companyId/issues

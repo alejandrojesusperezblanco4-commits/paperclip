@@ -862,6 +862,13 @@ function mdToHtml(text) {
       html += `<li>${inline(ol[1])}</li>`;
       continue;
     }
+    // Markdown image: ![alt](url)
+    const imgM = t.match(/^!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)$/);
+    if (imgM) {
+      closeList();
+      html += `<div style="margin:8px 0"><a href="${imgM[2]}" target="_blank" rel="noopener"><img src="${imgM[2]}" alt="${escHtml(imgM[1])}" style="max-width:100%;max-height:300px;border-radius:6px;cursor:pointer" loading="lazy" onerror="this.style.display='none'"></a><div style="font-size:10px;color:var(--sub);margin-top:3px">${escHtml(imgM[1])}</div></div>`;
+      continue;
+    }
     closeList();
     html += `<p>${inline(t)}</p>`;
   }
@@ -904,17 +911,29 @@ function buildDirectorResult(raw) {
     images:   extractDetail('Imagen Generator'),
   };
 
-  // Image gallery HTML
-  const galleryHtml = imageUrls.length
-    ? `<div class="image-gallery" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));margin-top:8px">
-        ${imageUrls.map((url,i)=>`
+  // Parse Imagen Generator JSON for richer gallery (label + prompt per scene)
+  let richImages = [];
+  try {
+    const jsonM = sections.images.match(/```json\s*([\s\S]+?)```/);
+    if (jsonM) richImages = JSON.parse(jsonM[1]);
+  } catch(e) {}
+  // Fallback: build from raw URLs + labels from **URL:** lines
+  if (!richImages.length && imageUrls.length) {
+    richImages = imageUrls.map((url,i) => ({ url, label: `Escena ${i+1}`, prompt: '' }));
+  }
+
+  // Image gallery HTML — uses richImages for proper labels/prompts
+  const galleryHtml = richImages.length
+    ? `<div class="image-gallery" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-top:8px">
+        ${richImages.map(img => img.url ? `
           <div>
             <div class="gallery-item">
-              <img src="${url}" alt="Escena ${i+1}" onclick="window.open('${url}','_blank')"
-                onerror="this.parentElement.innerHTML='<div class=\\'gallery-error\\'>❌</div>'">
+              <img src="${escHtml(img.url)}" alt="${escHtml(img.label||'')}"
+                onclick="window.open('${escHtml(img.url)}','_blank')" style="cursor:pointer"
+                onerror="this.parentElement.innerHTML='<div class=\\'gallery-error\\'>❌</div>'" loading="lazy">
             </div>
-            <div class="gallery-caption">Escena ${i+1}</div>
-          </div>`).join('')}
+            <div class="gallery-caption" title="${escHtml(img.prompt||'')}">${escHtml((img.label||'').replace('Escena ','E'))}</div>
+          </div>` : '').join('')}
        </div>`
     : `<div style="color:var(--sub);font-size:12px;padding:20px 0;text-align:center">Sin imágenes generadas</div>`;
 
@@ -938,7 +957,7 @@ function buildDirectorResult(raw) {
   return `
     <div class="art-tabs" id="artTabs">
       <button class="art-tab active" data-art="summary" onclick="switchArtTab('summary',this)">🎬 Resumen</button>
-      <button class="art-tab" data-art="images" onclick="switchArtTab('images',this)">🖼️ Imágenes${imageUrls.length ? ' · '+imageUrls.length : ''}</button>
+      <button class="art-tab" data-art="images" onclick="switchArtTab('images',this)">🖼️ Imágenes${richImages.length ? ' · '+richImages.filter(i=>i.url).length : (imageUrls.length ? ' · '+imageUrls.length : '')}</button>
       <button class="art-tab" data-art="story" onclick="switchArtTab('story',this)">✍️ Guión</button>
       <button class="art-tab" data-art="search" onclick="switchArtTab('search',this)">🔍 Deep Search</button>
       <button class="art-tab" data-art="analyzer" onclick="switchArtTab('analyzer',this)">📊 Canal</button>
@@ -951,7 +970,7 @@ function buildDirectorResult(raw) {
 
     <div id="art-panel-images" class="art-panel">
       <div class="card">
-        <div class="card-header"><span class="card-icon">🖼️</span><span class="card-title">Imágenes generadas · ${imageUrls.length} escenas</span></div>
+        <div class="card-header"><span class="card-icon">🖼️</span><span class="card-title">Imágenes generadas · ${richImages.filter(i=>i.url).length || imageUrls.length} escenas</span></div>
         ${galleryHtml}
       </div>
     </div>
