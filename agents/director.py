@@ -384,8 +384,8 @@ def main():
 
     # ── Helper: ejecuta un agente + gestiona su sub-issue ─────
     def run_tracked(script: str, task: str, label: str, agent_key: str,
-                    env_override=None) -> str:
-        """Crea sub-issue → ejecuta agente → cierra sub-issue con resultado."""
+                    extra_env: dict = None) -> str:
+        """Crea sub-issue → ejecuta agente apuntando a ese sub-issue → devuelve output."""
         sub_id = None
         if issue_id and "Authorization" in auth_headers:
             sub_id = create_sub_issue(
@@ -397,13 +397,29 @@ def main():
                 company_id=company_id,
             )
 
-        if env_override is not None:
-            result = run_agent_with_env(script, task, env_override, label)
-        else:
-            result = run_agent(script, task, api_key, label)
+        # Construir env del sub-agente:
+        # - Apuntar PAPERCLIP_ISSUE_ID al sub-issue (no al padre)
+        #   para que post_issue_result/post_issue_comment vayan al sitio correcto.
+        # - Limpiar PAPERCLIP_ISSUE_TITLE/BODY para que el sub-agente use la tarea
+        #   que le pasa el Director por stdin (no la sobreescriba con env vars).
+        sub_env = {**os.environ}
+        if extra_env:
+            sub_env.update(extra_env)
 
         if sub_id:
-            close_sub_issue(sub_id, result, api_url, auth_headers)
+            sub_env["PAPERCLIP_ISSUE_ID"] = sub_id
+        else:
+            sub_env.pop("PAPERCLIP_ISSUE_ID", None)
+
+        # Limpiar vars que harían que el sub-agente sobreescriba la tarea del Director
+        sub_env.pop("PAPERCLIP_ISSUE_TITLE", None)
+        sub_env.pop("PAPERCLIP_ISSUE_BODY", None)
+
+        result = run_agent_with_env(script, task, sub_env, label)
+
+        # Fallback: si el sub-agente falló y no cerró su sub-issue, cerrarlo aquí
+        if sub_id and (not result or (result.startswith('[') and 'Error' in result)):
+            close_sub_issue(sub_id, result or '[Sin resultado]', api_url, auth_headers)
 
         return result
 
@@ -440,11 +456,9 @@ Guión completo:
     imagen_result  = "[Imagen Generator: HIGGSFIELD_API_KEY no configurada — omitido]"
     higgsfield_key = os.environ.get("HIGGSFIELD_API_KEY", "")
     if higgsfield_key:
-        imagen_env = os.environ.copy()
-        imagen_env["HIGGSFIELD_API_KEY"] = higgsfield_key
         imagen_result = run_tracked("imagen.py", prompt_result,
                                     "Imagen Generator — Higgsfield Soul", "imagen_generator",
-                                    env_override=imagen_env)
+                                    extra_env={"HIGGSFIELD_API_KEY": higgsfield_key})
     else:
         print("⚠️  HIGGSFIELD_API_KEY no encontrada — saltando Imagen Generator", flush=True)
 
@@ -466,11 +480,22 @@ Guión completo:
     except Exception as e:
         synthesis = f"[Error en síntesis: {e}]"
 
+    # ── Extraer URLs de imágenes para incluirlas en el preamble ──
+    import re as _re
+    imagen_urls = _re.findall(r'https?://[^\s)"\']+\.png', imagen_result)
+
+    imagen_gallery = ""
+    if imagen_urls:
+        imagen_gallery = "\n## 🖼️ IMÁGENES GENERADAS\n"
+        for i, url in enumerate(imagen_urls, 1):
+            imagen_gallery += f"![Imagen {i}]({url})\n"
+        imagen_gallery += "\n"
+
     # ── Output final ───────────────────────────────────────────
     output = f"""# 🎬 PAQUETE COMPLETO DE CONTENIDO
 **Tema:** {objetivo}
 **Generado por:** Director de Contenido (5 agentes coordinados)
-
+{imagen_gallery}
 {synthesis}
 
 ---
