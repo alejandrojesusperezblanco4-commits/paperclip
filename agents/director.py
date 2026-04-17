@@ -363,16 +363,25 @@ def main():
     else:
         print("⚠️  Sin token de autenticación disponible — sub-issues no se crearán", flush=True)
 
-    # ── Marcar issue como in_progress al inicio ───────────────
-    # El issue vive en 'backlog' durante el run (el process adapter solo setea checkoutRunId).
-    # Si al final hacemos PATCH backlog→done, Paperclip dispara statusChangedFromBacklog→wakeup→re-run.
-    # Al pasar a in_progress AQUÍ, el PATCH final es in_progress→done → sin wakeup extra.
-    if issue_id and "Authorization" in auth_headers:
+    # ── Checkout del issue al inicio ─────────────────────────
+    # Usar POST /checkout en vez de PATCH directo: esto setea TANTO status=in_progress
+    # COMO checkoutRunId=<run_id del JWT>, lo que permite que los comentarios y el
+    # PATCH final funcionen sin 409. El PATCH final será in_progress→done, que NO
+    # dispara statusChangedFromBacklog → sin re-run extra.
+    if issue_id and agent_id and "Authorization" in auth_headers:
         try:
-            _api_request("PATCH", f"{api_url}/api/issues/{issue_id}", {"status": "in_progress"}, auth_headers)
-            print("✅ Issue marcado in_progress — evita re-trigger por statusChangedFromBacklog", flush=True)
+            _api_request(
+                "POST",
+                f"{api_url}/api/issues/{issue_id}/checkout",
+                {
+                    "agentId": agent_id,
+                    "expectedStatuses": ["backlog", "todo", "in_review", "blocked", "in_progress"],
+                },
+                auth_headers,
+            )
+            print("✅ Checkout exitoso — issue en in_progress con runId registrado", flush=True)
         except Exception as _e:
-            print(f"⚠️  No se pudo marcar in_progress: {_e}", flush=True)
+            print(f"⚠️  Checkout falló (continuando de todas formas): {_e}", flush=True)
 
     # ── Helper: ejecuta un agente + gestiona su sub-issue ─────
     def run_tracked(script: str, task: str, label: str, agent_key: str,
