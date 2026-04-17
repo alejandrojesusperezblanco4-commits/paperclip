@@ -253,7 +253,8 @@
     .card-icon { font-size: 15px; }
     .card-title { font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: 0.07em; }
 
-    .card-image { grid-row: 1 / 3; }
+    .card-image { grid-row: 1 / 2; }
+    .card-synth { grid-column: 2 / -1; grid-row: 1 / 2; overflow: hidden; }
     .thumbnail-wrap {
       border-radius: 7px; overflow: hidden;
       background: var(--muted); aspect-ratio: 9/16;
@@ -279,18 +280,25 @@
     .script-content::-webkit-scrollbar { width: 3px; }
     .script-content::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
 
-    /* Markdown result */
-    .md-result {
-      font-size: 12.5px; line-height: 1.7; color: var(--text);
-      max-height: 600px; overflow-y: auto;
+    /* Markdown render */
+    .md-render {
+      font-size: 12.5px; line-height: 1.75; color: var(--text);
+      overflow-y: auto; padding-right: 4px;
     }
-    .md-result h3 { font-size: 13px; font-weight: 600; color: var(--accent); margin: 12px 0 4px; }
-    .md-result p  { margin-bottom: 8px; }
-    .md-result ul { padding-left: 16px; margin-bottom: 8px; }
-    .md-result li { margin-bottom: 3px; }
-    .md-result strong { color: var(--text); font-weight: 600; }
-    .md-result::-webkit-scrollbar { width: 3px; }
-    .md-result::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+    .md-render::-webkit-scrollbar { width: 3px; }
+    .md-render::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+    .md-render h2 { font-size: 14px; font-weight: 700; color: var(--accent); margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+    .md-render h3 { font-size: 12.5px; font-weight: 700; color: var(--text); margin: 14px 0 5px; }
+    .md-render h4 { font-size: 11.5px; font-weight: 600; color: var(--sub); margin: 10px 0 4px; }
+    .md-render p  { margin: 0 0 8px; }
+    .md-render ul, .md-render ol { padding-left: 18px; margin: 4px 0 10px; }
+    .md-render li { margin: 3px 0; }
+    .md-render hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+    .md-render strong { color: var(--text); font-weight: 600; }
+    .md-render em { color: var(--sub); font-style: italic; }
+    .md-render code { background: var(--muted); padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 11.5px; }
+    .md-render a { color: var(--accent); text-decoration: none; }
+    .md-render a:hover { text-decoration: underline; }
 
     .meta-rows { display: flex; flex-direction: column; gap: 8px; }
     .meta-row  { display: flex; gap: 8px; align-items: flex-start; }
@@ -785,33 +793,107 @@ function showResults(raw, data) {
   }
 }
 
-/* Director: thumbnail + guión + meta */
+/* ── Markdown → HTML renderer ── */
+function mdToHtml(text) {
+  if (!text) return '';
+
+  // Inline formatter (escapes HTML then applies markdown patterns)
+  function inline(s) {
+    s = s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    return s;
+  }
+
+  // Strip HTML <details> blocks (embedded raw reports) — keep only synthesis
+  const detailsStart = text.indexOf('<details>');
+  const clean = detailsStart > 0 ? text.slice(0, detailsStart) : text;
+
+  const lines = clean.split('\n');
+  let html = '', inUl = false, inOl = false;
+
+  const closeList = () => {
+    if (inUl) { html += '</ul>'; inUl = false; }
+    if (inOl) { html += '</ol>'; inOl = false; }
+  };
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) { closeList(); continue; }
+    if (/^---+$/.test(t)) { closeList(); html += '<hr>'; continue; }
+
+    const h3 = t.match(/^###\s+(.*)/);
+    const h2 = t.match(/^##\s+(.*)/);
+    const h1 = t.match(/^#\s+(.*)/);
+    const ul = t.match(/^[-*•]\s+(.*)/);
+    const ol = t.match(/^\d+\.\s+(.*)/);
+
+    if (h3) { closeList(); html += `<h4>${inline(h3[1])}</h4>`; continue; }
+    if (h2) { closeList(); html += `<h3>${inline(h2[1])}</h3>`; continue; }
+    if (h1) { closeList(); html += `<h2>${inline(h1[1])}</h2>`; continue; }
+
+    if (ul) {
+      if (inOl) { html += '</ol>'; inOl = false; }
+      if (!inUl) { html += '<ul>'; inUl = true; }
+      html += `<li>${inline(ul[1])}</li>`;
+      continue;
+    }
+    if (ol) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (!inOl) { html += '<ol>'; inOl = true; }
+      html += `<li>${inline(ol[1])}</li>`;
+      continue;
+    }
+    closeList();
+    html += `<p>${inline(t)}</p>`;
+  }
+  closeList();
+  return html;
+}
+
+/* ── Extract image URL from any text (no extension required) ── */
+function extractImageUrl(text) {
+  // 1. Markdown image syntax: ![...](url)
+  const md = text.match(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/);
+  if (md) return md[1];
+  // 2. **URL:** line (from imagen.py output)
+  const urlLine = text.match(/\*\*URL:\*\*\s*(https?:\/\/[^\s\n)]+)/);
+  if (urlLine) return urlLine[1];
+  // 3. Any URL with image extension
+  const ext = text.match(/https?:\/\/[^\s)"'\]]+\.(?:png|jpg|jpeg|webp|gif)/i);
+  if (ext) return ext[0];
+  // 4. CDN/storage URLs likely to be images (Higgsfield, Google Storage, S3, CloudFront)
+  const cdn = text.match(/https?:\/\/(?:[^\s)"'\]]*(?:storage\.googleapis|higgsfield|cloudfront|s3\.amazonaws|cdn\.)[^\s)"'\]]*)/i);
+  if (cdn) return cdn[0];
+  return '';
+}
+
+/* Director: thumbnail + synthesis markdown */
 function buildDirectorResult(raw) {
-  const p = parseDirector(raw);
+  const imageUrl = extractImageUrl(raw);
+
+  // Synthesis = everything before the <details> blocks
+  const detailsIdx = raw.indexOf('<details>');
+  const synthesis = detailsIdx > 0 ? raw.slice(0, detailsIdx).trim() : raw;
+
   return `
     <div class="result-grid">
       <div class="card card-image">
         <div class="card-header"><span class="card-icon">🖼️</span><span class="card-title">Thumbnail 9:16</span></div>
         <div class="thumbnail-wrap">
-          ${p.imageUrl
-            ? `<img src="${p.imageUrl}" alt="Thumbnail" onerror="this.parentElement.innerHTML='<div class=\\'thumbnail-placeholder\\'><span>🖼️</span><span>Sin imagen</span></div>'">`
-            : `<div class="thumbnail-placeholder"><span>⏳</span><span>Sin imagen generada</span></div>`}
+          ${imageUrl
+            ? `<img src="${imageUrl}" alt="Thumbnail" onclick="window.open('${imageUrl}','_blank')" style="cursor:pointer"
+                onerror="this.parentElement.innerHTML='<div class=\\'thumbnail-placeholder\\'><span>🖼️</span><span>Sin imagen</span></div>'">`
+            : `<div class="thumbnail-placeholder"><span>🖼️</span><span>Sin imagen generada</span></div>`}
         </div>
       </div>
-      <div class="card">
-        <div class="card-header"><span class="card-icon">✍️</span><span class="card-title">Guión del video</span></div>
-        <div class="script-content">${escHtml(p.script || 'No se pudo extraer el guión.')}</div>
+      <div class="card card-synth">
+        <div class="card-header"><span class="card-icon">🎬</span><span class="card-title">Paquete de contenido</span></div>
+        <div class="md-render" style="max-height:420px;overflow-y:auto">${mdToHtml(synthesis)}</div>
       </div>
-      <div class="card">
-        <div class="card-header"><span class="card-icon">📌</span><span class="card-title">Datos clave</span></div>
-        <div class="meta-rows">
-          ${p.title ? `<div class="meta-row"><div class="meta-key">Título</div><div class="meta-val">${escHtml(p.title)}</div></div>` : ''}
-          ${p.hook  ? `<div class="meta-row"><div class="meta-key">Hook</div><div class="meta-val">${escHtml(p.hook)}</div></div>`   : ''}
-          ${(!p.title && !p.hook) ? `<div style="font-size:12px;color:var(--sub)">Consulta la salida completa abajo.</div>` : ''}
-        </div>
-      </div>
-      <div class="card card-raw">
-        <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver salida completa</div>
+      <div class="card card-raw" style="grid-column:1/-1">
+        <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver reportes completos (Deep Search · Channel Analyzer · Storytelling · Prompts · Imágenes)</div>
         <div class="raw-body">${escHtml(raw)}</div>
       </div>
     </div>`;
@@ -819,17 +901,25 @@ function buildDirectorResult(raw) {
 
 /* Images gallery */
 function buildImagesResult(raw) {
-  // Extract JSON array from raw output
   let images = [];
+  // 1. Try JSON block
   try {
     const jsonMatch = raw.match(/```json\s*([\s\S]+?)```/);
     if (jsonMatch) images = JSON.parse(jsonMatch[1]);
   } catch(e) {}
 
+  // 2. Fallback: extract markdown image lines  ![label](url)
   if (!images.length) {
-    // Try to extract URLs from markdown
-    const urlMatches = [...raw.matchAll(/https?:\/\/[^\s)]+\.png/g)];
-    images = urlMatches.map((m, i) => ({ url: m[0], label: `Imagen ${i+1}`, status: 'ok' }));
+    const mdImgs = [...raw.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g)];
+    if (mdImgs.length) {
+      images = mdImgs.map(m => ({ url: m[2], label: m[1] || 'Imagen', status: 'ok' }));
+    }
+  }
+
+  // 3. Fallback: **URL:** lines
+  if (!images.length) {
+    const urlLines = [...raw.matchAll(/\*\*URL:\*\*\s*(https?:\/\/[^\s\n)]+)/g)];
+    images = urlLines.map((m,i) => ({ url: m[1], label: `Imagen ${i+1}`, status: 'ok' }));
   }
 
   const galleryHtml = images.length
@@ -838,13 +928,13 @@ function buildImagesResult(raw) {
           <div>
             <div class="gallery-item">
               ${img.url
-                ? `<img src="${img.url}" alt="${escHtml(img.label)}" onclick="window.open('${img.url}','_blank')" title="Abrir en nueva pestaña">`
-                : `<div class="gallery-error">Error</div>`}
+                ? `<img src="${img.url}" alt="${escHtml(img.label||'')}" onclick="window.open('${img.url}','_blank')" title="Abrir en nueva pestaña">`
+                : `<div class="gallery-error">❌ Error</div>`}
             </div>
             <div class="gallery-caption">${escHtml((img.label||'').replace('Escena ','E'))}</div>
           </div>`).join('')}
       </div>`
-    : `<div style="color:var(--sub);font-size:12px;">No se encontraron imágenes en la respuesta.</div>`;
+    : `<div style="color:var(--sub);font-size:12px;padding:12px 0;">No se encontraron imágenes en la respuesta.</div>`;
 
   return `
     <div class="card" style="grid-column:1/-1">
@@ -857,12 +947,12 @@ function buildImagesResult(raw) {
     </div>`;
 }
 
-/* Script result */
+/* Script result — render as markdown */
 function buildScriptResult(raw) {
   return `
     <div class="card" style="grid-column:1/-1">
       <div class="card-header"><span class="card-icon">✍️</span><span class="card-title">Guión generado</span></div>
-      <div class="script-content" style="max-height:none">${escHtml(raw)}</div>
+      <div class="md-render">${mdToHtml(raw)}</div>
     </div>`;
 }
 
@@ -878,7 +968,7 @@ function buildPromptsResult(raw) {
           <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">Escena ${s.scene}: ${escHtml(s.title||'')}</div>
           <div style="font-size:12px;color:var(--text);line-height:1.6;">${escHtml(s.prompt)}</div>
         </div>`).join('')
-    : `<div class="script-content">${escHtml(raw)}</div>`;
+    : `<div class="md-render">${mdToHtml(raw)}</div>`;
 
   return `
     <div class="card" style="grid-column:1/-1">
@@ -896,7 +986,7 @@ function buildMarkdownResult(raw) {
   return `
     <div class="card" style="grid-column:1/-1">
       <div class="card-header"><span class="card-icon">${AGENTS[currentAgent].icon}</span><span class="card-title">Análisis</span></div>
-      <div class="script-content" style="max-height:600px">${escHtml(raw)}</div>
+      <div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(raw)}</div>
     </div>`;
 }
 
@@ -934,47 +1024,6 @@ function addLog(msg, cls='') {
   el.scrollTop = el.scrollHeight;
 }
 
-/* ────────────────────────────────────────
-   PARSE (Director result)
-──────────────────────────────────────── */
-function parseDirector(raw) {
-  const out = { imageUrl: '', script: '', title: '', hook: '' };
-
-  // Buscar URLs de imagen en cualquier parte del texto (cloudfront, CDN, etc.)
-  const allUrls = [...raw.matchAll(/https?:\/\/[^\s)"']+\.(?:png|jpg|jpeg|webp)/gi)];
-  if (allUrls.length) out.imageUrl = allUrls[0][0];
-
-  // Fallback: markdown image o URL line
-  if (!out.imageUrl) {
-    const imgMd  = raw.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-    const imgUrl = raw.match(/\*\*URL:\*\*\s*(https?:\/\/\S+)/);
-    out.imageUrl = (imgMd?.[1] || imgUrl?.[1] || '').split(')')[0];
-  }
-
-  // Título
-  const titleM = raw.match(/(?:título sugerido|título final|title)[:\s*\*]+["«]?([^"»\n*]+)/i);
-  if (titleM) out.title = titleM[1].trim();
-
-  // Hook
-  const hookM = raw.match(/(?:hook|primeros 3 segundos|primer frase)[^\n]*\n([^\n]+)/i);
-  if (hookM) out.hook = hookM[1].replace(/\*\*/g,'').trim();
-
-  // Guión — buscar sección específica o la más larga entre los párrafos narrativos
-  const scriptM = raw.match(/(?:###\s*Guion listo|🎙️ NARRACIÓN)[^\n]*\n([\s\S]+?)(?=\n###|\n##|\n━|$)/i);
-  if (scriptM) {
-    out.script = scriptM[1].replace(/\*\*/g,'').trim().slice(0, 2000);
-  } else {
-    // Fallback: bloques de texto narrativo largos
-    const lines = raw.split('\n').filter(l =>
-      !l.startsWith('#') && !l.startsWith('```') &&
-      !l.startsWith('<') && !l.startsWith('>') &&
-      l.trim().length > 50
-    );
-    out.script = lines.slice(0, 25).join('\n').slice(0, 2000);
-  }
-
-  return out;
-}
 
 /* ────────────────────────────────────────
    HISTORY
