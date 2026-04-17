@@ -343,32 +343,17 @@ def main():
         print("ERROR: OPENROUTER_API_KEY no configurada", file=sys.stderr)
         sys.exit(1)
 
-    # Leer objetivo desde stdin, args o env de Paperclip
+    # Leer objetivo desde stdin o args (fallback)
     if len(sys.argv) > 1:
         objetivo = " ".join(sys.argv[1:])
     else:
         objetivo = sys.stdin.read().strip()
 
-    issue_title = os.environ.get("PAPERCLIP_ISSUE_TITLE", "")
-    issue_body  = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
-    if issue_title:
-        objetivo = f"{issue_title}\n\n{issue_body or ''}"
-        post_issue_comment(
-            f"🎬 Perfecto, me pongo en marcha con: **{issue_title}**\n\n"
-            f"Coordino 5 agentes especializados:\n"
-            f"1️⃣ **Deep Search** — qué está viral ahora mismo en este nicho\n"
-            f"2️⃣ **Channel Analyzer** — qué hace la competencia y cómo superarla\n"
-            f"3️⃣ **Storytelling** — guión completo adaptado al nicho\n"
-            f"4️⃣ **Prompt Generator** — prompts de imagen para cada escena\n"
-            f"5️⃣ **Imagen Generator** — imágenes generadas con Higgsfield Soul\n\n"
-            f"El paquete completo estará listo en ~5 minutos. 🚀"
-        )
-
-    if not objetivo:
-        objetivo = "crea contenido viral para TikTok y YouTube en español"
+    # Leer contexto desde env (proceso local o adapter que los inyecta)
+    issue_title = os.environ.get("PAPERCLIP_ISSUE_TITLE", "").strip()
+    issue_body  = os.environ.get("PAPERCLIP_ISSUE_BODY", "").strip()
 
     print(f"🎯 DIRECTOR DE CONTENIDO INICIANDO", flush=True)
-    print(f"📌 Objetivo: {objetivo[:100]}...", flush=True)
 
     # ── Configurar auth de Paperclip ──────────────────────────
     issue_id   = os.environ.get("PAPERCLIP_ISSUE_ID", "")
@@ -395,6 +380,36 @@ def main():
             print(f"⚠️  No se pudo generar JWT: {e}", flush=True)
     else:
         print("⚠️  Sin token de autenticación disponible — sub-issues no se crearán", flush=True)
+
+    # ── Obtener título del issue desde la API si no llegó por env ─
+    # El wakeup de Paperclip solo pasa issueId en el payload, no el título.
+    # PAPERCLIP_ISSUE_TITLE queda vacío → el Director siempre usaba el objetivo
+    # por defecto. Solución: hacer GET del issue y leer su título real.
+    if not issue_title and issue_id and "Authorization" in auth_headers:
+        _issue_data = _api_request("GET", f"{api_url}/api/issues/{issue_id}", None, auth_headers)
+        if _issue_data:
+            issue_title = (_issue_data.get("title") or "").strip()
+            issue_body  = (_issue_data.get("description") or "").strip()
+            if issue_title:
+                print(f"📥 Título obtenido de la API: {issue_title!r}", flush=True)
+
+    # ── Construir objetivo final ───────────────────────────────
+    if issue_title:
+        objetivo = f"{issue_title}\n\n{issue_body}" if issue_body else issue_title
+        post_issue_comment(
+            f"🎬 Perfecto, me pongo en marcha con: **{issue_title}**\n\n"
+            f"Coordino 5 agentes especializados:\n"
+            f"1️⃣ **Deep Search** — qué está viral ahora mismo en este nicho\n"
+            f"2️⃣ **Channel Analyzer** — qué hace la competencia y cómo superarla\n"
+            f"3️⃣ **Storytelling** — guión completo adaptado al nicho\n"
+            f"4️⃣ **Prompt Generator** — prompts de imagen para cada escena\n"
+            f"5️⃣ **Imagen Generator** — imágenes generadas con Higgsfield Soul\n\n"
+            f"El paquete completo estará listo en ~5 minutos. 🚀"
+        )
+    elif not objetivo:
+        objetivo = "crea contenido viral para TikTok y YouTube en español"
+
+    print(f"📌 Objetivo: {objetivo[:120]}", flush=True)
 
     # ── Guardia: salir si el issue ya está cerrado ────────────
     # Previene re-runs de getWakeableParentAfterChildCompletion: cuando todos los
