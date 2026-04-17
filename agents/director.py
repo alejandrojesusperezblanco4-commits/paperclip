@@ -183,7 +183,11 @@ def _wait_for_sub_agent(sub_id: str, label: str, api_url: str,
                     items = (comments if isinstance(comments, list)
                              else comments.get("comments") or comments.get("items") or [])
                     if items:
-                        return items[-1].get("body", "") or "[sin contenido]"
+                        # Tomar el comentario más largo: es el resultado real del agente.
+                        # La API puede devolver newest-first o oldest-first; el JSON/markdown
+                        # del resultado siempre será mucho más largo que el mensaje de confirmación.
+                        best = max(items, key=lambda c: len(c.get("body", "") or ""))
+                        return best.get("body", "") or "[sin contenido]"
                 return "[Agente terminó sin comentario de resultado]"
             elif status == "cancelled":
                 return f"[{label}: cancelado]"
