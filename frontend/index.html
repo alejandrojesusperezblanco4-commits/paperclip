@@ -475,9 +475,10 @@
 /* ────────────────────────────────────────
    CONFIG
 ──────────────────────────────────────── */
-const API_BASE   = 'https://spirited-charm-production.up.railway.app';
-const COMPANY_ID = '4d39bc9c-a76c-4558-a3b0-2a3267124dc0';
-const POLL_MS    = 4000;
+const API_BASE    = 'https://spirited-charm-production.up.railway.app';
+const COMPANY_ID  = '4d39bc9c-a76c-4558-a3b0-2a3267124dc0';
+const PROJECT_ID  = 'ebb963af-a5b1-461e-af6f-0dc1927b83ce'; // Historias en sombra
+const POLL_MS     = 4000;
 
 /* ────────────────────────────────────────
    AGENT DEFINITIONS
@@ -487,7 +488,7 @@ const AGENTS = {
     icon: '🎬', name: 'Director',
     label: 'Historia o tema',
     placeholder: 'Ej: Ella descubre que su esposo la engañó con su mejor amiga el día de su aniversario…',
-    agentId: null,   // usa el Director ya configurado en Paperclip
+    agentId: 'b36d6723-4e9a-4b54-b94e-aff3f89ca690',
     showPipeline: true,
     resultType: 'director',
   },
@@ -637,7 +638,7 @@ async function startRun() {
   showRunningPanel(cfg, topic);
 
   try {
-    const body = { title: topic };
+    const body = { title: topic, projectId: PROJECT_ID };
     if (cfg.agentId) body.assigneeAgentId = cfg.agentId;
 
     const res = await fetch(`${API_BASE}/api/companies/${COMPANY_ID}/issues`, {
