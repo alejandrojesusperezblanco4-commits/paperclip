@@ -627,8 +627,12 @@ async function startPipeline() {
     const res = await fetch(`${API_BASE}/api/companies/${COMPANY_ID}/issues`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ title: topic, body: '' }),
     });
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`Sin sesión (${res.status}). Inicia sesión en la app principal primero.`);
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     currentIssueId = data.id || data.issueId || data.issue?.id;
@@ -649,24 +653,26 @@ async function startPipeline() {
 async function pollIssue() {
   if (!currentIssueId) return;
   try {
-    const res  = await fetch(`${API_BASE}/api/issues/${currentIssueId}`);
+    const res  = await fetch(`${API_BASE}/api/issues/${currentIssueId}`, { credentials: 'include' });
+    if (!res.ok) { addLog(`Poll HTTP ${res.status}`, 'red'); return; }
     const data = await res.json();
     const status = (data.status || '').toLowerCase();
     addLog(`Estado: ${status}`);
 
-    if (status === 'completed' || status === 'done' || status === 'finished') {
+    if (status === 'done') {
       clearInterval(pollTimer);
       startTime = null;
       setAllDone();
       document.getElementById('progressBar').style.width = '100%';
-      const raw = extractResult(data);
+      // El output del Director viene en comments — hay que pedirlos aparte
+      const raw = await fetchComments(currentIssueId);
       showResults(raw, data);
       saveHistory({ id: currentIssueId, topic: document.getElementById('topicInput').value.trim(), ts: Date.now(), raw });
       resetUI(false);
-    } else if (status === 'failed' || status === 'error') {
+    } else if (status === 'cancelled') {
       clearInterval(pollTimer);
       startTime = null;
-      showError('El pipeline falló. Revisa los logs en Railway.');
+      showError('El pipeline fue cancelado.');
       resetUI();
     }
   } catch(e) {
@@ -674,12 +680,19 @@ async function pollIssue() {
   }
 }
 
-function extractResult(data) {
-  // Try multiple locations where the result may live
-  if (data.result) return typeof data.result === 'string' ? data.result : JSON.stringify(data.result);
-  if (data.comments?.length) return data.comments[data.comments.length - 1].body || '';
-  if (data.output) return data.output;
-  return JSON.stringify(data, null, 2);
+async function fetchComments(issueId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/issues/${issueId}/comments`, { credentials: 'include' });
+    if (!res.ok) return '';
+    const data = await res.json();
+    // Los comments vienen como array, el último es el output del Director
+    const comments = data.comments || data || [];
+    if (!Array.isArray(comments) || !comments.length) return '';
+    const last = comments[comments.length - 1];
+    return last.body || last.content || last.text || JSON.stringify(last);
+  } catch(e) {
+    return '';
+  }
 }
 
 /* ──────────────────────────────────────────
