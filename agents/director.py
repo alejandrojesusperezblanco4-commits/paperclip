@@ -35,8 +35,8 @@ SUB_AGENT_IDS = {
     "storytelling":      "061ed6b8-27b1-4a31-8758-19af856b45d3",
     "prompt_generator":  "64e2cb07-75e1-4ca2-8b6c-05a78b66613f",
     "imagen_generator":  "2492962a-b9f0-4611-90e2-c7ccca5aa281",
-    "tts":               "518eb873-17d4-4278-8ac5-0d9127da2fd5",
-    "video_assembler":   "78ab90be-bac1-4426-84a3-06ef7a40b97a",
+    "tts":               "0d43b313-77b5-481b-83cc-a41485823f8e",
+    "video_assembler":   "28f0a4aa-a230-4d82-aedf-4c327ab4a506",
 }
 
 AGENTS_DIR = Path(__file__).parent
