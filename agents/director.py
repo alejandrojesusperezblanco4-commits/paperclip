@@ -30,6 +30,7 @@ sys.stderr.reconfigure(encoding="utf-8")
 
 # ── IDs de los sub-agentes registrados en Paperclip ─────────────────────────
 SUB_AGENT_IDS = {
+    "source_reader":     "",  # registrar en Paperclip → completar ID
     "deep_search":       "a1d8d0b8-9ada-4980-9b5f-663b34ba2c80",
     "channel_analyzer":  "0f784ca9-93b0-4384-ba7c-1e079bb8797b",
     "storytelling":      "061ed6b8-27b1-4a31-8758-19af856b45d3",
@@ -218,7 +219,8 @@ def close_sub_issue(sub_issue_id: str, result_text: str,
     print(f"  ✅ Sub-issue {sub_issue_id} cerrado con resultado", flush=True)
 
 
-def run_agent_with_env(script_name: str, task: str, env: dict, label: str) -> str:
+def run_agent_with_env(script_name: str, task: str, env: dict, label: str,
+                       timeout: int = 120) -> str:
     """Ejecuta un agente especializado con un env personalizado."""
     script_path = AGENTS_DIR / script_name
     print(f"\n{'='*60}", flush=True)
@@ -235,7 +237,7 @@ def run_agent_with_env(script_name: str, task: str, env: dict, label: str) -> st
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=240,
+            timeout=timeout,
             env=env
         )
         if result.returncode != 0:
@@ -404,17 +406,31 @@ def main():
         objetivo = f"{issue_title}\n\n{issue_body}" if issue_body else issue_title
         has_tts   = bool(os.environ.get("ELEVENLABS_API_KEY", ""))
         has_hf    = bool(os.environ.get("HIGGSFIELD_API_KEY", ""))
+        # Detectar URLs en el body para saber si hay source ingestion
+        _body_urls = _re.findall(r"https?://[^\s<>\"'\)\]]+", issue_body) if issue_body else []
+        _has_src   = len(_body_urls) > 0
+        _total_agents = (1 if _has_src else 0) + (7 if has_tts and has_hf else 5)
+        _phase = 1
+        _phases = ""
+        if _has_src:
+            _phases += f"{_phase}️⃣ **Source Reader** — extraigo el contenido real de tus {len(_body_urls)} fuente(s)\n"
+            _phase += 1
+        _phases += f"{_phase}️⃣ **Deep Search** — qué está viral ahora mismo en este nicho\n"; _phase += 1
+        _phases += f"{_phase}️⃣ **Channel Analyzer** — qué hace la competencia y cómo superarla\n"; _phase += 1
+        _phases += f"{_phase}️⃣ **Storytelling** — guión completo{'basado en tus fuentes' if _has_src else 'adaptado al nicho'}\n"; _phase += 1
+        if has_tts:
+            _phases += f"{_phase}️⃣ **TTS** — voz en off con ElevenLabs\n"; _phase += 1
+        _phases += f"{_phase}️⃣ **Prompt Generator** — prompts de imagen para cada escena\n"; _phase += 1
+        if has_hf:
+            _phases += f"{_phase}️⃣ **Imagen Generator** — imágenes con Higgsfield Soul\n"; _phase += 1
+        if has_tts and has_hf:
+            _phases += f"{_phase}️⃣ **Video Assembler** — MP4 final con imágenes + voz en off\n"; _phase += 1
+        _eta = 10 if _has_src and has_tts and has_hf else (8 if has_tts and has_hf else 5)
         post_issue_comment(
             f"🎬 Perfecto, me pongo en marcha con: **{issue_title}**\n\n"
-            f"Coordino {7 if has_tts else 5} agentes especializados:\n"
-            f"1️⃣ **Deep Search** — qué está viral ahora mismo en este nicho\n"
-            f"2️⃣ **Channel Analyzer** — qué hace la competencia y cómo superarla\n"
-            f"3️⃣ **Storytelling** — guión completo adaptado al nicho\n"
-            + (f"4️⃣ **TTS** — voz en off con ElevenLabs\n" if has_tts else "")
-            + f"{'5️⃣' if has_tts else '4️⃣'} **Prompt Generator** — prompts de imagen para cada escena\n"
-            + (f"{'6️⃣' if has_tts else '5️⃣'} **Imagen Generator** — imágenes con Higgsfield Soul\n" if has_hf else "")
-            + (f"7️⃣ **Video Assembler** — MP4 final con imágenes + voz en off\n" if has_tts and has_hf else "")
-            + f"\nEl paquete completo estará listo en ~{'8' if has_tts and has_hf else '5'} minutos. 🚀"
+            f"Coordino {_total_agents} agentes especializados:\n"
+            + _phases
+            + f"\nEl paquete completo estará listo en ~{_eta} minutos. 🚀"
         )
     elif not objetivo:
         objetivo = "crea contenido viral para TikTok y YouTube en español"
@@ -451,16 +467,21 @@ def main():
         except Exception as _e:
             print(f"⚠️  Checkout falló (continuando de todas formas): {_e}", flush=True)
 
+    # Agentes que históricamente fallan el dispatch de Paperclip y deben correr
+    # directo como subprocess para no desperdiciar tiempo en el timeout de 240s.
+    # El Director tiene un límite de ~300s en Railway — si TTS espera 240s, muere todo.
+    # Estos agentes se crean como sub-issue (visibilidad en inbox) pero se ejecutan localmente.
+    SUBPROCESS_ONLY = {"tts", "video_assembler", "source_reader"}
+
     # ── Helper: orquesta un sub-agente vía Paperclip ──────────
     def run_tracked(script: str, task: str, label: str, agent_key: str,
-                    extra_env: dict = None) -> str:
+                    extra_env: dict = None, paperclip_timeout: int = 180) -> str:
         """
         Estrategia de orquestación real:
-        1. Crea sub-issue con assigneeAgentId + description (tarea)
-        2. PATCH a 'todo' → dispara statusChangedFromBacklog → Paperclip despacha el agente
-        3. Espera polling hasta que el sub-agente cierre el issue (status=done)
-        4. Lee resultado del último comentario
-        5. Si timeout → fallback a subprocess local
+        1. Crea sub-issue con assigneeAgentId + description (tarea) → visible en inbox
+        2. Si el agente responde a statusChangedFromBacklog → espera resultado (polling)
+        3. Si timeout o SUBPROCESS_ONLY → fallback a subprocess local
+        4. Cierra el sub-issue con el resultado
         """
         assignee_id = SUB_AGENT_IDS.get(agent_key, "")
         sub_id = None
@@ -477,26 +498,28 @@ def main():
                 company_id=company_id,
             )
 
-        if sub_id and assignee_id:
+        # Agentes que van directo a subprocess (sin esperar dispatch de Paperclip)
+        use_subprocess_directly = agent_key in SUBPROCESS_ONLY or not assignee_id
+
+        if sub_id and assignee_id and not use_subprocess_directly:
             # PATCH a 'todo' → statusChangedFromBacklog → Paperclip despacha el sub-agente
             _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "todo"}, auth_headers)
             print(f"  🚀 {label} despachado — esperando que Paperclip lo complete...", flush=True)
 
-            result = _wait_for_sub_agent(sub_id, label, api_url, auth_headers, timeout=240)
+            result = _wait_for_sub_agent(sub_id, label, api_url, auth_headers,
+                                         timeout=paperclip_timeout)
             if result is not None:
-                # Éxito: Paperclip ejecutó el agente correctamente
                 print(f"  ✅ {label} completado vía Paperclip ({len(result)} caracteres)", flush=True)
                 return result
 
-            # Timeout: el agente no respondió, usar fallback subprocess
             print(f"  ⚠️  Timeout esperando {label} — usando subprocess como fallback...", flush=True)
             _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "in_progress"}, auth_headers)
 
         elif sub_id:
-            # No hay assignee_id configurado, marcar in_progress para visibilidad
+            # Sub-issue visible pero ejecución local inmediata
             _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "in_progress"}, auth_headers)
 
-        # ── Subprocess fallback ─────────────────────────────
+        # ── Subprocess (directo o fallback) ──────────────────
         sub_env = {**os.environ}
         if extra_env:
             sub_env.update(extra_env)
@@ -507,30 +530,72 @@ def main():
         sub_env.pop("PAPERCLIP_ISSUE_TITLE", None)
         sub_env.pop("PAPERCLIP_ISSUE_BODY", None)
 
-        result = run_agent_with_env(script, task, sub_env, label)
+        # TTS y Video Assembler necesitan más tiempo que el default de 120s
+        _subprocess_timeout = 180 if agent_key in ("tts", "video_assembler") else 120
+        result = run_agent_with_env(script, task, sub_env, label, timeout=_subprocess_timeout)
 
-        # Si el sub-agente subprocess no cerró su sub-issue, cerrarlo aquí
-        if sub_id and (not result or (result.startswith('[') and 'Error' in result)):
-            close_sub_issue(sub_id, result or '[Sin resultado]', api_url, auth_headers)
+        # Cerrar el sub-issue con el resultado
+        if sub_id:
+            if result and not (result.startswith('[') and 'Error' in result):
+                close_sub_issue(sub_id, result, api_url, auth_headers)
+            else:
+                close_sub_issue(sub_id, result or '[Sin resultado]', api_url, auth_headers)
 
         return result
 
     import re as _re
 
-    # ── Fase 1: Investigación ──────────────────────────────────
-    search_task   = f"Busca tendencias virales y keywords de oportunidad para el tema: {objetivo}"
-    analyzer_task = f"Analiza los canales más exitosos de YouTube y TikTok sobre: {objetivo}. Encuentra sus debilidades."
+    # ── Fase 0: Source Reader (solo si hay URLs en el body) ───
+    source_context  = ""
+    source_result   = ""
+    _urls_in_body   = _re.findall(r"https?://[^\s<>\"'\)\]]+", issue_body) if issue_body else []
+    has_sources     = len(_urls_in_body) > 0
 
-    post_issue_comment("🔍 **Fase 1 — Deep Search** en progreso…")
+    if has_sources:
+        _src_count = len(_urls_in_body)
+        post_issue_comment(
+            f"📚 **Fase 0 — Source Reader** en progreso…\n\n"
+            f"Detecté {_src_count} fuente(s) en la descripción. "
+            f"Extraigo el contenido real para basar el video en información verificada."
+        )
+        source_result = run_tracked(
+            "source_reader.py", issue_body,
+            "Source Reader — Ingesta de fuentes", "source_reader"
+        )
+        # Extraer la síntesis del JSON de resultado
+        try:
+            _src_m = _re.search(r'\{[\s\S]*?"synthesis"[\s\S]*?\}', source_result)
+            if _src_m:
+                _src_data    = json.loads(_src_m.group(0))
+                source_context = _src_data.get("synthesis", "")
+                # Si el topic extraído es más específico, úsalo
+                _src_topic   = _src_data.get("topic", "")
+                if _src_topic and len(_src_topic) > 5:
+                    objetivo = f"{objetivo} — basado en fuentes: {_src_topic}"
+        except Exception:
+            source_context = source_result[:2000]
+        print(f"📚 Source context: {len(source_context)} chars", flush=True)
+
+    # ── Fase 1: Investigación ──────────────────────────────────
+    _source_hint  = f"\n\nFUENTES REALES PROCESADAS:\n{source_context[:800]}" if source_context else ""
+    search_task   = f"Busca tendencias virales y keywords de oportunidad para el tema: {objetivo}{_source_hint}"
+    analyzer_task = f"Analiza los canales más exitosos de YouTube y TikTok sobre: {objetivo}. Encuentra sus debilidades.{_source_hint}"
+
+    post_issue_comment(f"🔍 **Fase {'2' if has_sources else '1'} — Deep Search** en progreso…")
     deep_search_result = run_tracked("deep_search.py", search_task,
                                      "Deep Search — Tendencias", "deep_search")
 
-    post_issue_comment("📊 **Fase 2 — Channel Analyzer** en progreso…")
+    post_issue_comment(f"📊 **Fase {'3' if has_sources else '2'} — Channel Analyzer** en progreso…")
     channel_result     = run_tracked("channel_analyzer.py", analyzer_task,
                                      "Channel Analyzer — Competencia", "channel_analyzer")
 
     # ── Fase 2: Guión ─────────────────────────────────────────
+    _source_block = ""
+    if source_context:
+        _source_block = f"\n\nCONTENIDO REAL DE LAS FUENTES (úsalo como base factual del guión):\n{source_context[:1500]}"
+
     storytelling_task = sanitize(f"""Crea un guion viral con 4-5 escenas para el tema: {objetivo}
+{_source_block}
 
 Contexto de tendencias encontradas:
 {deep_search_result[:400]}
@@ -551,7 +616,8 @@ Diferenciacion vs competencia:
         tts_result = run_tracked(
             "tts.py", storytelling_result,
             "TTS — Voz en off", "tts",
-            extra_env={"ELEVENLABS_API_KEY": elevenlabs_key}
+            extra_env={"ELEVENLABS_API_KEY": elevenlabs_key},
+            paperclip_timeout=90,  # falla rápido → subprocess directo
         )
         # Extraer audio_path del JSON que devuelve tts.py.
         # tts_result mezcla logs + JSON en stdout → buscar el JSON con regex.
@@ -607,7 +673,8 @@ Guión completo:
             }, ensure_ascii=False))
             post_issue_comment("🎬 **Fase 7 — Video Assembler** en progreso… ensamblando MP4 final…")
             video_result = run_tracked("video_assembler.py", video_task,
-                                       "Video Assembler — MP4 final", "video_assembler")
+                                       "Video Assembler — MP4 final", "video_assembler",
+                                       paperclip_timeout=60)
             try:
                 _vid_data = json.loads(video_result)
                 video_url = _vid_data.get("video_url", "")
@@ -646,6 +713,19 @@ Guión completo:
             imagen_gallery += f"![Imagen {i}]({url})\n"
         imagen_gallery += "\n"
 
+    source_section = ""
+    if source_result:
+        try:
+            _sd = json.loads(_re.search(r'\{[\s\S]*?\}', source_result).group(0))
+            _src_urls = _sd.get("sources", [])
+            if _src_urls:
+                source_section = "\n## 📚 FUENTES UTILIZADAS\n"
+                for _su in _src_urls:
+                    source_section += f"- {_su}\n"
+                source_section += "\n"
+        except Exception:
+            pass
+
     video_section = ""
     if video_url:
         video_section = f"\n## 🎬 VIDEO GENERADO\n📥 [Descargar MP4]({video_url})\n\n"
@@ -661,8 +741,8 @@ Guión completo:
 
     output = f"""# 🎬 PAQUETE COMPLETO DE CONTENIDO
 **Tema:** {objetivo}
-**Generado por:** Director de Contenido ({7 if elevenlabs_key and higgsfield_key else 5} agentes coordinados)
-{video_section}{tts_section}{imagen_gallery}
+**Generado por:** Director de Contenido ({(1 if has_sources else 0) + (7 if elevenlabs_key and higgsfield_key else 5)} agentes coordinados)
+{source_section}{video_section}{tts_section}{imagen_gallery}
 {synthesis}
 
 ---
@@ -700,6 +780,7 @@ Guión completo:
 </details>
 {"<details><summary>🎙️ TTS - Audio narración</summary>" + chr(10) + tts_result + chr(10) + "</details>" if tts_result else ""}
 {"<details><summary>🎬 Video Assembler - Video final</summary>" + chr(10) + video_result + chr(10) + "</details>" if video_result else ""}
+{"<details><summary>📚 Source Reader - Fuentes procesadas</summary>" + chr(10) + source_result + chr(10) + "</details>" if source_result else ""}
 """
     print(output, flush=True)
 
