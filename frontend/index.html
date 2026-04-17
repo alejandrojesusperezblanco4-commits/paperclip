@@ -751,8 +751,13 @@ async function fetchLastComment(issueId) {
     const data = await res.json();
     const comments = data.comments || data || [];
     if (!Array.isArray(comments) || !comments.length) return '';
-    const last = comments[comments.length - 1];
-    return last.body || last.content || last.text || '';
+    // Buscar el comentario más largo (el del agente, no el del usuario)
+    const sorted = [...comments].sort((a, b) => {
+      const lenA = (a.body || a.content || a.text || '').length;
+      const lenB = (b.body || b.content || b.text || '').length;
+      return lenB - lenA;
+    });
+    return sorted[0].body || sorted[0].content || sorted[0].text || '';
   } catch(e) { return ''; }
 }
 
@@ -934,21 +939,40 @@ function addLog(msg, cls='') {
 ──────────────────────────────────────── */
 function parseDirector(raw) {
   const out = { imageUrl: '', script: '', title: '', hook: '' };
-  const imgMd  = raw.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-  const imgUrl = raw.match(/\*\*URL:\*\*\s*(https?:\/\/\S+)/);
-  out.imageUrl = (imgMd?.[1] || imgUrl?.[1] || '').split(')')[0];
 
-  const titleM = raw.match(/(?:título sugerido|title)[:\s*]+["«]?([^"»\n]+)["»]?/i);
+  // Buscar URLs de imagen en cualquier parte del texto (cloudfront, CDN, etc.)
+  const allUrls = [...raw.matchAll(/https?:\/\/[^\s)"']+\.(?:png|jpg|jpeg|webp)/gi)];
+  if (allUrls.length) out.imageUrl = allUrls[0][0];
+
+  // Fallback: markdown image o URL line
+  if (!out.imageUrl) {
+    const imgMd  = raw.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+    const imgUrl = raw.match(/\*\*URL:\*\*\s*(https?:\/\/\S+)/);
+    out.imageUrl = (imgMd?.[1] || imgUrl?.[1] || '').split(')')[0];
+  }
+
+  // Título
+  const titleM = raw.match(/(?:título sugerido|título final|title)[:\s*\*]+["«]?([^"»\n*]+)/i);
   if (titleM) out.title = titleM[1].trim();
-  const hookM = raw.match(/(?:hook|primeros 3 segundos)[^\n]*\n([^\n]+)/i);
+
+  // Hook
+  const hookM = raw.match(/(?:hook|primeros 3 segundos|primer frase)[^\n]*\n([^\n]+)/i);
   if (hookM) out.hook = hookM[1].replace(/\*\*/g,'').trim();
 
-  const scriptM = raw.match(/###\s*Guion listo\s*\n([\s\S]+?)(?=\n###|\n##|$)/i);
-  if (scriptM) out.script = scriptM[1].replace(/\*\*/g,'').trim().slice(0,2000);
-  else {
-    const lines = raw.split('\n').filter(l => !l.startsWith('#') && l.trim().length > 40);
-    out.script = lines.slice(0,20).join('\n').slice(0,1500);
+  // Guión — buscar sección específica o la más larga entre los párrafos narrativos
+  const scriptM = raw.match(/(?:###\s*Guion listo|🎙️ NARRACIÓN)[^\n]*\n([\s\S]+?)(?=\n###|\n##|\n━|$)/i);
+  if (scriptM) {
+    out.script = scriptM[1].replace(/\*\*/g,'').trim().slice(0, 2000);
+  } else {
+    // Fallback: bloques de texto narrativo largos
+    const lines = raw.split('\n').filter(l =>
+      !l.startsWith('#') && !l.startsWith('```') &&
+      !l.startsWith('<') && !l.startsWith('>') &&
+      l.trim().length > 50
+    );
+    out.script = lines.slice(0, 25).join('\n').slice(0, 2000);
   }
+
   return out;
 }
 
