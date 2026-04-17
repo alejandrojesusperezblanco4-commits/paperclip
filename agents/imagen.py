@@ -15,6 +15,8 @@ import time
 import urllib.request
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
+from api_client import post_issue_result
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -227,7 +229,9 @@ def main():
     lines.append(json.dumps(results, indent=2, ensure_ascii=False))
     lines.append("```")
 
-    print("\n".join(lines), flush=True)
+    output = "\n".join(lines)
+    print(output, flush=True)
+    post_issue_result(output)
 
 
 if __name__ == "__main__":

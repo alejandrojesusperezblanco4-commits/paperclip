@@ -9,22 +9,21 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #0d0d0f;
-      --surface:  #161618;
-      --border:   #2a2a2e;
-      --muted:    #3a3a40;
-      --text:     #e8e8ec;
-      --sub:      #8888a0;
-      --accent:   #a855f7;
-      --accent2:  #7c3aed;
-      --green:    #22c55e;
-      --yellow:   #eab308;
-      --red:      #ef4444;
-      --blue:     #3b82f6;
+      --bg:      #0d0d0f;
+      --surface: #161618;
+      --border:  #2a2a2e;
+      --muted:   #3a3a40;
+      --text:    #e8e8ec;
+      --sub:     #8888a0;
+      --accent:  #a855f7;
+      --accent2: #7c3aed;
+      --green:   #22c55e;
+      --yellow:  #eab308;
+      --red:     #ef4444;
+      --blue:    #3b82f6;
     }
 
     html { scroll-behavior: smooth; }
-
     body {
       background: var(--bg);
       color: var(--text);
@@ -39,44 +38,24 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 28px;
+      padding: 14px 24px;
       border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
-      background: rgba(13,13,15,0.92);
+      background: rgba(13,13,15,0.94);
       backdrop-filter: blur(12px);
       z-index: 100;
     }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .logo-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 8px var(--accent);
-    }
-    .badge {
-      font-size: 11px;
-      color: var(--sub);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 3px 10px;
-      border-radius: 20px;
-    }
+    .logo { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; }
+    .logo-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    .badge { font-size: 11px; color: var(--sub); background: var(--surface); border: 1px solid var(--border); padding: 3px 10px; border-radius: 20px; }
 
     /* ── Layout ── */
     main {
       flex: 1;
       display: grid;
-      grid-template-columns: 340px 1fr;
-      grid-template-rows: 1fr;
-      height: calc(100vh - 57px);
+      grid-template-columns: 300px 1fr;
+      height: calc(100vh - 53px);
     }
 
     /* ── Left panel ── */
@@ -87,31 +66,66 @@
       overflow: hidden;
     }
 
-    .panel-section {
-      padding: 20px;
-      border-bottom: 1px solid var(--border);
+    /* Agent tabs */
+    .agent-tabs {
+      padding: 12px 12px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
     }
-    .panel-label {
-      font-size: 11px;
+    .agent-tab {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      font-size: 13px;
       font-weight: 500;
+      color: var(--sub);
+      user-select: none;
+    }
+    .agent-tab:hover { background: var(--surface); color: var(--text); }
+    .agent-tab.active { background: rgba(168,85,247,0.12); color: var(--text); }
+    .agent-tab.active .tab-icon { background: rgba(168,85,247,0.25); }
+    .tab-icon {
+      width: 30px; height: 30px;
+      border-radius: 7px;
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .tab-info { flex: 1; min-width: 0; }
+    .tab-name { font-size: 12.5px; white-space: nowrap; }
+    .tab-desc { font-size: 10.5px; color: var(--sub); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Divider */
+    .divider { height: 1px; background: var(--border); margin: 10px 12px; }
+
+    /* Input section */
+    .input-section { padding: 0 12px 12px; }
+    .panel-label {
+      font-size: 10px;
+      font-weight: 600;
       color: var(--sub);
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
-
-    /* Input */
     .input-area {
       width: 100%;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--text);
       font-family: 'Inter', sans-serif;
-      font-size: 13px;
-      padding: 12px 14px;
+      font-size: 12.5px;
+      padding: 10px 12px;
       resize: none;
-      height: 100px;
+      height: 90px;
       outline: none;
       transition: border-color 0.2s;
       line-height: 1.5;
@@ -119,315 +133,207 @@
     .input-area::placeholder { color: var(--muted); }
     .input-area:focus { border-color: var(--accent); }
 
-    .btn-generate {
-      margin-top: 10px;
+    .progress-bar-wrap { height: 2px; background: var(--border); border-radius: 1px; overflow: hidden; margin-top: 8px; }
+    .progress-bar { height: 100%; background: var(--accent); border-radius: 1px; transition: width 0.5s ease; }
+
+    .btn-run {
+      margin-top: 8px;
       width: 100%;
       background: var(--accent);
       color: #fff;
       border: none;
-      border-radius: 8px;
-      padding: 11px 0;
+      border-radius: 7px;
+      padding: 10px 0;
       font-family: 'Inter', sans-serif;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s, opacity 0.2s;
       letter-spacing: 0.02em;
     }
-    .btn-generate:hover:not(:disabled) { background: var(--accent2); }
-    .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-run:hover:not(:disabled) { background: var(--accent2); }
+    .btn-run:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Pipeline stages */
-    .stages { display: flex; flex-direction: column; gap: 6px; }
-
+    /* Pipeline stages — only for Director */
+    .pipeline-section { padding: 0 12px 12px; }
+    .stages { display: flex; flex-direction: column; gap: 4px; }
     .stage {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      border-radius: 8px;
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px;
+      border-radius: 7px;
       background: var(--surface);
       border: 1px solid var(--border);
       transition: border-color 0.3s, background 0.3s;
-      font-size: 13px;
+      font-size: 12px;
     }
-    .stage.active  { border-color: var(--accent); background: rgba(168,85,247,0.08); }
-    .stage.done    { border-color: var(--green);  background: rgba(34,197,94,0.06); }
-    .stage.error   { border-color: var(--red);    background: rgba(239,68,68,0.06); }
-    .stage.waiting { opacity: 0.45; }
-
+    .stage.active { border-color: var(--accent); background: rgba(168,85,247,0.08); }
+    .stage.done   { border-color: var(--green);  background: rgba(34,197,94,0.06); }
+    .stage.error  { border-color: var(--red);    background: rgba(239,68,68,0.06); }
+    .stage.waiting { opacity: 0.4; }
     .stage-icon {
-      width: 28px; height: 28px;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
+      width: 24px; height: 24px;
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
       flex-shrink: 0;
       background: var(--muted);
     }
-    .stage.active  .stage-icon { background: rgba(168,85,247,0.25); }
-    .stage.done    .stage-icon { background: rgba(34,197,94,0.2); }
-    .stage.error   .stage-icon { background: rgba(239,68,68,0.2); }
-
-    .stage-info { flex: 1; min-width: 0; }
-    .stage-name { font-weight: 500; color: var(--text); font-size: 12.5px; }
-    .stage-sub  { font-size: 11px; color: var(--sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    .stage-status {
-      font-size: 10px;
-      font-weight: 500;
-      padding: 2px 7px;
-      border-radius: 10px;
-      white-space: nowrap;
-      flex-shrink: 0;
+    .stage.active .stage-icon { background: rgba(168,85,247,0.25); }
+    .stage.done   .stage-icon { background: rgba(34,197,94,0.2); }
+    .stage.error  .stage-icon { background: rgba(239,68,68,0.2); }
+    .stage-name { flex: 1; font-weight: 500; color: var(--text); font-size: 11.5px; }
+    .stage-badge {
+      font-size: 9.5px; font-weight: 500;
+      padding: 2px 6px; border-radius: 8px; white-space: nowrap; flex-shrink: 0;
     }
-    .stage.waiting .stage-status { background: var(--surface); color: var(--sub); border: 1px solid var(--border); }
-    .stage.active  .stage-status { background: rgba(168,85,247,0.2); color: #c084fc; }
-    .stage.done    .stage-status { background: rgba(34,197,94,0.15); color: #4ade80; }
-    .stage.error   .stage-status { background: rgba(239,68,68,0.15); color: #f87171; }
-
-    /* Spinner */
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner {
-      display: inline-block;
-      width: 12px; height: 12px;
-      border: 2px solid rgba(168,85,247,0.3);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-right: 4px;
-      vertical-align: middle;
-    }
+    .stage.waiting .stage-badge { background: var(--muted); color: var(--sub); }
+    .stage.active  .stage-badge { background: rgba(168,85,247,0.2); color: #c084fc; }
+    .stage.done    .stage-badge { background: rgba(34,197,94,0.15); color: #4ade80; }
+    .stage.error   .stage-badge { background: rgba(239,68,68,0.15); color: #f87171; }
 
     /* History */
-    .history-list {
+    .history-section {
       flex: 1;
-      overflow-y: auto;
-      padding: 12px 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
-    .history-list::-webkit-scrollbar { width: 4px; }
-    .history-list::-webkit-scrollbar-track { background: transparent; }
+    .history-header { padding: 8px 12px 4px; }
+    .history-list { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
+    .history-list::-webkit-scrollbar { width: 3px; }
     .history-list::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
-
     .history-item {
-      padding: 10px 12px;
-      border-radius: 8px;
+      padding: 8px 10px;
+      border-radius: 7px;
       border: 1px solid var(--border);
       background: var(--surface);
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       cursor: pointer;
       transition: border-color 0.2s;
-      font-size: 12px;
+      font-size: 11.5px;
     }
     .history-item:hover { border-color: var(--muted); }
     .history-item.active-run { border-color: var(--accent); }
     .history-title { font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .history-meta  { color: var(--sub); font-size: 11px; margin-top: 3px; }
+    .history-meta  { color: var(--sub); font-size: 10.5px; margin-top: 2px; display: flex; gap: 6px; align-items: center; }
+    .history-agent { background: var(--muted); padding: 1px 5px; border-radius: 4px; font-size: 10px; }
 
     /* ── Right panel ── */
     .panel-right {
       overflow-y: auto;
-      padding: 28px 32px;
+      padding: 24px 28px;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 18px;
     }
-    .panel-right::-webkit-scrollbar { width: 6px; }
-    .panel-right::-webkit-scrollbar-track { background: transparent; }
+    .panel-right::-webkit-scrollbar { width: 5px; }
     .panel-right::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 3px; }
 
     /* Empty state */
     .empty-state {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      gap: 12px;
-      color: var(--sub);
-      padding: 40px;
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; gap: 10px; color: var(--sub); padding: 40px;
     }
-    .empty-icon { font-size: 40px; opacity: 0.4; }
-    .empty-state h2 { font-size: 17px; font-weight: 600; color: var(--text); opacity: 0.5; }
-    .empty-state p  { font-size: 13px; max-width: 320px; line-height: 1.6; }
+    .empty-icon { font-size: 36px; opacity: 0.35; }
+    .empty-state h2 { font-size: 16px; font-weight: 600; color: var(--text); opacity: 0.45; }
+    .empty-state p  { font-size: 12.5px; max-width: 300px; line-height: 1.6; }
 
-    /* Result cards */
-    .result-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
+    /* Cards */
+    .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     @media (max-width: 900px) { .result-grid { grid-template-columns: 1fr; } }
 
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
+      border-radius: 10px;
+      padding: 18px;
     }
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 14px;
-    }
-    .card-icon { font-size: 16px; }
-    .card-title { font-size: 13px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.06em; }
+    .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .card-icon { font-size: 15px; }
+    .card-title { font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: 0.07em; }
 
-    /* Imagen card */
-    .card-image {
-      grid-row: 1 / 3;
-    }
+    .card-image { grid-row: 1 / 3; }
     .thumbnail-wrap {
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--muted);
-      aspect-ratio: 9/16;
-      max-height: 400px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .thumbnail-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-    .thumbnail-placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      color: var(--sub);
-      font-size: 12px;
-    }
-    .thumbnail-placeholder span { font-size: 28px; opacity: 0.3; }
-
-    /* Script card */
-    .card-script {
-      grid-column: 2;
-    }
-    .script-content {
-      font-size: 13px;
-      line-height: 1.7;
-      color: var(--text);
-      white-space: pre-wrap;
+      border-radius: 7px; overflow: hidden;
+      background: var(--muted); aspect-ratio: 9/16;
       max-height: 380px;
-      overflow-y: auto;
-      padding-right: 4px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .thumbnail-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .thumbnail-placeholder { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--sub); font-size: 11px; }
+    .thumbnail-placeholder span { font-size: 24px; opacity: 0.3; }
+
+    /* Image gallery (for Imagen agent) */
+    .image-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+    .gallery-item { border-radius: 7px; overflow: hidden; background: var(--muted); aspect-ratio: 9/16; }
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; transition: opacity 0.2s; }
+    .gallery-item img:hover { opacity: 0.85; }
+    .gallery-caption { font-size: 10px; color: var(--sub); margin-top: 4px; text-align: center; }
+    .gallery-error { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 11px; color: var(--red); opacity: 0.7; }
+
+    .script-content {
+      font-size: 12.5px; line-height: 1.7; color: var(--text);
+      white-space: pre-wrap; max-height: 360px; overflow-y: auto; padding-right: 4px;
     }
     .script-content::-webkit-scrollbar { width: 3px; }
     .script-content::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
 
-    /* Metadata card */
-    .card-meta {
-      grid-column: 2;
+    /* Markdown result */
+    .md-result {
+      font-size: 12.5px; line-height: 1.7; color: var(--text);
+      max-height: 600px; overflow-y: auto;
     }
-    .meta-rows { display: flex; flex-direction: column; gap: 10px; }
-    .meta-row  { display: flex; gap: 10px; align-items: flex-start; }
-    .meta-key  { font-size: 11px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.05em; min-width: 90px; flex-shrink: 0; padding-top: 1px; }
-    .meta-val  { font-size: 13px; color: var(--text); line-height: 1.5; }
+    .md-result h3 { font-size: 13px; font-weight: 600; color: var(--accent); margin: 12px 0 4px; }
+    .md-result p  { margin-bottom: 8px; }
+    .md-result ul { padding-left: 16px; margin-bottom: 8px; }
+    .md-result li { margin-bottom: 3px; }
+    .md-result strong { color: var(--text); font-weight: 600; }
+    .md-result::-webkit-scrollbar { width: 3px; }
+    .md-result::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
 
-    /* Raw card (for debug) */
+    .meta-rows { display: flex; flex-direction: column; gap: 8px; }
+    .meta-row  { display: flex; gap: 8px; align-items: flex-start; }
+    .meta-key  { font-size: 10px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: 0.05em; min-width: 80px; flex-shrink: 0; padding-top: 2px; }
+    .meta-val  { font-size: 12.5px; color: var(--text); line-height: 1.5; }
+
     .card-raw { grid-column: 1 / -1; }
-    .raw-toggle {
-      font-size: 12px;
-      color: var(--sub);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      user-select: none;
-    }
+    .raw-toggle { font-size: 11.5px; color: var(--sub); cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none; }
     .raw-toggle:hover { color: var(--text); }
     .raw-body {
-      margin-top: 12px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 14px;
-      font-size: 11.5px;
-      font-family: 'Menlo', 'Consolas', monospace;
-      color: var(--sub);
-      white-space: pre-wrap;
-      max-height: 300px;
-      overflow-y: auto;
-      display: none;
+      margin-top: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+      padding: 12px; font-size: 11px; font-family: 'Menlo','Consolas',monospace;
+      color: var(--sub); white-space: pre-wrap; max-height: 260px; overflow-y: auto; display: none;
     }
     .raw-body.visible { display: block; }
 
-    /* Progress bar */
-    @keyframes progress-glow {
-      0%   { opacity: 0.6; }
-      50%  { opacity: 1; }
-      100% { opacity: 0.6; }
-    }
-    .progress-bar-wrap {
-      height: 2px;
-      background: var(--border);
-      border-radius: 1px;
-      overflow: hidden;
-      margin-top: 10px;
-    }
-    .progress-bar {
-      height: 100%;
-      background: var(--accent);
-      border-radius: 1px;
-      transition: width 0.5s ease;
-      animation: progress-glow 1.5s infinite;
-    }
-
     /* Running log */
     .running-log {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px 20px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px;
     }
     .log-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--sub);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px; font-size: 11px; font-weight: 600;
+      color: var(--sub); text-transform: uppercase; letter-spacing: 0.06em;
     }
-    .log-lines {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      max-height: 120px;
-      overflow-y: auto;
-    }
-    .log-line {
-      font-size: 12px;
-      color: var(--sub);
-      font-family: 'Menlo', monospace;
-      line-height: 1.5;
-    }
+    .log-lines { display: flex; flex-direction: column; gap: 3px; max-height: 160px; overflow-y: auto; }
+    .log-line { font-size: 11.5px; color: var(--sub); font-family: 'Menlo',monospace; line-height: 1.5; }
     .log-line.accent { color: #c084fc; }
     .log-line.green  { color: #4ade80; }
     .log-line.red    { color: #f87171; }
 
-    /* Dot pulse */
+    /* Spinners & animations */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block; width: 11px; height: 11px;
+      border: 2px solid rgba(168,85,247,0.3); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin-right: 4px; vertical-align: middle;
+    }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
-    .dot-pulse {
-      display: inline-flex;
-      gap: 3px;
-      align-items: center;
-    }
-    .dot-pulse span {
-      width: 4px; height: 4px;
-      background: var(--accent);
-      border-radius: 50%;
-      animation: pulse 1.2s ease-in-out infinite;
-    }
+    .dot-pulse { display: inline-flex; gap: 3px; align-items: center; }
+    .dot-pulse span { width: 3px; height: 3px; background: var(--accent); border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; }
     .dot-pulse span:nth-child(2) { animation-delay: 0.2s; }
     .dot-pulse span:nth-child(3) { animation-delay: 0.4s; }
   </style>
@@ -447,81 +353,109 @@
   <!-- ── LEFT PANEL ── -->
   <div class="panel-left">
 
+    <!-- Agent selector -->
+    <div class="agent-tabs" id="agentTabs">
+      <div class="agent-tab active" data-agent="director" onclick="selectAgent('director')">
+        <div class="tab-icon">🎬</div>
+        <div class="tab-info">
+          <div class="tab-name">Director</div>
+          <div class="tab-desc">Pipeline completo</div>
+        </div>
+      </div>
+      <div class="agent-tab" data-agent="search" onclick="selectAgent('search')">
+        <div class="tab-icon">🔍</div>
+        <div class="tab-info">
+          <div class="tab-name">Deep Search</div>
+          <div class="tab-desc">Tendencias en tiempo real</div>
+        </div>
+      </div>
+      <div class="agent-tab" data-agent="analyzer" onclick="selectAgent('analyzer')">
+        <div class="tab-icon">📊</div>
+        <div class="tab-info">
+          <div class="tab-name">Channel Analyzer</div>
+          <div class="tab-desc">Analiza canales rivales</div>
+        </div>
+      </div>
+      <div class="agent-tab" data-agent="story" onclick="selectAgent('story')">
+        <div class="tab-icon">✍️</div>
+        <div class="tab-info">
+          <div class="tab-name">Storytelling</div>
+          <div class="tab-desc">Guión en 4-5 escenas</div>
+        </div>
+      </div>
+      <div class="agent-tab" data-agent="prompt" onclick="selectAgent('prompt')">
+        <div class="tab-icon">🎨</div>
+        <div class="tab-info">
+          <div class="tab-name">Prompt Generator</div>
+          <div class="tab-desc">Prompts para Higgsfield</div>
+        </div>
+      </div>
+      <div class="agent-tab" data-agent="imagen" onclick="selectAgent('imagen')">
+        <div class="tab-icon">🖼️</div>
+        <div class="tab-info">
+          <div class="tab-name">Imagen AI</div>
+          <div class="tab-desc">Genera con Higgsfield Soul</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <!-- Input -->
-    <div class="panel-section">
-      <div class="panel-label">Nueva historia</div>
-      <textarea
-        id="topicInput"
-        class="input-area"
-        placeholder="Ej: Ella descubre que su esposo la engañó con su mejor amiga el día de su aniversario…"
-      ></textarea>
+    <div class="input-section">
+      <div class="panel-label" id="inputLabel">Historia / tema</div>
+      <textarea id="topicInput" class="input-area" placeholder="Ej: Ella descubre que su esposo la engañó con su mejor amiga…"></textarea>
       <div class="progress-bar-wrap" id="progressWrap" style="display:none">
         <div class="progress-bar" id="progressBar" style="width:5%"></div>
       </div>
-      <button class="btn-generate" id="btnGenerate" onclick="startPipeline()">
-        ✦ Generar contenido
+      <button class="btn-run" id="btnRun" onclick="startRun()">
+        ✦ Ejecutar
       </button>
     </div>
 
-    <!-- Pipeline stages -->
-    <div class="panel-section">
+    <!-- Pipeline stages (Director only) -->
+    <div class="pipeline-section" id="pipelineSection">
       <div class="panel-label">Pipeline</div>
       <div class="stages" id="stages">
         <div class="stage waiting" id="stage-director">
           <div class="stage-icon">🎬</div>
-          <div class="stage-info">
-            <div class="stage-name">Director</div>
-            <div class="stage-sub" id="sub-director">Esperando</div>
-          </div>
-          <div class="stage-status">En espera</div>
+          <div class="stage-name">Director</div>
+          <div class="stage-badge">En espera</div>
         </div>
         <div class="stage waiting" id="stage-search">
           <div class="stage-icon">🔍</div>
-          <div class="stage-info">
-            <div class="stage-name">Deep Search</div>
-            <div class="stage-sub" id="sub-search">Reddit · TikTok</div>
-          </div>
-          <div class="stage-status">En espera</div>
+          <div class="stage-name">Deep Search</div>
+          <div class="stage-badge">En espera</div>
         </div>
         <div class="stage waiting" id="stage-analyzer">
           <div class="stage-icon">📊</div>
-          <div class="stage-info">
-            <div class="stage-name">Channel Analyzer</div>
-            <div class="stage-sub" id="sub-analyzer">Competencia</div>
-          </div>
-          <div class="stage-status">En espera</div>
+          <div class="stage-name">Channel Analyzer</div>
+          <div class="stage-badge">En espera</div>
         </div>
         <div class="stage waiting" id="stage-story">
           <div class="stage-icon">✍️</div>
-          <div class="stage-info">
-            <div class="stage-name">Storytelling</div>
-            <div class="stage-sub" id="sub-story">Guión</div>
-          </div>
-          <div class="stage-status">En espera</div>
+          <div class="stage-name">Storytelling</div>
+          <div class="stage-badge">En espera</div>
         </div>
         <div class="stage waiting" id="stage-prompt">
           <div class="stage-icon">🎨</div>
-          <div class="stage-info">
-            <div class="stage-name">Prompt Generator</div>
-            <div class="stage-sub" id="sub-prompt">Thumbnail</div>
-          </div>
-          <div class="stage-status">En espera</div>
+          <div class="stage-name">Prompt Generator</div>
+          <div class="stage-badge">En espera</div>
         </div>
         <div class="stage waiting" id="stage-imagen">
           <div class="stage-icon">🖼️</div>
-          <div class="stage-info">
-            <div class="stage-name">Imagen AI</div>
-            <div class="stage-sub" id="sub-imagen">Higgsfield</div>
-          </div>
-          <div class="stage-status">En espera</div>
+          <div class="stage-name">Imagen AI</div>
+          <div class="stage-badge">En espera</div>
         </div>
       </div>
     </div>
 
     <!-- History -->
-    <div class="panel-label" style="padding: 16px 20px 4px;">Historial</div>
-    <div class="history-list" id="historyList">
-      <!-- items added by JS -->
+    <div class="history-section">
+      <div class="history-header">
+        <div class="panel-label">Historial</div>
+      </div>
+      <div class="history-list" id="historyList"></div>
     </div>
 
   </div>
@@ -530,125 +464,221 @@
   <div class="panel-right" id="rightPanel">
     <div class="empty-state" id="emptyState">
       <div class="empty-icon">✦</div>
-      <h2>Todo listo para generar</h2>
-      <p>Escribe el tema de tu historia y pulsa Generar. El pipeline hará todo el trabajo.</p>
+      <h2>Selecciona un agente y ejecuta</h2>
+      <p>Cada agente trabaja de forma independiente o juntos en el pipeline completo.</p>
     </div>
   </div>
 
 </main>
 
 <script>
-/* ──────────────────────────────────────────
+/* ────────────────────────────────────────
    CONFIG
-────────────────────────────────────────── */
+──────────────────────────────────────── */
 const API_BASE   = 'https://spirited-charm-production.up.railway.app';
 const COMPANY_ID = '4d39bc9c-a76c-4558-a3b0-2a3267124dc0';
 const POLL_MS    = 4000;
 
-/* ──────────────────────────────────────────
+/* ────────────────────────────────────────
+   AGENT DEFINITIONS
+──────────────────────────────────────── */
+const AGENTS = {
+  director: {
+    icon: '🎬', name: 'Director',
+    label: 'Historia o tema',
+    placeholder: 'Ej: Ella descubre que su esposo la engañó con su mejor amiga el día de su aniversario…',
+    agentId: null,   // usa el Director ya configurado en Paperclip
+    showPipeline: true,
+    resultType: 'director',
+  },
+  search: {
+    icon: '🔍', name: 'Deep Search',
+    label: 'Tema a investigar',
+    placeholder: 'Ej: tendencias de infidelidad en TikTok esta semana en LATAM',
+    agentId: 'a1d8d0b8-9ada-4980-9b5f-663b34ba2c80',
+    showPipeline: false,
+    resultType: 'markdown',
+  },
+  analyzer: {
+    icon: '📊', name: 'Channel Analyzer',
+    label: 'Canal o nicho a analizar',
+    placeholder: 'Ej: @historias.de.telenovela — o describe el nicho a analizar',
+    agentId: '0f784ca9-93b0-4384-ba7c-1e079bb8797b',
+    showPipeline: false,
+    resultType: 'markdown',
+  },
+  story: {
+    icon: '✍️', name: 'Storytelling',
+    label: 'Historia a guionizar',
+    placeholder: 'Ej: Una mujer descubre que su marido tiene una doble vida con otra familia en otra ciudad',
+    agentId: '061ed6b8-27b1-4a31-8758-19af856b45d3',
+    showPipeline: false,
+    resultType: 'script',
+  },
+  prompt: {
+    icon: '🎨', name: 'Prompt Generator',
+    label: 'Guión o concepto de las escenas',
+    placeholder: 'Pega el guión generado por Storytelling, o describe el concepto visual…',
+    agentId: '64e2cb07-75e1-4ca2-8b6c-05a78b66613f',
+    showPipeline: false,
+    resultType: 'prompts',
+  },
+  imagen: {
+    icon: '🖼️', name: 'Imagen AI',
+    label: 'JSON de prompts o concepto',
+    placeholder: 'Pega el JSON del Prompt Generator, o describe las escenas que quieres generar…',
+    agentId: '2492962a-b9f0-4611-90e2-c7ccca5aa281',
+    showPipeline: false,
+    resultType: 'images',
+  },
+};
+
+const SUB_STAGE_MAP = [
+  { key: 'deep search',      stage: 'search'   },
+  { key: 'channel analyzer', stage: 'analyzer' },
+  { key: 'storytelling',     stage: 'story'    },
+  { key: 'prompt generator', stage: 'prompt'   },
+  { key: 'imagen generator', stage: 'imagen'   },
+];
+
+/* ────────────────────────────────────────
    STATE
-────────────────────────────────────────── */
+──────────────────────────────────────── */
+let currentAgent   = 'director';
 let currentIssueId = null;
 let pollTimer      = null;
 let subPollTimer   = null;
 let startTime      = null;
-let history        = JSON.parse(localStorage.getItem('hs_history') || '[]');
+let runHistory     = JSON.parse(localStorage.getItem('hs_history') || '[]');
 
-// Map sub-issue title keywords → stage id
-const SUB_STAGE_MAP = [
-  { key: 'deep search',       stage: 'search'   },
-  { key: 'channel analyzer',  stage: 'analyzer' },
-  { key: 'storytelling',      stage: 'story'    },
-  { key: 'prompt generator',  stage: 'prompt'   },
-  { key: 'imagen generator',  stage: 'imagen'   },
-];
+/* ────────────────────────────────────────
+   AGENT SELECTOR
+──────────────────────────────────────── */
+function selectAgent(key) {
+  if (currentIssueId) return; // no cambiar mientras corre
+  currentAgent = key;
+  const cfg = AGENTS[key];
 
-/* ──────────────────────────────────────────
-   STAGE MANAGEMENT
-────────────────────────────────────────── */
-const STAGE_ORDER = ['director','search','analyzer','story','prompt','imagen'];
+  // Update tabs
+  document.querySelectorAll('.agent-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[data-agent="${key}"]`).classList.add('active');
 
-function setStage(id, state, sub='') {
+  // Update input
+  document.getElementById('inputLabel').textContent = cfg.label;
+  document.getElementById('topicInput').placeholder = cfg.placeholder;
+  document.getElementById('topicInput').value = '';
+
+  // Pipeline visibility
+  document.getElementById('pipelineSection').style.display = cfg.showPipeline ? '' : 'none';
+
+  // Update button label
+  document.getElementById('btnRun').innerHTML = `${cfg.icon} Ejecutar ${cfg.name}`;
+
+  // Reset right panel
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">${cfg.icon}</div>
+      <h2>${cfg.name}</h2>
+      <p style="max-width:340px">${getAgentDesc(key)}</p>
+    </div>`;
+}
+
+function getAgentDesc(key) {
+  const descs = {
+    director:  'Coordina los 5 agentes en secuencia: busca tendencias, analiza competencia, crea guión, genera prompts e imágenes.',
+    search:    'Busca en TikTok, YouTube, Reddit, Twitter y Google Trends qué está viral ahora mismo.',
+    analyzer:  'Disecciona canales exitosos: hooks, estructura, thumbnails, ritmo de cortes y fórmula ganadora.',
+    story:     'Crea un guión cinematográfico de 4-5 escenas con hook brutal, narración en primera persona y CTA final.',
+    prompt:    'Genera 5-6 prompts ultra-detallados para Higgsfield Soul, uno por escena, con coherencia visual total.',
+    imagen:    'Genera imágenes cinématicas 9:16 con Higgsfield Soul. Puedes pegar el JSON del Prompt Generator.',
+  };
+  return descs[key] || '';
+}
+
+/* ────────────────────────────────────────
+   STAGES
+──────────────────────────────────────── */
+const STAGE_IDS = ['director','search','analyzer','story','prompt','imagen'];
+
+function setStage(id, state) {
   const el = document.getElementById(`stage-${id}`);
   if (!el) return;
   el.className = `stage ${state}`;
-  const statusEl = el.querySelector('.stage-status');
-  const subEl    = document.getElementById(`sub-${id}`);
-  const labels   = { waiting:'En espera', active:'Procesando…', done:'Listo ✓', error:'Error' };
-  if (statusEl) statusEl.textContent = labels[state] || state;
-  if (subEl && sub) subEl.textContent = sub;
+  const badge = el.querySelector('.stage-badge');
+  const labels = { waiting:'En espera', active:'Procesando…', done:'Listo ✓', error:'Error' };
+  if (badge) badge.textContent = labels[state] || state;
 }
+function setAllDone()    { STAGE_IDS.forEach(id => setStage(id, 'done')); }
+function setAllWaiting() { STAGE_IDS.forEach(id => setStage(id, 'waiting')); }
 
-function setAllDone()  { STAGE_ORDER.forEach(id => setStage(id, 'done')); }
-function setAllWaiting(){ STAGE_ORDER.forEach(id => setStage(id, 'waiting')); }
-
-/* Map a Paperclip status string → stage state */
-function paperclipToStageState(status) {
+function paperclipToState(status) {
   const s = (status || '').toLowerCase();
-  if (s === 'done')        return 'done';
+  if (s === 'done') return 'done';
   if (s === 'in_progress') return 'active';
   if (s === 'cancelled' || s === 'failed') return 'error';
   return 'waiting';
 }
 
-/* Update progress bar from how many sub-stages are done */
-function updateProgress(doneCount, total) {
-  // director counts as 1 + each sub-agent
-  const pct = Math.min(95, Math.round(((doneCount + 1) / (total + 2)) * 100));
-  document.getElementById('progressBar').style.width = pct + '%';
-}
-
-/* ──────────────────────────────────────────
-   PIPELINE
-────────────────────────────────────────── */
-async function startPipeline() {
+/* ────────────────────────────────────────
+   RUN
+──────────────────────────────────────── */
+async function startRun() {
   const topic = document.getElementById('topicInput').value.trim();
   if (!topic) { flashInput(); return; }
 
-  // UI: disable
-  document.getElementById('btnGenerate').disabled = true;
-  document.getElementById('btnGenerate').innerHTML = '<span class="spinner"></span> Generando…';
+  const cfg = AGENTS[currentAgent];
+
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('btnRun').innerHTML = '<span class="spinner"></span> Generando…';
   document.getElementById('progressWrap').style.display = 'block';
   document.getElementById('progressBar').style.width = '5%';
-  setAllWaiting();
-  setStage('director','active','Iniciando…');
+  if (cfg.showPipeline) { setAllWaiting(); setStage('director','active'); }
   startTime = Date.now();
-  showRunningPanel(topic);
+  showRunningPanel(cfg, topic);
 
-  // Kick off pipeline
   try {
+    const body = { title: topic };
+    if (cfg.agentId) body.assigneeAgentId = cfg.agentId;
+
     const res = await fetch(`${API_BASE}/api/companies/${COMPANY_ID}/issues`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ title: topic }),
+      body: JSON.stringify(body),
     });
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401 || res.status === 403)
       throw new Error(`Sin sesión (${res.status}). Inicia sesión en la app principal primero.`);
-    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
     const data = await res.json();
     currentIssueId = data.id || data.issueId || data.issue?.id;
     if (!currentIssueId) throw new Error('No se obtuvo ID del issue');
-    addLog(`Issue creado → ${currentIssueId.slice(0,8)}…`, 'accent');
+    addLog(`▸ Issue #${currentIssueId.slice(0,8)}… asignado a ${cfg.name}`, 'accent');
 
-    // Poll main issue for completion
-    pollTimer    = setInterval(pollIssue,    POLL_MS);
-    // Poll sub-issues for live stage updates (faster)
-    subPollTimer = setInterval(pollSubIssues, POLL_MS);
+    pollTimer = setInterval(pollMain, POLL_MS);
+    if (cfg.showPipeline) subPollTimer = setInterval(pollSubIssues, POLL_MS);
+
+    // Animate progress bar
+    const tick = setInterval(() => {
+      if (!startTime) { clearInterval(tick); return; }
+      const elapsed = (Date.now() - startTime) / 1000;
+      const totalSec = cfg.showPipeline ? 180 : 60;
+      const pct = Math.min(90, Math.round((elapsed / totalSec) * 100));
+      document.getElementById('progressBar').style.width = pct + '%';
+    }, 2000);
 
   } catch (e) {
-    showError(`No se pudo iniciar el pipeline: ${e.message}`);
+    showError(`No se pudo iniciar: ${e.message}`);
     resetUI();
   }
 }
 
-/* ── Main issue poll: detect done/cancelled ── */
-async function pollIssue() {
+/* ── Poll main issue ── */
+async function pollMain() {
   if (!currentIssueId) return;
   try {
     const res  = await fetch(`${API_BASE}/api/issues/${currentIssueId}`, { credentials: 'include' });
-    if (!res.ok) { addLog(`Poll HTTP ${res.status}`, 'red'); return; }
+    if (!res.ok) return;
     const data = await res.json();
     const status = (data.status || '').toLowerCase();
 
@@ -656,12 +686,14 @@ async function pollIssue() {
       clearInterval(pollTimer);
       clearInterval(subPollTimer);
       startTime = null;
-      setAllDone();
+      if (AGENTS[currentAgent].showPipeline) setAllDone();
       document.getElementById('progressBar').style.width = '100%';
-      const raw = await fetchComments(currentIssueId);
+
+      const raw = await fetchLastComment(currentIssueId);
       showResults(raw, data);
-      saveHistory({ id: currentIssueId, topic: document.getElementById('topicInput').value.trim(), ts: Date.now(), raw });
+      saveHistory({ id: currentIssueId, agent: currentAgent, topic: document.getElementById('topicInput').value.trim(), ts: Date.now(), raw });
       resetUI(false);
+
     } else if (status === 'cancelled') {
       clearInterval(pollTimer);
       clearInterval(subPollTimer);
@@ -674,7 +706,7 @@ async function pollIssue() {
   }
 }
 
-/* ── Sub-issue poll: update individual agent stages ── */
+/* ── Poll sub-issues for Director pipeline ── */
 async function pollSubIssues() {
   if (!currentIssueId) return;
   try {
@@ -687,28 +719,22 @@ async function pollSubIssues() {
     const issues = data.issues || data || [];
     if (!Array.isArray(issues) || !issues.length) return;
 
-    let doneCount = 0;
-    issues.forEach(issue => {
-      const title  = (issue.title || '').toLowerCase();
-      const status = (issue.status || '').toLowerCase();
-      const match  = SUB_STAGE_MAP.find(m => title.includes(m.key));
+    let done = 0;
+    issues.forEach(iss => {
+      const title = (iss.title || '').toLowerCase();
+      const match = SUB_STAGE_MAP.find(m => title.includes(m.key));
       if (!match) return;
-
-      const state = paperclipToStageState(status);
+      const state = paperclipToState(iss.status);
       setStage(match.stage, state);
-      if (state === 'done') doneCount++;
-
-      // Update log only on transition to active
-      if (state === 'active') addLog(`${match.stage === 'search' ? '🔍' : match.stage === 'analyzer' ? '📊' : match.stage === 'story' ? '✍️' : match.stage === 'prompt' ? '🎨' : '🖼️'} ${issue.title.replace('🤖 ','').split(' —')[0]}…`, 'accent');
+      if (state === 'done') done++;
     });
 
-    updateProgress(doneCount, issues.length);
-  } catch(e) {
-    // silencioso — no es crítico
-  }
+    const pct = Math.min(90, Math.round(((done + 1) / 7) * 100));
+    document.getElementById('progressBar').style.width = pct + '%';
+  } catch(e) { /* silencioso */ }
 }
 
-async function fetchComments(issueId) {
+async function fetchLastComment(issueId) {
   try {
     const res = await fetch(`${API_BASE}/api/issues/${issueId}/comments`, { credentials: 'include' });
     if (!res.ok) return '';
@@ -716,141 +742,166 @@ async function fetchComments(issueId) {
     const comments = data.comments || data || [];
     if (!Array.isArray(comments) || !comments.length) return '';
     const last = comments[comments.length - 1];
-    return last.body || last.content || last.text || JSON.stringify(last);
-  } catch(e) {
-    return '';
-  }
+    return last.body || last.content || last.text || '';
+  } catch(e) { return ''; }
 }
 
-/* ──────────────────────────────────────────
-   PARSER  — extract structured info from raw markdown
-────────────────────────────────────────── */
-function parseResult(raw) {
-  const out = { title: '', hook: '', script: '', imageUrl: null, imagePrompt: '', trends: '', analysis: '' };
-
-  // Image URL — look for markdown image or URL line
-  const imgMd   = raw.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-  const imgUrl  = raw.match(/\*\*URL:\*\*\s*(https?:\/\/\S+)/);
-  const imgLine = raw.match(/https?:\/\/\S+\.(jpg|jpeg|png|webp)/i);
-  out.imageUrl  = (imgMd?.[1] || imgUrl?.[1] || imgLine?.[0] || '').split(')')[0];
-
-  // Prompt de imagen
-  const promptMatch = raw.match(/\*\*Prompt usado:\*\*\s*(.+?)(?:\n|$)/);
-  if (promptMatch) out.imagePrompt = promptMatch[1].replace(/\.\.\.$/, '');
-
-  // Title / hook
-  const titleMatch = raw.match(/(?:título|title|tiktok title)[:\s]+["«]?([^"»\n]+)["»]?/i);
-  if (titleMatch) out.title = titleMatch[1].trim();
-
-  const hookMatch = raw.match(/(?:hook|ggancho|primer frase)[:\s]+["«]?([^"»\n]+)["»]?/i);
-  if (hookMatch) out.hook = hookMatch[1].trim();
-
-  // Script section
-  const scriptSection = raw.match(/##\s*(?:🎬|guión|script|video)[^\n]*\n([\s\S]+?)(?=\n##\s|$)/i);
-  if (scriptSection) {
-    out.script = scriptSection[1].replace(/\*\*/g, '').trim().slice(0, 2000);
-  } else {
-    // fallback: take the largest paragraph block
-    const lines = raw.split('\n').filter(l => !l.startsWith('#') && !l.startsWith('```') && l.trim().length > 40);
-    out.script = lines.slice(0, 20).join('\n').slice(0, 1500);
-  }
-
-  // Trends
-  const trendsSection = raw.match(/##\s*(?:🔍|tendencias|trends|reddit)[^\n]*\n([\s\S]+?)(?=\n##\s|$)/i);
-  if (trendsSection) out.trends = trendsSection[1].replace(/\*\*/g, '').trim().slice(0, 600);
-
-  // Analysis
-  const analysisSection = raw.match(/##\s*(?:📊|análisis|analysis|competencia)[^\n]*\n([\s\S]+?)(?=\n##\s|$)/i);
-  if (analysisSection) out.analysis = analysisSection[1].replace(/\*\*/g, '').trim().slice(0, 600);
-
-  return out;
-}
-
-/* ──────────────────────────────────────────
-   UI — SHOW RESULTS
-────────────────────────────────────────── */
+/* ────────────────────────────────────────
+   RESULTS
+──────────────────────────────────────── */
 function showResults(raw, data) {
-  const p = parseResult(raw);
+  const cfg = AGENTS[currentAgent];
+  const elapsed = formatMs(Date.now() - (startTime || Date.now()));
+
   const right = document.getElementById('rightPanel');
-  const elapsed = data._elapsed ? `${data._elapsed}s` : formatMs(Date.now() - (startTime || Date.now()));
-
-  right.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-      <div style="font-size:18px;font-weight:700;color:var(--text);">Resultado generado</div>
-      <div style="font-size:12px;color:var(--sub);background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:20px;">${elapsed}</div>
+  const header = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+      <div style="font-size:16px;font-weight:700;">${cfg.icon} Resultado — ${cfg.name}</div>
+      <div style="font-size:11px;color:var(--sub);background:var(--surface);border:1px solid var(--border);padding:2px 9px;border-radius:16px;">${elapsed}</div>
     </div>
-    <div style="font-size:13px;color:var(--sub);margin-bottom:4px;">Issue #${currentIssueId}</div>
+    <div style="font-size:11.5px;color:var(--sub);margin-bottom:16px;">Issue #${(currentIssueId||'').slice(0,8)}…</div>`;
 
+  switch (cfg.resultType) {
+    case 'director':  right.innerHTML = header + buildDirectorResult(raw); break;
+    case 'images':    right.innerHTML = header + buildImagesResult(raw);   break;
+    case 'script':    right.innerHTML = header + buildScriptResult(raw);   break;
+    case 'prompts':   right.innerHTML = header + buildPromptsResult(raw);  break;
+    default:          right.innerHTML = header + buildMarkdownResult(raw); break;
+  }
+}
+
+/* Director: thumbnail + guión + meta */
+function buildDirectorResult(raw) {
+  const p = parseDirector(raw);
+  return `
     <div class="result-grid">
-
-      <!-- IMAGEN -->
       <div class="card card-image">
-        <div class="card-header">
-          <span class="card-icon">🖼️</span>
-          <span class="card-title">Thumbnail TikTok 9:16</span>
-        </div>
+        <div class="card-header"><span class="card-icon">🖼️</span><span class="card-title">Thumbnail 9:16</span></div>
         <div class="thumbnail-wrap">
           ${p.imageUrl
-            ? `<img src="${p.imageUrl}" alt="Thumbnail" onerror="this.parentElement.innerHTML='<div class=\\'thumbnail-placeholder\\'><span>🖼️</span><span>Imagen no disponible</span></div>'">`
-            : `<div class="thumbnail-placeholder"><span>⏳</span><span>Sin imagen generada</span></div>`
-          }
+            ? `<img src="${p.imageUrl}" alt="Thumbnail" onerror="this.parentElement.innerHTML='<div class=\\'thumbnail-placeholder\\'><span>🖼️</span><span>Sin imagen</span></div>'">`
+            : `<div class="thumbnail-placeholder"><span>⏳</span><span>Sin imagen generada</span></div>`}
         </div>
-        ${p.imagePrompt ? `<div style="margin-top:10px;font-size:11px;color:var(--sub);line-height:1.5;">${p.imagePrompt.slice(0,180)}…</div>` : ''}
       </div>
-
-      <!-- GUIÓN -->
-      <div class="card card-script">
-        <div class="card-header">
-          <span class="card-icon">✍️</span>
-          <span class="card-title">Guión del video</span>
-        </div>
-        <div class="script-content">${escHtml(p.script) || '<span style="color:var(--sub)">No se pudo extraer el guión.</span>'}</div>
+      <div class="card">
+        <div class="card-header"><span class="card-icon">✍️</span><span class="card-title">Guión del video</span></div>
+        <div class="script-content">${escHtml(p.script || 'No se pudo extraer el guión.')}</div>
       </div>
-
-      <!-- META -->
-      <div class="card card-meta">
-        <div class="card-header">
-          <span class="card-icon">📌</span>
-          <span class="card-title">Datos clave</span>
-        </div>
+      <div class="card">
+        <div class="card-header"><span class="card-icon">📌</span><span class="card-title">Datos clave</span></div>
         <div class="meta-rows">
           ${p.title ? `<div class="meta-row"><div class="meta-key">Título</div><div class="meta-val">${escHtml(p.title)}</div></div>` : ''}
-          ${p.hook  ? `<div class="meta-row"><div class="meta-key">Hook</div><div class="meta-val">${escHtml(p.hook)}</div></div>` : ''}
-          ${p.trends ? `<div class="meta-row"><div class="meta-key">Tendencias</div><div class="meta-val">${escHtml(p.trends.slice(0,200))}</div></div>` : ''}
-          ${p.analysis ? `<div class="meta-row"><div class="meta-key">Análisis</div><div class="meta-val">${escHtml(p.analysis.slice(0,200))}</div></div>` : ''}
-          ${(!p.title && !p.hook && !p.trends && !p.analysis) ? '<div class="meta-row"><div class="meta-val" style="color:var(--sub)">Sin metadatos estructurados</div></div>' : ''}
+          ${p.hook  ? `<div class="meta-row"><div class="meta-key">Hook</div><div class="meta-val">${escHtml(p.hook)}</div></div>`   : ''}
+          ${(!p.title && !p.hook) ? `<div style="font-size:12px;color:var(--sub)">Consulta la salida completa abajo.</div>` : ''}
         </div>
       </div>
-
-    </div>
-
-    <!-- RAW -->
-    <div class="card card-raw">
-      <div class="raw-toggle" onclick="toggleRaw(this)">
-        <span>▸</span> Ver salida completa del Director
+      <div class="card card-raw">
+        <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver salida completa</div>
+        <div class="raw-body">${escHtml(raw)}</div>
       </div>
-      <div class="raw-body">${escHtml(raw)}</div>
-    </div>
-  `;
+    </div>`;
 }
 
-function showRunningPanel(topic) {
-  const right = document.getElementById('rightPanel');
-  right.innerHTML = `
-    <div style="font-size:18px;font-weight:700;margin-bottom:4px;">Generando…</div>
-    <div style="font-size:13px;color:var(--sub);margin-bottom:20px;">"${escHtml(topic.slice(0, 80))}"</div>
-    <div class="running-log">
-      <div class="log-header"><span class="dot-pulse"><span></span><span></span><span></span></span>&nbsp;Pipeline en vivo</div>
-      <div class="log-lines" id="logLines">
-        <div class="log-line accent">▸ Iniciando pipeline…</div>
-      </div>
+/* Images gallery */
+function buildImagesResult(raw) {
+  // Extract JSON array from raw output
+  let images = [];
+  try {
+    const jsonMatch = raw.match(/```json\s*([\s\S]+?)```/);
+    if (jsonMatch) images = JSON.parse(jsonMatch[1]);
+  } catch(e) {}
+
+  if (!images.length) {
+    // Try to extract URLs from markdown
+    const urlMatches = [...raw.matchAll(/https?:\/\/[^\s)]+\.png/g)];
+    images = urlMatches.map((m, i) => ({ url: m[0], label: `Imagen ${i+1}`, status: 'ok' }));
+  }
+
+  const galleryHtml = images.length
+    ? `<div class="image-gallery">
+        ${images.map(img => `
+          <div>
+            <div class="gallery-item">
+              ${img.url
+                ? `<img src="${img.url}" alt="${escHtml(img.label)}" onclick="window.open('${img.url}','_blank')" title="Abrir en nueva pestaña">`
+                : `<div class="gallery-error">Error</div>`}
+            </div>
+            <div class="gallery-caption">${escHtml((img.label||'').replace('Escena ','E'))}</div>
+          </div>`).join('')}
+      </div>`
+    : `<div style="color:var(--sub);font-size:12px;">No se encontraron imágenes en la respuesta.</div>`;
+
+  return `
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header"><span class="card-icon">🖼️</span><span class="card-title">Imágenes generadas · ${images.filter(i=>i.url).length}/${images.length}</span></div>
+      ${galleryHtml}
     </div>
-  `;
+    <div class="card card-raw" style="margin-top:0">
+      <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver salida completa</div>
+      <div class="raw-body">${escHtml(raw)}</div>
+    </div>`;
+}
+
+/* Script result */
+function buildScriptResult(raw) {
+  return `
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header"><span class="card-icon">✍️</span><span class="card-title">Guión generado</span></div>
+      <div class="script-content" style="max-height:none">${escHtml(raw)}</div>
+    </div>`;
+}
+
+/* Prompts JSON */
+function buildPromptsResult(raw) {
+  let parsed = null;
+  try { parsed = JSON.parse(raw); } catch(e) {}
+  const scenes = parsed?.scene_prompts || [];
+
+  const scenesHtml = scenes.length
+    ? scenes.map(s => `
+        <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">Escena ${s.scene}: ${escHtml(s.title||'')}</div>
+          <div style="font-size:12px;color:var(--text);line-height:1.6;">${escHtml(s.prompt)}</div>
+        </div>`).join('')
+    : `<div class="script-content">${escHtml(raw)}</div>`;
+
+  return `
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header"><span class="card-icon">🎨</span><span class="card-title">Prompts para Higgsfield · ${scenes.length} escenas</span></div>
+      <div style="max-height:500px;overflow-y:auto;">${scenesHtml}</div>
+    </div>
+    <div class="card card-raw" style="margin-top:0">
+      <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver JSON completo</div>
+      <div class="raw-body">${escHtml(raw)}</div>
+    </div>`;
+}
+
+/* Generic markdown */
+function buildMarkdownResult(raw) {
+  return `
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header"><span class="card-icon">${AGENTS[currentAgent].icon}</span><span class="card-title">Análisis</span></div>
+      <div class="script-content" style="max-height:600px">${escHtml(raw)}</div>
+    </div>`;
+}
+
+/* ────────────────────────────────────────
+   RUNNING UI
+──────────────────────────────────────── */
+function showRunningPanel(cfg, topic) {
+  document.getElementById('rightPanel').innerHTML = `
+    <div style="font-size:16px;font-weight:700;margin-bottom:2px;">${cfg.icon} Ejecutando ${cfg.name}…</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:18px;">"${escHtml(topic.slice(0,80))}"</div>
+    <div class="running-log">
+      <div class="log-header"><span class="dot-pulse"><span></span><span></span><span></span></span>&nbsp;En vivo</div>
+      <div class="log-lines" id="logLines">
+        <div class="log-line accent">▸ Iniciando ${cfg.name}…</div>
+      </div>
+    </div>`;
 }
 
 function showError(msg) {
-  const right = document.getElementById('rightPanel');
-  right.innerHTML = `
+  document.getElementById('rightPanel').innerHTML = `
     <div class="empty-state">
       <div class="empty-icon">⚠️</div>
       <h2>Algo salió mal</h2>
@@ -863,9 +914,89 @@ function addLog(msg, cls='') {
   if (!el) return;
   const line = document.createElement('div');
   line.className = `log-line ${cls}`;
-  line.textContent = `▸ ${msg}`;
+  line.textContent = msg;
   el.appendChild(line);
   el.scrollTop = el.scrollHeight;
+}
+
+/* ────────────────────────────────────────
+   PARSE (Director result)
+──────────────────────────────────────── */
+function parseDirector(raw) {
+  const out = { imageUrl: '', script: '', title: '', hook: '' };
+  const imgMd  = raw.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+  const imgUrl = raw.match(/\*\*URL:\*\*\s*(https?:\/\/\S+)/);
+  out.imageUrl = (imgMd?.[1] || imgUrl?.[1] || '').split(')')[0];
+
+  const titleM = raw.match(/(?:título sugerido|title)[:\s*]+["«]?([^"»\n]+)["»]?/i);
+  if (titleM) out.title = titleM[1].trim();
+  const hookM = raw.match(/(?:hook|primeros 3 segundos)[^\n]*\n([^\n]+)/i);
+  if (hookM) out.hook = hookM[1].replace(/\*\*/g,'').trim();
+
+  const scriptM = raw.match(/###\s*Guion listo\s*\n([\s\S]+?)(?=\n###|\n##|$)/i);
+  if (scriptM) out.script = scriptM[1].replace(/\*\*/g,'').trim().slice(0,2000);
+  else {
+    const lines = raw.split('\n').filter(l => !l.startsWith('#') && l.trim().length > 40);
+    out.script = lines.slice(0,20).join('\n').slice(0,1500);
+  }
+  return out;
+}
+
+/* ────────────────────────────────────────
+   HISTORY
+──────────────────────────────────────── */
+function saveHistory(item) {
+  runHistory.unshift(item);
+  if (runHistory.length > 30) runHistory = runHistory.slice(0,30);
+  localStorage.setItem('hs_history', JSON.stringify(runHistory));
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (!runHistory.length) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--sub);padding:2px 0;">Sin historial aún</div>';
+    return;
+  }
+  list.innerHTML = runHistory.map((h,i) => {
+    const cfg = AGENTS[h.agent] || AGENTS.director;
+    return `<div class="history-item ${h.id===currentIssueId?'active-run':''}" onclick="loadHistory(${i})">
+      <div class="history-title">${escHtml((h.topic||'').slice(0,55))}</div>
+      <div class="history-meta">
+        <span class="history-agent">${cfg.icon} ${cfg.name}</span>
+        ${relTime(h.ts)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadHistory(idx) {
+  const h = runHistory[idx];
+  if (!h) return;
+  currentIssueId = h.id;
+  currentAgent   = h.agent || 'director';
+  selectAgent(currentAgent);
+  document.getElementById('topicInput').value = h.topic || '';
+  setAllDone();
+  showResults(h.raw, {});
+}
+
+/* ────────────────────────────────────────
+   UTILS
+──────────────────────────────────────── */
+function resetUI(withWaiting=true) {
+  currentIssueId = null;
+  const cfg = AGENTS[currentAgent];
+  document.getElementById('btnRun').disabled  = false;
+  document.getElementById('btnRun').innerHTML = `${cfg.icon} Ejecutar ${cfg.name}`;
+  document.getElementById('progressWrap').style.display = 'none';
+  if (withWaiting && cfg.showPipeline) setAllWaiting();
+}
+
+function flashInput() {
+  const inp = document.getElementById('topicInput');
+  inp.style.borderColor = 'var(--red)';
+  setTimeout(() => { inp.style.borderColor = ''; }, 900);
 }
 
 function toggleRaw(btn) {
@@ -874,72 +1005,25 @@ function toggleRaw(btn) {
   btn.querySelector('span').textContent = body.classList.contains('visible') ? '▾' : '▸';
 }
 
-/* ──────────────────────────────────────────
-   HISTORY
-────────────────────────────────────────── */
-function saveHistory(item) {
-  history.unshift(item);
-  if (history.length > 20) history = history.slice(0, 20);
-  localStorage.setItem('hs_history', JSON.stringify(history));
-  renderHistory();
-}
-
-function renderHistory() {
-  const list = document.getElementById('historyList');
-  if (!history.length) {
-    list.innerHTML = '<div style="font-size:12px;color:var(--sub);padding:4px 0;">Sin historial aún</div>';
-    return;
-  }
-  list.innerHTML = history.map((h, i) => `
-    <div class="history-item ${h.id === currentIssueId ? 'active-run' : ''}" onclick="loadHistoryItem(${i})">
-      <div class="history-title">${escHtml(h.topic.slice(0, 60))}</div>
-      <div class="history-meta">${relTime(h.ts)} · #${h.id || '?'}</div>
-    </div>
-  `).join('');
-}
-
-function loadHistoryItem(idx) {
-  const h = history[idx];
-  if (!h) return;
-  currentIssueId = h.id;
-  setAllDone();
-  showResults(h.raw, { _elapsed: '' });
-}
-
-/* ──────────────────────────────────────────
-   UTILS
-────────────────────────────────────────── */
-function resetUI(withWaiting=true) {
-  document.getElementById('btnGenerate').disabled  = false;
-  document.getElementById('btnGenerate').innerHTML = '✦ Generar contenido';
-  document.getElementById('progressWrap').style.display = 'none';
-  if (withWaiting) setAllWaiting();
-}
-
-function flashInput() {
-  const inp = document.getElementById('topicInput');
-  inp.style.borderColor = 'var(--red)';
-  setTimeout(() => { inp.style.borderColor = ''; }, 1000);
-}
-
 function escHtml(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function relTime(ts) {
-  const sec = Math.floor((Date.now() - ts) / 1000);
-  if (sec < 60)   return 'Hace un momento';
-  if (sec < 3600) return `Hace ${Math.floor(sec/60)} min`;
-  if (sec < 86400)return `Hace ${Math.floor(sec/3600)} h`;
-  return `Hace ${Math.floor(sec/86400)} días`;
+  const s = Math.floor((Date.now()-ts)/1000);
+  if (s < 60)    return 'Hace un momento';
+  if (s < 3600)  return `Hace ${Math.floor(s/60)} min`;
+  if (s < 86400) return `Hace ${Math.floor(s/3600)} h`;
+  return `Hace ${Math.floor(s/86400)} d`;
 }
 
 function formatMs(ms) {
-  const s = Math.floor(ms / 1000);
+  const s = Math.floor(ms/1000);
   return s > 60 ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`;
 }
 
 /* ── Init ── */
+selectAgent('director');
 renderHistory();
 </script>
 </body>

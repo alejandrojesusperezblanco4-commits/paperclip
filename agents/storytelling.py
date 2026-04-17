@@ -7,7 +7,7 @@ import os
 import sys
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save
-from api_client import call_llm
+from api_client import call_llm, post_issue_result
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -96,6 +96,7 @@ def main():
         response = call_openrouter(task, api_key)
         save("storytelling", task[:60], response)
         print(response)
+        post_issue_result(response)
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)

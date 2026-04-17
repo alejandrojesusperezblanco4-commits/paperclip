@@ -1,8 +1,13 @@
 """
 Módulo compartido: cliente de OpenRouter con retry y fallback de modelos.
+También incluye post_issue_result() para que los sub-agentes cierren su issue en Paperclip.
 """
+import os
 import json
 import time
+import hmac
+import hashlib
+import base64
 import urllib.request
 import urllib.error
 
@@ -110,3 +115,66 @@ def call_llm(
             continue
 
     raise last_error or Exception("Todos los modelos fallaron")
+
+
+# ── Paperclip issue posting ───────────────────────────────────────────────────
+
+def _b64u(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def _make_jwt(agent_id: str, company_id: str, run_id: str, secret: str) -> str:
+    hdr = json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":"))
+    now = int(time.time())
+    pay = json.dumps({
+        "sub": agent_id, "company_id": company_id, "adapter_type": "process",
+        "run_id": run_id, "iat": now, "exp": now + 172800,
+        "iss": "paperclip", "aud": "paperclip-api",
+    }, separators=(",", ":"))
+    si  = f"{_b64u(hdr.encode())}.{_b64u(pay.encode())}"
+    sig = hmac.new(secret.encode("utf-8"), si.encode("utf-8"), hashlib.sha256).digest()
+    return f"{si}.{_b64u(sig)}"
+
+
+def post_issue_result(output: str) -> None:
+    """Cierra el issue de Paperclip y publica el output como comentario.
+    Lee las variables de entorno que Paperclip inyecta automáticamente.
+    No hace nada si PAPERCLIP_ISSUE_ID no está definido."""
+    issue_id   = os.environ.get("PAPERCLIP_ISSUE_ID", "").strip()
+    api_url    = os.environ.get("PAPERCLIP_API_URL", "http://localhost:7777").strip()
+    if not issue_id:
+        return
+
+    headers = {"Content-Type": "application/json"}
+
+    api_key = os.environ.get("PAPERCLIP_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    else:
+        agent_id   = os.environ.get("PAPERCLIP_AGENT_ID", "")
+        company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
+        run_id     = os.environ.get("PAPERCLIP_RUN_ID", "agent-run")
+        secret     = (os.environ.get("PAPERCLIP_AGENT_JWT_SECRET") or
+                      os.environ.get("BETTER_AUTH_SECRET", "")).strip()
+        if secret and agent_id:
+            try:
+                token = _make_jwt(agent_id, company_id, run_id, secret)
+                headers["Authorization"] = f"Bearer {token}"
+            except Exception:
+                pass
+
+    def _call(method, path, body=None):
+        data = json.dumps(body).encode("utf-8") if body else None
+        req  = urllib.request.Request(f"{api_url}{path}", data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return r.status
+        except Exception as e:
+            print(f"⚠️  Paperclip API {method} {path}: {e}", flush=True)
+            return None
+
+    # 1. Marcar done
+    _call("PATCH", f"/api/issues/{issue_id}", {"status": "done"})
+    # 2. Publicar resultado como comentario
+    _call("POST",  f"/api/issues/{issue_id}/comments", {"body": output[:10000]})
+    print(f"✅ Resultado publicado en issue {issue_id}", flush=True)
