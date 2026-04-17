@@ -433,7 +433,7 @@ Diferenciacion vs competencia:
     prompt_task = sanitize(f"""Genera 5-6 prompts JSON (uno por escena) para el guión de: {objetivo}
 
 Guión completo:
-{storytelling_result[:800]}""")
+{storytelling_result[:2500]}""")
 
     prompt_result = run_tracked("prompt_generator.py", prompt_task,
                                 "Prompt Generator — 5-6 imágenes", "prompt_generator")
@@ -468,7 +468,10 @@ Guión completo:
 
     # ── Extraer URLs de imágenes para incluirlas en el preamble ──
     import re as _re
-    imagen_urls = _re.findall(r'https?://[^\s)"\']+\.png', imagen_result)
+    # Deduplicar: la misma URL aparece varias veces en el output de imagen.py
+    # (línea de status, **URL:**, markdown image y bloque JSON → hasta 4x la misma URL)
+    _raw_urls = _re.findall(r'https?://[^\s)"\']+\.png', imagen_result)
+    imagen_urls = list(dict.fromkeys(_raw_urls))  # preserva orden, elimina duplicados
 
     imagen_gallery = ""
     if imagen_urls:
