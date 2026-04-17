@@ -409,6 +409,8 @@ def main():
 
         if sub_id:
             sub_env["PAPERCLIP_ISSUE_ID"] = sub_id
+            # Marcar sub-issue como in_progress para que aparezca activo en el pipeline
+            _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "in_progress"}, auth_headers)
         else:
             sub_env.pop("PAPERCLIP_ISSUE_ID", None)
 
