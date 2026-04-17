@@ -254,6 +254,16 @@ export async function createApp(
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "API route not found" });
   });
+
+  // Studio frontend — servido sin auth desde /studio
+  app.get("/studio", (_req, res) => {
+    const studioPath = path.resolve(process.cwd(), "frontend", "index.html");
+    if (fs.existsSync(studioPath)) {
+      res.sendFile(studioPath);
+    } else {
+      res.status(404).send("Studio not found.");
+    }
+  });
   app.use(pluginUiStaticRoutes(db, {
     localPluginDir: opts.localPluginDir ?? DEFAULT_LOCAL_PLUGIN_DIR,
   }));
