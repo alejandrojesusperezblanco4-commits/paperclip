@@ -133,8 +133,11 @@ def _api_request(method: str, url: str, payload, headers: dict):
 
 
 def create_sub_issue(title: str, agent_key: str, parent_issue_id: str,
-                     api_url: str, auth_headers: dict, company_id: str = ""):
-    """Crea un sub-issue en Paperclip asignado al sub-agente correspondiente.
+                     api_url: str, auth_headers: dict, company_id: str = "",
+                     description: str = "", assignee_agent_id: str = ""):
+    """Crea un sub-issue en Paperclip.
+    - description: tarea del agente (inyectada como PAPERCLIP_ISSUE_BODY)
+    - assignee_agent_id: ID del agente Paperclip que lo ejecutará
     Devuelve el ID del sub-issue creado, o None si falla."""
     if not parent_issue_id or not api_url:
         return None
@@ -142,15 +145,15 @@ def create_sub_issue(title: str, agent_key: str, parent_issue_id: str,
     payload = {
         "title":    title,
         "status":   "backlog",
-        "parentId": parent_issue_id,  # vincula al issue padre para visibilidad en el pipeline
-        # NO assigneeAgentId: evita que Paperclip dispare el agente por separado.
-        # El Director re-run por getWakeableParentAfterChildCompletion se previene con
-        # la guardia de "issue ya done" al inicio de main().
+        "parentId": parent_issue_id,
     }
+    if description:
+        payload["description"] = description[:4000]
+    if assignee_agent_id:
+        payload["assigneeAgentId"] = assignee_agent_id
 
-    # Ruta correcta: /api/companies/:companyId/issues
     url = f"{api_url}/api/companies/{company_id}/issues" if company_id else f"{api_url}/api/issues"
-    print(f"  📋 Creando sub-issue: {title!r} (agente: {agent_key})", flush=True)
+    print(f"  📋 Creando sub-issue: {title!r}", flush=True)
     result = _api_request("POST", url, payload, auth_headers)
 
     if result:
@@ -160,6 +163,35 @@ def create_sub_issue(title: str, agent_key: str, parent_issue_id: str,
             return sub_id
     print(f"  ⚠️  No se pudo crear sub-issue para {agent_key}", flush=True)
     return None
+
+
+def _wait_for_sub_agent(sub_id: str, label: str, api_url: str,
+                        auth_headers: dict, timeout: int = 240) -> str | None:
+    """Espera a que Paperclip despache y complete el sub-agente.
+    Devuelve el resultado (último comentario) o None si hay timeout."""
+    deadline = time.time() + timeout
+    last_log  = 0
+    while time.time() < deadline:
+        time.sleep(7)
+        data = _api_request("GET", f"{api_url}/api/issues/{sub_id}", None, auth_headers)
+        if data:
+            status = data.get("status", "")
+            if status == "done":
+                comments = _api_request("GET", f"{api_url}/api/issues/{sub_id}/comments",
+                                        None, auth_headers)
+                if comments:
+                    items = (comments if isinstance(comments, list)
+                             else comments.get("comments") or comments.get("items") or [])
+                    if items:
+                        return items[-1].get("body", "") or "[sin contenido]"
+                return "[Agente terminó sin comentario de resultado]"
+            elif status == "cancelled":
+                return f"[{label}: cancelado]"
+        if time.time() - last_log > 30:
+            elapsed = int(time.time() - (deadline - timeout))
+            print(f"  ⏳ Esperando {label}... ({elapsed}s/{timeout}s)", flush=True)
+            last_log = time.time()
+    return None  # timeout → activar fallback subprocess
 
 
 def close_sub_issue(sub_issue_id: str, result_text: str,
@@ -394,44 +426,65 @@ def main():
         except Exception as _e:
             print(f"⚠️  Checkout falló (continuando de todas formas): {_e}", flush=True)
 
-    # ── Helper: ejecuta un agente + gestiona su sub-issue ─────
+    # ── Helper: orquesta un sub-agente vía Paperclip ──────────
     def run_tracked(script: str, task: str, label: str, agent_key: str,
                     extra_env: dict = None) -> str:
-        """Crea sub-issue → ejecuta agente apuntando a ese sub-issue → devuelve output."""
+        """
+        Estrategia de orquestación real:
+        1. Crea sub-issue con assigneeAgentId + description (tarea)
+        2. PATCH a 'todo' → dispara statusChangedFromBacklog → Paperclip despacha el agente
+        3. Espera polling hasta que el sub-agente cierre el issue (status=done)
+        4. Lee resultado del último comentario
+        5. Si timeout → fallback a subprocess local
+        """
+        assignee_id = SUB_AGENT_IDS.get(agent_key, "")
         sub_id = None
+
         if issue_id and "Authorization" in auth_headers:
             sub_id = create_sub_issue(
                 title=f"🤖 {label}",
                 agent_key=agent_key,
+                description=task,
+                assignee_agent_id=assignee_id,
                 parent_issue_id=issue_id,
                 api_url=api_url,
                 auth_headers=auth_headers,
                 company_id=company_id,
             )
 
-        # Construir env del sub-agente:
-        # - Apuntar PAPERCLIP_ISSUE_ID al sub-issue (no al padre)
-        #   para que post_issue_result/post_issue_comment vayan al sitio correcto.
-        # - Limpiar PAPERCLIP_ISSUE_TITLE/BODY para que el sub-agente use la tarea
-        #   que le pasa el Director por stdin (no la sobreescriba con env vars).
+        if sub_id and assignee_id:
+            # PATCH a 'todo' → statusChangedFromBacklog → Paperclip despacha el sub-agente
+            _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "todo"}, auth_headers)
+            print(f"  🚀 {label} despachado — esperando que Paperclip lo complete...", flush=True)
+
+            result = _wait_for_sub_agent(sub_id, label, api_url, auth_headers, timeout=240)
+            if result is not None:
+                # Éxito: Paperclip ejecutó el agente correctamente
+                print(f"  ✅ {label} completado vía Paperclip ({len(result)} caracteres)", flush=True)
+                return result
+
+            # Timeout: el agente no respondió, usar fallback subprocess
+            print(f"  ⚠️  Timeout esperando {label} — usando subprocess como fallback...", flush=True)
+            _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "in_progress"}, auth_headers)
+
+        elif sub_id:
+            # No hay assignee_id configurado, marcar in_progress para visibilidad
+            _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "in_progress"}, auth_headers)
+
+        # ── Subprocess fallback ─────────────────────────────
         sub_env = {**os.environ}
         if extra_env:
             sub_env.update(extra_env)
-
         if sub_id:
             sub_env["PAPERCLIP_ISSUE_ID"] = sub_id
-            # Marcar sub-issue como in_progress para que aparezca activo en el pipeline
-            _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "in_progress"}, auth_headers)
         else:
             sub_env.pop("PAPERCLIP_ISSUE_ID", None)
-
-        # Limpiar vars que harían que el sub-agente sobreescriba la tarea del Director
         sub_env.pop("PAPERCLIP_ISSUE_TITLE", None)
         sub_env.pop("PAPERCLIP_ISSUE_BODY", None)
 
         result = run_agent_with_env(script, task, sub_env, label)
 
-        # Fallback: si el sub-agente falló y no cerró su sub-issue, cerrarlo aquí
+        # Si el sub-agente subprocess no cerró su sub-issue, cerrarlo aquí
         if sub_id and (not result or (result.startswith('[') and 'Error' in result)):
             close_sub_issue(sub_id, result or '[Sin resultado]', api_url, auth_headers)
 
