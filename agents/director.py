@@ -221,10 +221,11 @@ Los reportes completos se adjuntarán al resultado final; aquí solo sintetiza l
             {"role": "user", "content": content}
         ],
         api_key=api_key,
-        max_tokens=1200,
+        max_tokens=1000,
         temperature=0.6,
         title="Paperclip - Director de Contenido",
-        timeout=120,
+        timeout=45,   # 45s por modelo
+        retries=0,    # sin retries: máximo ~45s total (1 solo modelo)
     )
 
 
