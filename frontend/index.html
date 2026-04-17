@@ -344,6 +344,22 @@
     .dot-pulse span { width: 3px; height: 3px; background: var(--accent); border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; }
     .dot-pulse span:nth-child(2) { animation-delay: 0.2s; }
     .dot-pulse span:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Agent result tabs */
+    .art-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:14px; }
+    .art-tab {
+      padding:5px 11px; border-radius:6px; font-size:11px; font-weight:600;
+      background:var(--surface); border:1px solid var(--border); color:var(--sub);
+      cursor:pointer; transition:all 0.15s; white-space:nowrap;
+    }
+    .art-tab:hover { color:var(--text); border-color:var(--muted); }
+    .art-tab.active { background:rgba(168,85,247,0.15); color:var(--accent); border-color:var(--accent); }
+    .art-panel { display:none; }
+    .art-panel.active { display:block; }
+    /* Make pipeline stages look clickable when done */
+    .stage.done { cursor:pointer; }
+    .stage.done:hover { border-color:var(--accent); background:rgba(168,85,247,0.06); }
+    .stage.nav-active { border-color:var(--accent) !important; background:rgba(168,85,247,0.12) !important; }
   </style>
 </head>
 <body>
@@ -534,8 +550,8 @@ const AGENTS = {
   },
   imagen: {
     icon: '🖼️', name: 'Imagen AI',
-    label: 'JSON de prompts o concepto',
-    placeholder: 'Pega el JSON del Prompt Generator, o describe las escenas que quieres generar…',
+    label: 'JSON del Prompt Generator',
+    placeholder: '💡 Para mejores resultados: pega el JSON que genera el Prompt Generator (campo "scene_prompts").\n\nSi describes una escena en texto, se genera 1 imagen con prompt genérico.',
     agentId: '2492962a-b9f0-4611-90e2-c7ccca5aa281',
     showPipeline: false,
     resultType: 'images',
@@ -710,6 +726,7 @@ async function pollMain() {
       const raw = await fetchLastComment(currentIssueId);
       showResults(raw, data);
       saveHistory({ id: currentIssueId, agent: currentAgent, topic: document.getElementById('topicInput').value.trim(), ts: Date.now(), raw });
+      if (AGENTS[currentAgent].showPipeline) activatePipelineNav();
       resetUI(false);
 
     } else if (status === 'cancelled') {
@@ -866,69 +883,101 @@ function extractImageUrls(text) {
 }
 function extractImageUrl(text) { return extractImageUrls(text)[0] || ''; }
 
-/* Director: gallery + synthesis + storytelling */
+/* Director: tabbed result — one tab per agent */
 function buildDirectorResult(raw) {
   const imageUrls = extractImageUrls(raw);
 
-  // Synthesis = everything before the first <details>
+  // Split synthesis (before <details>) from embedded agent reports
   const detailsIdx = raw.indexOf('<details>');
   const synthesis  = detailsIdx > 0 ? raw.slice(0, detailsIdx).trim() : raw;
 
-  // Extract individual <details> sections by summary label
-  function extractDetail(labelFragment) {
-    const re = new RegExp('<details>[\\s\\S]*?<summary>[^<]*' + labelFragment + '[^<]*<\\/summary>([\\s\\S]*?)<\\/details>', 'i');
-    const m = raw.match(re);
-    return m ? m[1].trim() : '';
+  // Parse each <details> block by summary label
+  function extractDetail(label) {
+    const re = new RegExp('<details>[\\s\\S]*?<summary>[^<]*' + label + '[^<]*<\\/summary>([\\s\\S]*?)<\\/details>', 'i');
+    const m = raw.match(re); return m ? m[1].trim() : '';
   }
-  const storyContent  = extractDetail('Storytelling');
-  const searchContent = extractDetail('Deep Search');
-  const analyzerContent = extractDetail('Channel Analyzer');
+  const sections = {
+    search:   extractDetail('Deep Search'),
+    analyzer: extractDetail('Channel Analyzer'),
+    story:    extractDetail('Storytelling'),
+    prompts:  extractDetail('Prompt Generator'),
+    images:   extractDetail('Imagen Generator'),
+  };
 
-  // Images gallery
+  // Image gallery HTML
   const galleryHtml = imageUrls.length
-    ? `<div class="image-gallery" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
-        ${imageUrls.map((url, i) => `
+    ? `<div class="image-gallery" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));margin-top:8px">
+        ${imageUrls.map((url,i)=>`
           <div>
             <div class="gallery-item">
               <img src="${url}" alt="Escena ${i+1}" onclick="window.open('${url}','_blank')"
-                title="Abrir escena ${i+1}"
                 onerror="this.parentElement.innerHTML='<div class=\\'gallery-error\\'>❌</div>'">
             </div>
             <div class="gallery-caption">Escena ${i+1}</div>
           </div>`).join('')}
-      </div>`
-    : `<div style="color:var(--sub);font-size:12px;padding:12px 0">Sin imágenes generadas</div>`;
+       </div>`
+    : `<div style="color:var(--sub);font-size:12px;padding:20px 0;text-align:center">Sin imágenes generadas</div>`;
+
+  // Parse prompt JSON for nice display
+  let promptsHtml = '';
+  try {
+    const jsonM = sections.prompts.match(/\{[\s\S]+\}/);
+    const parsed = jsonM ? JSON.parse(jsonM[0]) : null;
+    const scenes = parsed?.scene_prompts || [];
+    promptsHtml = scenes.length
+      ? scenes.map(s=>`
+          <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+            <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px">Escena ${s.scene}: ${escHtml(s.title||'')}</div>
+            <div style="font-size:12px;line-height:1.6">${escHtml(s.prompt)}</div>
+          </div>`).join('')
+      : `<div class="md-render">${mdToHtml(sections.prompts)}</div>`;
+  } catch(e) {
+    promptsHtml = `<div class="md-render">${mdToHtml(sections.prompts)}</div>`;
+  }
 
   return `
-    <div class="result-grid">
+    <div class="art-tabs" id="artTabs">
+      <button class="art-tab active" data-art="summary" onclick="switchArtTab('summary',this)">🎬 Resumen</button>
+      <button class="art-tab" data-art="images" onclick="switchArtTab('images',this)">🖼️ Imágenes${imageUrls.length ? ' · '+imageUrls.length : ''}</button>
+      <button class="art-tab" data-art="story" onclick="switchArtTab('story',this)">✍️ Guión</button>
+      <button class="art-tab" data-art="search" onclick="switchArtTab('search',this)">🔍 Deep Search</button>
+      <button class="art-tab" data-art="analyzer" onclick="switchArtTab('analyzer',this)">📊 Canal</button>
+      <button class="art-tab" data-art="prompts" onclick="switchArtTab('prompts',this)">🎨 Prompts</button>
+    </div>
 
-      <div class="card" style="grid-column:1/-1">
+    <div id="art-panel-summary" class="art-panel active">
+      <div class="card"><div class="md-render">${mdToHtml(synthesis)}</div></div>
+    </div>
+
+    <div id="art-panel-images" class="art-panel">
+      <div class="card">
         <div class="card-header"><span class="card-icon">🖼️</span><span class="card-title">Imágenes generadas · ${imageUrls.length} escenas</span></div>
         ${galleryHtml}
       </div>
+    </div>
 
+    <div id="art-panel-story" class="art-panel">
+      <div class="card"><div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(sections.story || '_(sin datos — ver raw)_')}</div></div>
+    </div>
+
+    <div id="art-panel-search" class="art-panel">
+      <div class="card"><div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(sections.search || '_(sin datos — ver raw)_')}</div></div>
+    </div>
+
+    <div id="art-panel-analyzer" class="art-panel">
+      <div class="card"><div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(sections.analyzer || '_(sin datos — ver raw)_')}</div></div>
+    </div>
+
+    <div id="art-panel-prompts" class="art-panel">
       <div class="card">
-        <div class="card-header"><span class="card-icon">🎬</span><span class="card-title">Paquete ejecutivo</span></div>
-        <div class="md-render" style="max-height:460px;overflow-y:auto">${mdToHtml(synthesis)}</div>
+        <div class="card-header"><span class="card-icon">🎨</span><span class="card-title">Prompts · ${(() => { try { const m=sections.prompts.match(/\{[\s\S]+\}/); return m ? (JSON.parse(m[0])?.scene_prompts?.length||0) : 0; } catch(e){return 0;} })()} escenas</span></div>
+        <div style="max-height:500px;overflow-y:auto">${promptsHtml}</div>
       </div>
+    </div>
 
-      <div class="card">
-        <div class="card-header"><span class="card-icon">✍️</span><span class="card-title">Guión completo</span></div>
-        <div class="md-render" style="max-height:460px;overflow-y:auto">${mdToHtml(storyContent || '_(disponible en reportes completos)_')}</div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><span class="card-icon">🔍</span><span class="card-title">Tendencias · Deep Search</span></div>
-        <div class="md-render" style="max-height:300px;overflow-y:auto">${mdToHtml(searchContent || '_(ver reportes completos)_')}</div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><span class="card-icon">📊</span><span class="card-title">Competencia · Channel Analyzer</span></div>
-        <div class="md-render" style="max-height:300px;overflow-y:auto">${mdToHtml(analyzerContent || '_(ver reportes completos)_')}</div>
-      </div>
-
-      <div class="card card-raw" style="grid-column:1/-1">
-        <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver reportes completos (raw)</div>
+    <div style="margin-top:10px">
+      <div class="card card-raw">
+        <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver output raw completo</div>
         <div class="raw-body">${escHtml(raw)}</div>
       </div>
     </div>`;
@@ -1138,6 +1187,44 @@ function relTime(ts) {
 function formatMs(ms) {
   const s = Math.floor(ms/1000);
   return s > 60 ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`;
+}
+
+/* ── Agent result tab switcher ── */
+function switchArtTab(tabId, btn) {
+  // Switch panels
+  document.querySelectorAll('.art-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('art-panel-' + tabId);
+  if (panel) panel.classList.add('active');
+
+  // Switch tab buttons
+  document.querySelectorAll('.art-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else {
+    const found = document.querySelector(`[data-art="${tabId}"]`);
+    if (found) found.classList.add('active');
+  }
+
+  // Highlight matching pipeline stage
+  const TAB_TO_STAGE = { summary:'director', images:'imagen', story:'story', search:'search', analyzer:'analyzer', prompts:'prompt' };
+  document.querySelectorAll('.stage').forEach(s => s.classList.remove('nav-active'));
+  const stageId = TAB_TO_STAGE[tabId];
+  if (stageId) {
+    const stageEl = document.getElementById('stage-' + stageId);
+    if (stageEl) stageEl.classList.add('nav-active');
+  }
+}
+
+/* Wire pipeline stages as tab navigation once Director results are visible */
+function activatePipelineNav() {
+  const STAGE_TO_TAB = { director:'summary', search:'search', analyzer:'analyzer', story:'story', prompt:'prompts', imagen:'images' };
+  STAGE_IDS.forEach(id => {
+    const el = document.getElementById('stage-' + id);
+    if (!el) return;
+    const tabId = STAGE_TO_TAB[id];
+    if (!tabId) return;
+    el.onclick = () => switchArtTab(tabId, null);
+    el.title = 'Ver resultado de este agente';
+  });
 }
 
 /* ── Init ── */
