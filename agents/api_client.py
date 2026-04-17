@@ -208,8 +208,8 @@ def post_issue_result(output: str) -> None:
             print(f"⚠️  Paperclip API {method} {path}: {e}", flush=True)
             return None
 
-    # 1. Marcar done
-    _call("PATCH", f"/api/issues/{issue_id}", {"status": "done"})
-    # 2. Publicar resultado como comentario
+    # 1. Publicar resultado como comentario PRIMERO (el frontend detecta 'done' y ya necesita el comentario)
     _call("POST",  f"/api/issues/{issue_id}/comments", {"body": output[:10000]})
+    # 2. Marcar done DESPUÉS
+    _call("PATCH", f"/api/issues/{issue_id}", {"status": "done"})
     print(f"✅ Resultado publicado en issue {issue_id}", file=__import__("sys").stderr, flush=True)
