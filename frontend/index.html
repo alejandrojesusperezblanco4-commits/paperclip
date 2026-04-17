@@ -656,6 +656,15 @@ async function startRun() {
     if (!currentIssueId) throw new Error('No se obtuvo ID del issue');
     addLog(`▸ Issue #${currentIssueId.slice(0,8)}… asignado a ${cfg.name}`, 'accent');
 
+    // Enviar mensaje al chat para disparar al agente (igual que escribir en el inbox)
+    await fetch(`${API_BASE}/api/issues/${currentIssueId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ body: topic }),
+    });
+    addLog(`▸ Agente disparado`, 'accent');
+
     pollTimer = setInterval(pollMain, POLL_MS);
     if (cfg.showPipeline) subPollTimer = setInterval(pollSubIssues, POLL_MS);
 
