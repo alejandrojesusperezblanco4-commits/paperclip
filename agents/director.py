@@ -140,11 +140,12 @@ def create_sub_issue(title: str, agent_key: str, parent_issue_id: str,
         return None
 
     payload = {
-        "title":  title,
-        "status": "backlog",
-        # "backlog" no requiere assignee y no dispara wakeups de Paperclip.
-        # NO parentId: evita getWakeableParentAfterChildCompletion → re-trigger del Director.
-        # NO assigneeAgentId: evita que Paperclip dispare el agente por separado (doble run).
+        "title":    title,
+        "status":   "backlog",
+        "parentId": parent_issue_id,  # vincula al issue padre para visibilidad en el pipeline
+        # NO assigneeAgentId: evita que Paperclip dispare el agente por separado.
+        # El Director re-run por getWakeableParentAfterChildCompletion se previene con
+        # la guardia de "issue ya done" al inicio de main().
     }
 
     # Ruta correcta: /api/companies/:companyId/issues
@@ -362,6 +363,16 @@ def main():
             print(f"⚠️  No se pudo generar JWT: {e}", flush=True)
     else:
         print("⚠️  Sin token de autenticación disponible — sub-issues no se crearán", flush=True)
+
+    # ── Guardia: salir si el issue ya está cerrado ────────────
+    # Previene re-runs de getWakeableParentAfterChildCompletion: cuando todos los
+    # sub-issues terminan, Paperclip re-despierta al Director. Si el issue ya está
+    # done (el Director ya terminó), salimos inmediatamente.
+    if issue_id and "Authorization" in auth_headers:
+        _guard = _api_request("GET", f"{api_url}/api/issues/{issue_id}", None, auth_headers)
+        if _guard and _guard.get("status") in ("done", "cancelled"):
+            print(f"⛔ Issue ya está '{_guard.get('status')}' — saliendo para evitar re-run duplicado", flush=True)
+            sys.exit(0)
 
     # ── Checkout del issue al inicio ─────────────────────────
     # Usar POST /checkout en vez de PATCH directo: esto setea TANTO status=in_progress
