@@ -33,27 +33,37 @@ def build_auth_header(api_key: str) -> str:
 
 def submit_image(prompt: str, aspect_ratio: str, resolution: str, api_key: str) -> str:
     """Envía una solicitud de generación a Higgsfield y devuelve el request_id."""
+    # Payload directo, sin wrapper "arguments"
     payload = {
-        "arguments": {
-            "prompt": prompt,
-            "resolution": resolution,
-            "aspect_ratio": aspect_ratio,
-            "camera_fixed": True,
-        }
+        "prompt": prompt,
+        "resolution": resolution,
+        "aspect_ratio": aspect_ratio,
     }
+    url = f"{HIGGSFIELD_API_URL}/{MODEL_PATH}"
+    auth = build_auth_header(api_key)
+    print(f"  📡 POST {url}", flush=True)
+    print(f"  🔑 Auth: {auth[:20]}…", flush=True)
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        f"{HIGGSFIELD_API_URL}/{MODEL_PATH}",
+        url,
         data=data,
         headers={
-            "Authorization": build_auth_header(api_key),
+            "Authorization": auth,
             "Content-Type": "application/json",
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        body = resp.read().decode("utf-8")
-        result = json.loads(body)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read().decode("utf-8")
+            result = json.loads(body)
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+        raise Exception(f"HTTP {e.code} — {body[:400]}")
 
     request_id = result.get("request_id") or result.get("id")
     if not request_id:
