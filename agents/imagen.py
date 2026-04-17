@@ -58,6 +58,11 @@ def submit_image(prompt: str, aspect_ratio: str, resolution: str, api_key: str) 
         headers={
             "Authorization": auth,
             "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "application/json, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Origin": "https://cloud.higgsfield.ai",
+            "Referer": "https://cloud.higgsfield.ai/",
         },
         method="POST",
     )
@@ -84,7 +89,13 @@ def poll_result(request_id: str, api_key: str, max_wait: int = 120) -> str:
     """Hace polling hasta obtener la URL de la imagen generada."""
     deadline = time.time() + max_wait
     interval = 4
-    headers = {"Authorization": build_auth_header(api_key)}
+    headers = {
+        "Authorization": build_auth_header(api_key),
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json, */*",
+        "Origin": "https://cloud.higgsfield.ai",
+        "Referer": "https://cloud.higgsfield.ai/",
+    }
 
     while time.time() < deadline:
         # 1. Consultar status
