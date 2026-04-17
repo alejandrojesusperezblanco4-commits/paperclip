@@ -105,6 +105,45 @@ def sanitize(text: str) -> str:
     return text.encode("utf-8", errors="replace").decode("utf-8").replace("\x00", "")
 
 
+def run_agent_with_env(script_name: str, task: str, env: dict, label: str) -> str:
+    """Ejecuta un agente especializado con un env personalizado."""
+    script_path = AGENTS_DIR / script_name
+    print(f"\n{'='*60}", flush=True)
+    print(f"🤖 Ejecutando: {label}...", flush=True)
+    print(f"{'='*60}", flush=True)
+
+    env = {**env, "PYTHONIOENCODING": "utf-8"}
+
+    try:
+        result = subprocess.run(
+            [PYTHON, str(script_path)],
+            input=sanitize(task),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=240,
+            env=env
+        )
+        if result.returncode != 0:
+            error_msg = result.stderr.strip()
+            print(f"⚠️  {label} falló (exit {result.returncode}): {error_msg[:300]}", flush=True)
+            return f"[{label}: Error - {error_msg[:200]}]"
+
+        output = sanitize(result.stdout.strip())
+        if not output:
+            return f"[{label}: respuesta vacía]"
+        print(f"✅ {label} completado ({len(output)} caracteres)", flush=True)
+        return output
+
+    except subprocess.TimeoutExpired:
+        print(f"⏱️  {label} timeout (240s)", flush=True)
+        return f"[{label}: Timeout]"
+    except Exception as e:
+        print(f"❌ {label} error inesperado: {e}", flush=True)
+        return f"[{label}: {str(e)}]"
+
+
 def run_agent(script_name: str, task: str, api_key: str, label: str) -> str:
     """Ejecuta un agente especializado y devuelve su output."""
     script_path = AGENTS_DIR / script_name
@@ -227,6 +266,17 @@ El video tiene este concepto:
 
     prompt_result = run_agent("prompt_generator.py", prompt_task, api_key, "Prompt Generator")
 
+    # ── Fase 2b: Generación de imágenes reales con Higgsfield ──
+    imagen_result = "[Imagen Generator: HIGGSFIELD_API_KEY no configurada — omitido]"
+    higgsfield_key = os.environ.get("HIGGSFIELD_API_KEY", "")
+    if higgsfield_key:
+        imagen_task = sanitize(f"""Genera imágenes para este guión:\n{storytelling_result[:500]}""")
+        imagen_env = os.environ.copy()
+        imagen_env["HIGGSFIELD_API_KEY"] = higgsfield_key
+        imagen_result = run_agent_with_env("imagen.py", imagen_task, imagen_env, "Imagen Generator")
+    else:
+        print("⚠️  HIGGSFIELD_API_KEY no encontrada — saltando Imagen Generator", flush=True)
+
     # ── Fase 3: Síntesis ejecutiva ─────────────────────────────
     print(f"\n{'='*60}", flush=True)
     print(f"🧠 Sintetizando paquete ejecutivo...", flush=True)
@@ -236,7 +286,8 @@ El video tiene este concepto:
         "deep_search": deep_search_result,
         "channel_analyzer": channel_result,
         "storytelling": storytelling_result,
-        "prompt_generator": prompt_result
+        "prompt_generator": prompt_result,
+        "imagen": imagen_result,
     }
 
     try:
@@ -247,7 +298,7 @@ El video tiene este concepto:
     # ── Output final ───────────────────────────────────────────
     output = f"""# 🎬 PAQUETE COMPLETO DE CONTENIDO
 **Tema:** {objetivo}
-**Generado por:** Director de Contenido (4 agentes coordinados)
+**Generado por:** Director de Contenido (5 agentes coordinados)
 
 {synthesis}
 
@@ -277,6 +328,12 @@ El video tiene este concepto:
 <summary>🪄 Prompt Generator - Prompts de imágenes</summary>
 
 {prompt_result}
+</details>
+
+<details>
+<summary>🖼️ Imagen Generator - Imágenes generadas con Higgsfield</summary>
+
+{imagen_result}
 </details>
 """
     print(output, flush=True)
