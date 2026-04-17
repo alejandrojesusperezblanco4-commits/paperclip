@@ -187,24 +187,33 @@ def run_agent(script_name: str, task: str, api_key: str, label: str) -> str:
         return f"[{label}: {str(e)}]"
 
 
+def truncate_report(text: str, max_chars: int = 1500) -> str:
+    """Recorta un reporte a max_chars, manteniendo inicio útil."""
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + f"\n\n[... {len(text) - max_chars} caracteres omitidos para síntesis ...]"
+
+
 def synthesize(tema: str, reports: dict, api_key: str) -> str:
-    """Llama al LLM para sintetizar todos los reportes en un paquete ejecutivo."""
+    """Llama al LLM para sintetizar todos los reportes en un paquete ejecutivo.
+    Trunca cada reporte para no saturar el contexto del LLM y evitar timeouts."""
     content = f"""Tema del canal: {tema}
 
 ## REPORTE 1 - DEEP SEARCH (Tendencias y Keywords)
-{reports['deep_search']}
+{truncate_report(reports['deep_search'], 1500)}
 
 ## REPORTE 2 - CHANNEL ANALYZER (Competencia)
-{reports['channel_analyzer']}
+{truncate_report(reports['channel_analyzer'], 1500)}
 
 ## REPORTE 3 - STORYTELLING DESIGNER (Guión)
-{reports['storytelling']}
+{truncate_report(reports['storytelling'], 2000)}
 
 ## REPORTE 4 - PROMPT GENERATOR (Imágenes)
-{reports['prompt_generator']}
+{truncate_report(reports['prompt_generator'], 800)}
 
 ---
-Con base en estos 4 reportes, crea el paquete ejecutivo de contenido semanal."""
+Con base en estos 4 reportes, crea el paquete ejecutivo de contenido semanal.
+Los reportes completos se adjuntarán al resultado final; aquí solo sintetiza lo esencial."""
 
     return call_llm(
         messages=[
@@ -212,9 +221,10 @@ Con base en estos 4 reportes, crea el paquete ejecutivo de contenido semanal."""
             {"role": "user", "content": content}
         ],
         api_key=api_key,
-        max_tokens=1500,
+        max_tokens=1200,
         temperature=0.6,
         title="Paperclip - Director de Contenido",
+        timeout=120,
     )
 
 
