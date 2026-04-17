@@ -202,7 +202,7 @@ def main():
             api_key=api_key,
         )
 
-    with ThreadPoolExecutor(max_workers=6) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {executor.submit(run, i, item): i for i, item in enumerate(prompts)}
         for future in as_completed(futures):
             idx, result = future.result()
