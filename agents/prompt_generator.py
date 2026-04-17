@@ -8,7 +8,7 @@ import sys
 import json
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save
-from api_client import call_llm, post_issue_result, post_issue_comment
+from api_client import call_llm, post_issue_result, post_issue_comment, resolve_issue_context
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -92,8 +92,7 @@ def main():
     else:
         task = sys.stdin.read().strip()
 
-    issue_title = os.environ.get("PAPERCLIP_ISSUE_TITLE", "")
-    issue_body  = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
+    issue_title, issue_body = resolve_issue_context()
     if issue_title:
         context = issue_body if issue_body and len(issue_body) > len(issue_title) else issue_title
         task = f"Genera prompts para: {context}\n\nContexto adicional: {issue_body or 'ninguno'}"

@@ -136,6 +136,47 @@ def _make_jwt(agent_id: str, company_id: str, run_id: str, secret: str) -> str:
     return f"{si}.{_b64u(sig)}"
 
 
+def resolve_issue_context() -> tuple:
+    """Devuelve (title, description) del issue actual.
+    workspace-runtime.ts solo inyecta PAPERCLIP_ISSUE_TITLE, no PAPERCLIP_ISSUE_BODY.
+    Si el body está vacío, hace GET del issue para leer su description."""
+    title = os.environ.get("PAPERCLIP_ISSUE_TITLE", "").strip()
+    body  = os.environ.get("PAPERCLIP_ISSUE_BODY", "").strip()
+    if body:
+        return title, body
+
+    issue_id = os.environ.get("PAPERCLIP_ISSUE_ID", "").strip()
+    api_url  = os.environ.get("PAPERCLIP_API_URL", "http://localhost:7777").strip()
+    if not issue_id:
+        return title, body
+
+    headers = {"Content-Type": "application/json"}
+    api_key = os.environ.get("PAPERCLIP_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    else:
+        agent_id   = os.environ.get("PAPERCLIP_AGENT_ID", "")
+        company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
+        run_id     = os.environ.get("PAPERCLIP_RUN_ID", "agent-run")
+        secret     = (os.environ.get("PAPERCLIP_AGENT_JWT_SECRET") or
+                      os.environ.get("BETTER_AUTH_SECRET", "")).strip()
+        if secret and agent_id:
+            try:
+                token = _make_jwt(agent_id, company_id, run_id, secret)
+                headers["Authorization"] = f"Bearer {token}"
+            except Exception:
+                pass
+
+    try:
+        req = urllib.request.Request(f"{api_url}/api/issues/{issue_id}",
+                                     headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read().decode("utf-8"))
+            return (data.get("title") or title).strip(), (data.get("description") or "").strip()
+    except Exception:
+        return title, body
+
+
 def post_issue_comment(message: str) -> None:
     """Publica un comentario en el issue actual (para confirmaciones, sugerencias, etc.)."""
     issue_id = os.environ.get("PAPERCLIP_ISSUE_ID", "").strip()
