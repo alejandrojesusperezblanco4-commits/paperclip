@@ -7,7 +7,7 @@ import os
 import sys
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save, append_keywords
-from api_client import call_llm, post_issue_result
+from api_client import call_llm, post_issue_result, post_issue_comment
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -73,9 +73,15 @@ def main():
 
     # Variables de contexto de Paperclip
     issue_title = os.environ.get("PAPERCLIP_ISSUE_TITLE", "")
-    issue_body = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
+    issue_body  = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
     if issue_title:
-        task = f"Búsqueda solicitada: {issue_title}\n\nDetalles adicionales: {issue_body or 'ninguno'}"
+        context = issue_body if issue_body and len(issue_body) > len(issue_title) else issue_title
+        task = f"Búsqueda solicitada: {context}\n\nDetalles adicionales: {issue_body or 'ninguno'}"
+        post_issue_comment(
+            f"🔍 Entendido. Voy a buscar en TikTok, YouTube, Reddit, Twitter y Google Trends "
+            f"sobre: **{issue_title}**\n\nDame un par de minutos — te traigo las tendencias más "
+            f"calientes del momento con datos reales."
+        )
 
     if not task:
         task = "Dame las tendencias más importantes en YouTube Shorts y TikTok esta semana para canales de contenido en español. Incluye nichos de oportunidad con baja competencia."

@@ -7,7 +7,7 @@ import os
 import sys
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save, append_channel
-from api_client import call_llm, post_issue_result
+from api_client import call_llm, post_issue_result, post_issue_comment
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -73,9 +73,15 @@ def main():
         task = sys.stdin.read().strip()
 
     issue_title = os.environ.get("PAPERCLIP_ISSUE_TITLE", "")
-    issue_body = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
+    issue_body  = os.environ.get("PAPERCLIP_ISSUE_BODY", "")
     if issue_title:
-        task = f"Analiza este canal o nicho: {issue_title}\n\nDetalles: {issue_body or 'ninguno'}"
+        context = issue_body if issue_body and len(issue_body) > len(issue_title) else issue_title
+        task = f"Analiza este canal o nicho: {context}\n\nDetalles: {issue_body or 'ninguno'}"
+        post_issue_comment(
+            f"📊 Perfecto. Voy a diseccionar los canales más exitosos en este nicho: **{issue_title}**\n\n"
+            f"Busco hooks ganadores, estructura de videos, thumbnails que convierten y los errores "
+            f"que cometen los canales mediocres. Enseguida te doy el análisis completo."
+        )
 
     if not task:
         task = "Analiza los 3 canales de YouTube en español más exitosos en el nicho de inteligencia artificial y tecnología. Incluye sus estrategias, debilidades y cómo superarlos."

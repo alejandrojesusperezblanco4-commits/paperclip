@@ -136,6 +136,41 @@ def _make_jwt(agent_id: str, company_id: str, run_id: str, secret: str) -> str:
     return f"{si}.{_b64u(sig)}"
 
 
+def post_issue_comment(message: str) -> None:
+    """Publica un comentario en el issue actual (para confirmaciones, sugerencias, etc.)."""
+    issue_id = os.environ.get("PAPERCLIP_ISSUE_ID", "").strip()
+    api_url  = os.environ.get("PAPERCLIP_API_URL", "http://localhost:7777").strip()
+    if not issue_id:
+        return
+
+    headers = {"Content-Type": "application/json"}
+    api_key = os.environ.get("PAPERCLIP_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    else:
+        agent_id   = os.environ.get("PAPERCLIP_AGENT_ID", "")
+        company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
+        run_id     = os.environ.get("PAPERCLIP_RUN_ID", "agent-run")
+        secret     = (os.environ.get("PAPERCLIP_AGENT_JWT_SECRET") or
+                      os.environ.get("BETTER_AUTH_SECRET", "")).strip()
+        if secret and agent_id:
+            try:
+                token = _make_jwt(agent_id, company_id, run_id, secret)
+                headers["Authorization"] = f"Bearer {token}"
+            except Exception:
+                pass
+
+    data = json.dumps({"body": message}).encode("utf-8")
+    req  = urllib.request.Request(
+        f"{api_url}/api/issues/{issue_id}/comments",
+        data=data, headers=headers, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10): pass
+    except Exception:
+        pass
+
+
 def post_issue_result(output: str) -> None:
     """Cierra el issue de Paperclip y publica el output como comentario.
     Lee las variables de entorno que Paperclip inyecta automáticamente.
