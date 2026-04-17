@@ -37,6 +37,26 @@ def extract_image_urls(text: str) -> list:
     return list(dict.fromkeys(urls))
 
 
+def extract_audio_url(text: str) -> str:
+    """Extrae URL de audio MP3 del texto (para modo standalone)."""
+    m = re.search(r"https?://[^\s\"')]+\.mp3", text)
+    return m.group(0) if m else ""
+
+
+def download_audio(url: str, output_path: str) -> bool:
+    """Descarga un MP3 desde URL a output_path."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            with open(output_path, "wb") as f:
+                f.write(r.read())
+        print(f"  ✅ Audio descargado: {output_path}", flush=True)
+        return True
+    except Exception as e:
+        print(f"  ⚠️  Error descargando audio: {e}", flush=True)
+        return False
+
+
 def get_audio_duration(path: str) -> float:
     """Devuelve la duración del audio en segundos."""
     try:
@@ -161,11 +181,15 @@ def main():
         raw = issue_body
 
     post_issue_comment(
-        "🎬 Ensamblando video final...\n\n"
-        "Combino las imágenes con la voz en off en un MP4 9:16 listo para TikTok/Reels."
+        "🎬 Ensamblando video...\n\n"
+        "Descargo imágenes, busco audio y genero el MP4 9:16 listo para TikTok/Reels.\n\n"
+        "**Formato aceptado en la descripción:**\n"
+        "- URLs de imágenes (.png/.jpg)\n"
+        "- URL de audio (.mp3) — opcional\n"
+        "- O JSON: `{\"image_urls\": [...], \"audio_url\": \"...\"}`"
     )
 
-    # Parsear JSON del input (puede venir como dict con image_urls + audio_path)
+    # Parsear input — acepta JSON o texto libre con URLs
     data = {}
     m = re.search(r"\{[\s\S]*\}", raw)
     if m:
@@ -176,14 +200,34 @@ def main():
 
     image_urls = data.get("image_urls") or extract_image_urls(raw)
     audio_path = data.get("audio_path", "")
+    audio_url  = data.get("audio_url", "") or extract_audio_url(raw)
 
-    # Si no llegó audio_path, buscar el MP3 más reciente en /tmp
-    if not audio_path or not os.path.exists(audio_path):
+    timestamp = int(time.time())
+    tmp_dir   = f"/tmp/video_{timestamp}"
+    os.makedirs(tmp_dir, exist_ok=True)
+
+    # Resolver audio: prioridad → ruta local → URL → glob /tmp
+    if audio_path and os.path.exists(audio_path):
+        print(f"🎙️  Audio local: {audio_path}", flush=True)
+    elif audio_url:
+        # Modo standalone: descargar audio desde URL
+        print(f"🎙️  Descargando audio desde URL: {audio_url[:60]}", flush=True)
+        downloaded = f"{tmp_dir}/narration.mp3"
+        if download_audio(audio_url, downloaded):
+            audio_path = downloaded
+        else:
+            audio_path = ""
+    else:
+        # Fallback: buscar MP3 más reciente en /tmp (cuando corre tras TTS en el Director)
         mp3s = sorted(glob.glob("/tmp/narration_*.mp3"), key=os.path.getmtime, reverse=True)
         audio_path = mp3s[0] if mp3s else ""
+        if audio_path:
+            print(f"🎙️  Audio encontrado en /tmp: {audio_path}", flush=True)
+        else:
+            print("🎙️  Sin audio — se generará video mudo", flush=True)
 
     print(f"🖼️  {len(image_urls)} imágenes", flush=True)
-    print(f"🎙️  Audio: {audio_path or 'no encontrado'}", flush=True)
+    print(f"🎙️  Audio final: {audio_path or 'ninguno (video mudo)'}", flush=True)
 
     if not image_urls:
         print("ERROR: sin imágenes para ensamblar", file=sys.stderr)
