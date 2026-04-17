@@ -128,19 +128,13 @@ def extract_higgsfield_prompts(input_text: str) -> list:
             data = json.loads(json_str)
             hf = data.get("higgsfield", {})
             prompts = []
+            # Formato diario: solo 1 imagen (TikTok 9:16). YouTube ya no aplica.
             if hf.get("tiktok", {}).get("prompt"):
                 prompts.append({
                     "prompt": hf["tiktok"]["prompt"],
                     "aspect_ratio": hf["tiktok"].get("aspect_ratio", "9:16"),
                     "resolution": hf["tiktok"].get("resolution", "2K"),
                     "label": "Thumbnail TikTok",
-                })
-            if hf.get("youtube", {}).get("prompt"):
-                prompts.append({
-                    "prompt": hf["youtube"]["prompt"],
-                    "aspect_ratio": hf["youtube"].get("aspect_ratio", "16:9"),
-                    "resolution": hf["youtube"].get("resolution", "2K"),
-                    "label": "Portada YouTube",
                 })
             if prompts:
                 print(f"  ✅ Prompts extraídos del prompt_generator ({len(prompts)} imágenes)", flush=True)
@@ -165,22 +159,11 @@ def extract_higgsfield_prompts(input_text: str) -> list:
             "resolution": "2K",
             "label": "Thumbnail TikTok",
         },
-        {
-            "prompt": (
-                f"Cinematic horizontal YouTube thumbnail, 16:9. Dramatic betrayal scene. "
-                f"Emotional Latin woman on right side, expression of rage and heartbreak, tears. "
-                f"Empty space on left third for title text. Deep red background, harsh shadows, "
-                f"high contrast, photorealistic, editorial photography style, 8K. Context: {concept[:150]}"
-            ),
-            "aspect_ratio": "16:9",
-            "resolution": "2K",
-            "label": "Portada YouTube",
-        },
     ]
 
 
 def main():
-    higgsfield_key = os.environ.get("HIGGSFIELD_API_KEY", "")
+    higgsfield_key = os.environ.get("HIGGSFIELD_API_KEY", "").strip()
     if not higgsfield_key:
         print("ERROR: HIGGSFIELD_API_KEY no configurada", file=sys.stderr)
         sys.exit(1)

@@ -33,36 +33,49 @@ El canal publica historias REALISTAS con emociones fuertes: traiciones, engaños
 Estilo: narración en primera persona, tono íntimo y emocional, como si fuera real.
 Audiencia: latinos 18-35 años que disfrutan drama relacional y se sienten identificados.
 
-Recibes los reportes de 4 agentes y los sintetizas en un paquete ejecutivo listo para producir.
+Recibes los reportes de los agentes y los sintetizas en un paquete diario — UN SOLO VIDEO listo para producir y publicar HOY.
 
 ---
 
-# 🎯 PAQUETE SEMANAL — @historias.en.sombra
-## Historia seleccionada: {tema}
+# 🎬 PAQUETE DIARIO — @historias.en.sombra
+## Historia del día: {tema}
 
 ---
 
-## 📋 RESUMEN EJECUTIVO
-[Por qué esta historia va a viralizar: emoción, identificación, factor sorpresa]
+## 📋 RESUMEN EJECUTIVO (3-4 líneas)
+[Por qué esta historia va a viralizar HOY: emoción, identificación, factor sorpresa]
 
 ---
 
-## ⚡ TOP 3 ACCIONES ESTA SEMANA
-1. [Acción concreta hoy]
-2. [Acción concreta mañana]
-3. [Acción para el fin de semana]
+## ⚡ ACCIÓN INMEDIATA
+1. Grabar hoy
+2. Editar + subir antes de la hora pico
+3. Responder comentarios en las primeras 2 horas
 
 ---
 
-## 📅 CALENDARIO (7 días)
-| Día | Historia/Ángulo | Emoción principal | Hora sugerida |
-|-----|-----------------|-------------------|---------------|
-[Plan con 3-5 posts, variando entre traición, engaño, manipulación]
+## 🎬 VIDEO DEL DÍA
+
+**Título sugerido:** [título corto, emocional, con gancho]
+**Duración:** 60-90 segundos
+**Hora de publicación sugerida:** [hora óptima según la audiencia latina]
+**Hashtags:** [5-7 hashtags relevantes]
+
+### Hook (primeros 3 segundos)
+[Frase exacta a decir]
+
+### Guion listo
+[Guion completo en primera persona, tal como debe grabarse]
+
+### CTA final
+[Pregunta o provocación al espectador]
 
 ---
 
-## 🎬 VIDEO PRIORITARIO DE LA SEMANA
-[El guión listo para grabar, con el hook más fuerte]
+## 🖼️ IMÁGENES A GENERAR (1 video = 1 thumbnail, máximo)
+- **1 thumbnail vertical 9:16** para TikTok
+
+> Solo se genera UNA imagen al día. No saturamos Higgsfield ni tokens.
 
 ---
 
@@ -70,11 +83,10 @@ Recibes los reportes de 4 agentes y los sintetizas en un paquete ejecutivo listo
 - Retención al segundo 3: >85%
 - Comentarios esperados: "esto me pasó a mí" / "¿cómo se llama él/ella?"
 - Shares objetivo: que lo manden a alguien conocido
-- CTR del thumbnail: >8%
 
 ---
 
-Sé directo y emocional. El contenido debe hacer que la gente sienta rabia, tristeza o identificación.
+Sé directo y emocional. Una sola historia bien contada > paquete saturado.
 """
 
 def b64url(data: bytes) -> str:
