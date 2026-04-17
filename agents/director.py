@@ -554,12 +554,20 @@ Diferenciacion vs competencia:
             "TTS — Voz en off", "tts",
             extra_env={"ELEVENLABS_API_KEY": elevenlabs_key}
         )
-        # Extraer audio_path del JSON que devuelve tts.py
+        # Extraer audio_path del JSON que devuelve tts.py.
+        # tts_result mezcla logs + JSON en stdout → buscar el JSON con regex.
         try:
-            _tts_data = json.loads(tts_result)
-            audio_path = _tts_data.get("audio_path", "")
+            _m = _re.search(r'\{[\s\S]*?"audio_path"[\s\S]*?\}', tts_result)
+            if _m:
+                _tts_data = json.loads(_m.group(0))
+                audio_path = _tts_data.get("audio_path", "")
         except Exception:
             pass
+        # Fallback: buscar el MP3 más reciente en /tmp si el parsing falló
+        if not audio_path or not os.path.exists(audio_path):
+            import glob as _glob
+            _mp3s = sorted(_glob.glob("/tmp/narration_*.mp3"), key=os.path.getmtime, reverse=True)
+            audio_path = _mp3s[0] if _mp3s else ""
         print(f"🎙️ Audio path: {audio_path or 'no disponible'}", flush=True)
     else:
         print("⚠️  ELEVENLABS_API_KEY no encontrada — saltando TTS", flush=True)
@@ -592,7 +600,7 @@ Guión completo:
         _img_urls = list(dict.fromkeys(
             _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
         ))
-        if _img_urls and audio_path:
+        if _img_urls:
             video_task = sanitize(json.dumps({
                 "image_urls": _img_urls,
                 "audio_path": audio_path,

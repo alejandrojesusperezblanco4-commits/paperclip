@@ -109,7 +109,7 @@ def generate_audio(text: str, voice_id: str, api_key: str, output_path: str) -> 
 
 
 def upload_file(file_path: str) -> str:
-    """Sube archivo a 0x0.st y devuelve URL pública."""
+    """Sube archivo probando varios servicios hasta que uno funcione."""
     import mimetypes
     mime     = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
     filename = os.path.basename(file_path)
@@ -118,20 +118,38 @@ def upload_file(file_path: str) -> str:
     with open(file_path, "rb") as f:
         file_data = f.read()
 
-    body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-        f"Content-Type: {mime}\r\n\r\n"
-    ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
+    def _multipart_post(url: str, field: str) -> str:
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
+        req = urllib.request.Request(
+            url, data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return resp.read().decode("utf-8").strip()
 
-    req = urllib.request.Request(
-        "https://0x0.st",
-        data=body,
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-        method="POST"
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return resp.read().decode("utf-8").strip()
+    # Intentar servicios en orden
+    services = [
+        ("https://0x0.st",       "file"),
+        ("https://file.io",      "file"),
+        ("https://litterbox.catbox.moe/resources/internals/api.php", "fileToUpload"),
+    ]
+    for url, field in services:
+        try:
+            result = _multipart_post(url, field)
+            # file.io devuelve JSON
+            if url == "https://file.io":
+                result = json.loads(result).get("link", result)
+            if result.startswith("http"):
+                print(f"  ✅ Subido a {url.split('/')[2]}: {result}", flush=True)
+                return result
+        except Exception as e:
+            print(f"  ⚠️  {url.split('/')[2]} falló: {e}", flush=True)
+    raise Exception("Todos los servicios de upload fallaron")
 
 
 def main():
