@@ -141,14 +141,15 @@ def create_sub_issue(title: str, agent_key: str, parent_issue_id: str,
     if not parent_issue_id or not api_url:
         return None
 
-    sub_agent_id = SUB_AGENT_IDS.get(agent_key)
     payload = {
         "title":    title,
         "status":   "in_progress",
         "parentId": parent_issue_id,
+        # NO assigneeAgentId — los sub-issues son solo para visibilidad/tracking.
+        # El Director ya ejecuta cada agente como subprocess directamente.
+        # Poner assigneeAgentId hace que Paperclip dispare el agente POR SEPARADO
+        # además del subprocess → doble ejecución + imágenes de fallback sin input.
     }
-    if sub_agent_id:
-        payload["assigneeAgentId"] = sub_agent_id
 
     # Ruta correcta: /api/companies/:companyId/issues
     url = f"{api_url}/api/companies/{company_id}/issues" if company_id else f"{api_url}/api/issues"
