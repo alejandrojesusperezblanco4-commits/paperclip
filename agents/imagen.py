@@ -18,9 +18,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 HIGGSFIELD_API_URL = "https://platform.higgsfield.ai"
-MODEL_PATH = "bytedance/seedream/v4/text-to-image"
-DONE_STATUSES = {"Completed", "completed", "Failed", "failed", "Cancelled", "cancelled", "NSFW"}
-SUCCESS_STATUSES = {"Completed", "completed"}
+SUBMIT_PATH = "v1/text2image/soul"
+DONE_STATUSES = {"Completed", "completed", "Failed", "failed", "Cancelled", "cancelled", "NSFW", "ERROR", "error"}
+SUCCESS_STATUSES = {"Completed", "completed", "SUCCESS", "success"}
 
 
 def build_auth_header(api_key: str) -> str:
@@ -32,14 +32,22 @@ def build_auth_header(api_key: str) -> str:
 
 
 def submit_image(prompt: str, aspect_ratio: str, resolution: str, api_key: str) -> str:
-    """Envía una solicitud de generación a Higgsfield y devuelve el request_id."""
-    # Payload directo, sin wrapper "arguments"
+    """Envía una solicitud de generación a Higgsfield Soul y devuelve el request_id."""
+    # Soul acepta width_and_height, no aspect_ratio
+    # 9:16 → 1080x1920 | 16:9 → 1920x1080
+    size_map = {
+        "9:16": "1080x1920",
+        "16:9": "1920x1080",
+        "1:1":  "1024x1024",
+    }
+    width_and_height = size_map.get(aspect_ratio, "1080x1920")
     payload = {
         "prompt": prompt,
-        "resolution": resolution,
-        "aspect_ratio": aspect_ratio,
+        "width_and_height": width_and_height,
+        "quality": "720p",
+        "result_images": 1,
     }
-    url = f"{HIGGSFIELD_API_URL}/{MODEL_PATH}"
+    url = f"{HIGGSFIELD_API_URL}/{SUBMIT_PATH}"
     auth = build_auth_header(api_key)
     print(f"  📡 POST {url}", flush=True)
     print(f"  🔑 Auth: {auth[:20]}…", flush=True)
@@ -129,8 +137,8 @@ def poll_result(request_id: str, api_key: str, max_wait: int = 120) -> str:
 
 def generate_image(prompt: str, aspect_ratio: str, label: str, api_key: str) -> dict:
     """Genera una imagen y devuelve un dict con label, prompt, url."""
-    resolution = "2K"
-    print(f"\n🎨 Generando {label} ({aspect_ratio})...", flush=True)
+    resolution = "720p"  # Soul usa quality, no resolution — este valor es ignorado
+    print(f"\n🎨 Generando {label} ({aspect_ratio}) con Higgsfield Soul...", flush=True)
     try:
         request_id = submit_image(prompt, aspect_ratio, resolution, api_key)
         url = poll_result(request_id, api_key)
