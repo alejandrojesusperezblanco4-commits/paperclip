@@ -150,7 +150,7 @@ def _api_request(method: str, url: str, payload, headers: dict):
 
 
 def create_sub_issue(title: str, agent_key: str, parent_issue_id: str,
-                     api_url: str, auth_headers: dict):
+                     api_url: str, auth_headers: dict, company_id: str = ""):
     """Crea un sub-issue en Paperclip asignado al sub-agente correspondiente.
     Devuelve el ID del sub-issue creado, o None si falla."""
     if not parent_issue_id or not api_url:
@@ -158,15 +158,17 @@ def create_sub_issue(title: str, agent_key: str, parent_issue_id: str,
 
     sub_agent_id = SUB_AGENT_IDS.get(agent_key)
     payload = {
-        "title":      title,
-        "status":     "in_progress",
-        "parentId":   parent_issue_id,
+        "title":    title,
+        "status":   "in_progress",
+        "parentId": parent_issue_id,
     }
     if sub_agent_id:
-        payload["assigneeId"] = sub_agent_id
+        payload["assigneeAgentId"] = sub_agent_id
 
+    # Ruta correcta: /api/companies/:companyId/issues
+    url = f"{api_url}/api/companies/{company_id}/issues" if company_id else f"{api_url}/api/issues"
     print(f"  📋 Creando sub-issue: {title!r} (agente: {agent_key})", flush=True)
-    result = _api_request("POST", f"{api_url}/api/issues", payload, auth_headers)
+    result = _api_request("POST", url, payload, auth_headers)
 
     if result:
         sub_id = result.get("id") or result.get("issue", {}).get("id")
@@ -381,6 +383,7 @@ def main():
                 parent_issue_id=issue_id,
                 api_url=api_url,
                 auth_headers=auth_headers,
+                company_id=company_id,
             )
 
         if env_override is not None:
