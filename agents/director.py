@@ -141,13 +141,10 @@ def create_sub_issue(title: str, agent_key: str, parent_issue_id: str,
 
     payload = {
         "title":  title,
-        "status": "in_progress",
-        # NO parentId: si los sub-issues son hijos del Director, Paperclip llama a
-        # getWakeableParentAfterChildCompletion cuando el último hijo se cierra como
-        # "done" → reactiva el Director (que sigue corriendo) → segunda ejecución completa.
-        # Sin parentId los sub-issues aparecen como issues independientes en el inbox.
-        # NO assigneeAgentId: Paperclip dispararía el agente por separado además del
-        # subprocess del Director → doble ejecución + imágenes de fallback sin input.
+        "status": "backlog",
+        # "backlog" no requiere assignee y no dispara wakeups de Paperclip.
+        # NO parentId: evita getWakeableParentAfterChildCompletion → re-trigger del Director.
+        # NO assigneeAgentId: evita que Paperclip dispare el agente por separado (doble run).
     }
 
     # Ruta correcta: /api/companies/:companyId/issues
@@ -407,12 +404,15 @@ def main():
 
         return result
 
-    # ── Fase 1: Investigación en paralelo ──────────────────────
+    # ── Fase 1: Investigación ──────────────────────────────────
     search_task   = f"Busca tendencias virales y keywords de oportunidad para el tema: {objetivo}"
     analyzer_task = f"Analiza los canales más exitosos de YouTube y TikTok sobre: {objetivo}. Encuentra sus debilidades."
 
+    post_issue_comment("🔍 **Fase 1/5 — Deep Search** en progreso…")
     deep_search_result = run_tracked("deep_search.py", search_task,
                                      "Deep Search — Tendencias", "deep_search")
+
+    post_issue_comment("📊 **Fase 2/5 — Channel Analyzer** en progreso…")
     channel_result     = run_tracked("channel_analyzer.py", analyzer_task,
                                      "Channel Analyzer — Competencia", "channel_analyzer")
 
@@ -425,6 +425,7 @@ Contexto de tendencias encontradas:
 Diferenciacion vs competencia:
 {channel_result[:250]}""")
 
+    post_issue_comment("✍️ **Fase 3/5 — Storytelling** en progreso…")
     storytelling_result = run_tracked("storytelling.py", storytelling_task,
                                       "Storytelling — Guión 4-5 escenas", "storytelling")
 
@@ -433,6 +434,7 @@ Diferenciacion vs competencia:
 Guión completo:
 {storytelling_result[:2500]}""")
 
+    post_issue_comment("🎨 **Fase 4/5 — Prompt Generator** en progreso…")
     prompt_result = run_tracked("prompt_generator.py", prompt_task,
                                 "Prompt Generator — 5-6 imágenes", "prompt_generator")
 
@@ -440,6 +442,7 @@ Guión completo:
     imagen_result  = "[Imagen Generator: HIGGSFIELD_API_KEY no configurada — omitido]"
     higgsfield_key = os.environ.get("HIGGSFIELD_API_KEY", "")
     if higgsfield_key:
+        post_issue_comment("🖼️ **Fase 5/5 — Imagen Generator** en progreso… (puede tardar 2-3 min)")
         imagen_result = run_tracked("imagen.py", prompt_result,
                                     "Imagen Generator — Higgsfield Soul", "imagen_generator",
                                     extra_env={"HIGGSFIELD_API_KEY": higgsfield_key})
