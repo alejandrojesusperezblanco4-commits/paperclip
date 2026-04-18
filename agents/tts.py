@@ -75,10 +75,12 @@ def extract_narration(script: str) -> str:
         stripped = line.strip()
 
         # Activar captura de narración
-        if "🎙️" in stripped or re.search(r'\bNARRACIÓN\b|\bNARRACION\b', stripped, re.IGNORECASE):
+        if "🎙️" in stripped or re.search(r'\bNARRACI[OÓ]N\b', stripped, re.IGNORECASE):
             in_narration = True
             # Capturar contenido después del marcador en la misma línea
-            after = re.sub(r'🎙️\s*|(?i)\bnarración\s*[:：]?\s*|(?i)\bnarracion\s*[:：]?\s*', '', stripped).strip()
+            # Usar flags=re.IGNORECASE en llamada separada (Python 3.13 no permite (?i) inline en alternados)
+            after = re.sub(r'🎙️\s*', '', stripped)
+            after = re.sub(r'\bNARRACI[OÓ]N\s*[:：]?\s*', '', after, flags=re.IGNORECASE).strip()
             if after:
                 parts.append(after)
             continue
