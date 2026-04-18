@@ -20,22 +20,10 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 
-_IMAGE_MAGIC = {
-    b"\xff\xd8\xff": "jpg",
-    b"\x89PNG":      "png",
-    b"RIFF":         "webp",  # RIFF....WEBP
-    b"GIF8":         "gif",
-}
-
-def _is_real_image(data: bytes) -> bool:
-    """Verifica que los bytes sean una imagen real (no HTML de error 403/404)."""
-    for magic in _IMAGE_MAGIC:
-        if data[:len(magic)] == magic:
-            return True
-    # WebP extra check: RIFF....WEBP
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return True
-    return False
+def _is_html(data: bytes) -> bool:
+    """Detecta respuestas HTML (errores 403/404 disfrazados como 200)."""
+    start = data[:100].lower()
+    return start.startswith(b"<!doctype") or start.startswith(b"<html") or b"<html" in start[:60]
 
 
 def download_image(url: str, path: str) -> bool:
@@ -53,17 +41,23 @@ def download_image(url: str, path: str) -> bool:
     }
     try:
         req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=45) as r:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            content_type = r.headers.get("Content-Type", "")
             data = r.read()
-        if not _is_real_image(data):
-            print(f"  ⚠️  Respuesta no es imagen ({len(data)}B, inicio: {data[:20]}): {url[:60]}", flush=True)
+        print(f"  📦 Descargado: {len(data)//1024}KB, Content-Type: {content_type[:40]}", flush=True)
+        # Rechazar solo respuestas HTML (errores disfrazados)
+        if _is_html(data):
+            print(f"  ⚠️  Respuesta es HTML (error del servidor): {url[:70]}", flush=True)
+            return False
+        if len(data) < 500:
+            print(f"  ⚠️  Respuesta demasiado pequeña ({len(data)}B): {url[:70]}", flush=True)
             return False
         with open(path, "wb") as f:
             f.write(data)
-        print(f"  ✅ Imagen descargada ({len(data)//1024}KB): {path}", flush=True)
+        print(f"  ✅ Imagen guardada: {path}", flush=True)
         return True
     except Exception as e:
-        print(f"  ⚠️  Error descargando {url[:60]}: {e}", flush=True)
+        print(f"  ⚠️  Error descargando {url[:70]}: {e}", flush=True)
         return False
 
 
@@ -184,7 +178,12 @@ def assemble_video(image_paths: list, audio_path: str,
         print(f"  🎞️  Clip {i+1}/{len(norm_paths)}: {scene_duration:.1f}s desde {os.path.basename(img)}", flush=True)
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=per_clip_timeout)
         if r.returncode != 0:
-            print(f"  ❌ Clip {i+1} falló (código {r.returncode}):\n{r.stderr[-600:]}", flush=True)
+            print(f"  ❌ Clip {i+1} falló (código {r.returncode}):", flush=True)
+            print(f"     stderr: {r.stderr[-800:]}", flush=True)
+            return False
+        if not os.path.exists(clip) or os.path.getsize(clip) < 1000:
+            print(f"  ❌ Clip {i+1} vacío o no existe (tamaño: {os.path.getsize(clip) if os.path.exists(clip) else 0}B)", flush=True)
+            print(f"     stderr: {r.stderr[-400:]}", flush=True)
             return False
         sz = os.path.getsize(clip) // 1024
         print(f"  ✅ Clip {i+1} listo: {sz}KB", flush=True)
@@ -213,6 +212,12 @@ def assemble_video(image_paths: list, audio_path: str,
         print(f"  ✅ Clips concatenados", flush=True)
 
     # Paso 4: muxear audio
+    if audio_path:
+        exists = os.path.exists(audio_path)
+        sz = os.path.getsize(audio_path) // 1024 if exists else 0
+        print(f"  🎙️  Audio: '{audio_path}' — exists={exists}, {sz}KB", flush=True)
+    else:
+        print(f"  🔇 Sin audio_path — video mudo", flush=True)
     has_audio = bool(audio_path and os.path.exists(audio_path))
     if has_audio:
         cmd = [
@@ -238,12 +243,13 @@ def assemble_video(image_paths: list, audio_path: str,
 
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if r.stderr:
-        print(f"  📋 mux stderr:\n{r.stderr[-600:]}", flush=True)
+        print(f"  📋 mux stderr:\n{r.stderr[-800:]}", flush=True)
     if r.returncode != 0:
         print(f"  ❌ Mux falló (código {r.returncode})", flush=True)
         return False
 
-    print(f"  ✅ Video ensamblado: {output_path}", flush=True)
+    final_size = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+    print(f"  ✅ Video ensamblado: {output_path} ({final_size//1024}KB)", flush=True)
     return True
 
 
@@ -424,6 +430,12 @@ def main():
     audio_path = data.get("audio_path", "")
     audio_url  = data.get("audio_url", "") or extract_audio_url(raw)
 
+    print(f"📋 image_urls recibidas ({len(image_urls)}):", flush=True)
+    for u in image_urls:
+        print(f"   • {u[:100]}", flush=True)
+    print(f"🎙️  audio_path recibido: '{audio_path}'", flush=True)
+    print(f"🔗 audio_url recibido: '{audio_url[:80] if audio_url else ''}'", flush=True)
+
     timestamp = int(time.time())
     tmp_dir   = f"/tmp/video_{timestamp}"
     os.makedirs(tmp_dir, exist_ok=True)
@@ -462,9 +474,19 @@ def main():
     # Descargar imágenes
     image_paths = []
     for i, url in enumerate(image_urls):
-        ext  = url.rsplit(".", 1)[-1].split("?")[0] or "png"
+        # Extraer extensión solo del path de la URL (ignorar dominio y query params)
+        from urllib.parse import urlparse as _urlparse
+        _url_path = _urlparse(url).path          # e.g. "/outputs/abc.webp"
+        _basename = _url_path.rsplit("/", 1)[-1] # e.g. "abc.webp"
+        if "." in _basename:
+            ext = _basename.rsplit(".", 1)[-1][:8]  # máx 8 chars para evitar basura
+        else:
+            ext = "jpg"  # default seguro — ffmpeg detecta el formato real
+        # Validar que sea extensión de imagen conocida
+        if ext.lower() not in {"jpg", "jpeg", "png", "webp", "avif", "gif", "bmp"}:
+            ext = "jpg"
         path = f"{tmp_dir}/scene_{i+1:02d}.{ext}"
-        print(f"  📥 Imagen {i+1}/{len(image_urls)}: {url[-50:]}", flush=True)
+        print(f"  📥 Imagen {i+1}/{len(image_urls)} [{ext}]: {url[:80]}", flush=True)
         if download_image(url, path):
             image_paths.append(path)
 
