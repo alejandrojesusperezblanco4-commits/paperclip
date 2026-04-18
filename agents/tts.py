@@ -21,6 +21,34 @@ DEFAULT_VOICE   = "ErXwobaYiN019PkySvjV"   # Antoni — multilingual, dramático
 MODEL_ID        = "eleven_multilingual_v2"  # mejor para español
 
 
+def _clean_narration_text(text: str) -> str:
+    """
+    Limpia el texto narrado de instrucciones de dirección que no deben leerse en voz alta.
+    Elimina:
+      - Acotaciones entre paréntesis: (voz en off), (emocionado), (pausa dramática)...
+      - Acotaciones entre corchetes: [música tensa], [corte a negro]...
+      - Etiquetas de rol: "Voz en off:", "VOZ EN OFF:", "Narrador:", "NARRACIÓN:"...
+      - Indicaciones de stage direction al inicio de línea
+      - Markdown residual: **, __, ##, ---
+    """
+    # Eliminar acotaciones entre paréntesis (instrucciones de dirección)
+    text = re.sub(r'\([^)]{0,80}\)', '', text)
+    # Eliminar acotaciones entre corchetes
+    text = re.sub(r'\[[^\]]{0,80}\]', '', text)
+    # Eliminar etiquetas de rol al inicio del fragmento o de una frase
+    text = re.sub(
+        r'(?i)\b(voz\s+en\s+off|narrador[a]?|narración|off[-\s]?camera|voice[-\s]?over)\s*[:：\-–]?\s*',
+        '', text
+    )
+    # Eliminar markdown residual
+    text = re.sub(r'\*{1,3}|_{1,3}|#{1,6}\s*|---+', '', text)
+    # Colapsar espacios y puntuación doble
+    text = re.sub(r'\s{2,}', ' ', text)
+    text = re.sub(r'([.,;:!?])\s*\1+', r'\1', text)
+    text = re.sub(r'^\s*[,;:.]\s*', '', text)
+    return text.strip()
+
+
 def extract_narration(script: str) -> str:
     """
     Extrae solo el texto de narración (🎙️) del guión de storytelling.
@@ -36,17 +64,23 @@ def extract_narration(script: str) -> str:
         "HASHTAGS:", "CTA FINAL:", "PARTE 2",
     )
 
+    # Líneas que son claramente instrucciones de dirección (inicio de línea)
+    DIRECTION_PREFIXES = (
+        "Plano", "Iluminación", "Fondo", "Ambiente", "Encuadre",
+        "Corte a", "Transición", "Efecto", "Música:", "Sonido:",
+        "VISUAL", "ESCENA", "Escena", "INT.", "EXT.",
+    )
+
     for line in script.split("\n"):
         stripped = line.strip()
 
         # Activar captura de narración
-        if "🎙️" in stripped or "NARRACIÓN" in stripped.upper():
+        if "🎙️" in stripped or re.search(r'\bNARRACIÓN\b|\bNARRACION\b', stripped, re.IGNORECASE):
             in_narration = True
-            # Si la línea tiene contenido después del marcador, capturarlo
-            after = re.sub(r"🎙️.*?NARRACIÓN.*?[:：]?\s*", "", stripped, flags=re.IGNORECASE).strip()
+            # Capturar contenido después del marcador en la misma línea
+            after = re.sub(r'🎙️\s*|(?i)\bnarración\s*[:：]?\s*|(?i)\bnarracion\s*[:：]?\s*', '', stripped).strip()
             if after:
-                clean = re.sub(r"\*+|_+", "", after)
-                parts.append(clean)
+                parts.append(after)
             continue
 
         if in_narration:
@@ -54,20 +88,21 @@ def extract_narration(script: str) -> str:
             if any(marker in stripped for marker in NON_NARRATION_MARKERS):
                 in_narration = False
                 continue
-            # Detener en encabezados de escena nuevos
-            if stripped.startswith("ESCENA") and stripped.isupper():
+            # Detener en encabezados de escena nuevos (ej: "ESCENA 2 — ...")
+            if re.match(r'^ESCENA\s+\d', stripped, re.IGNORECASE):
                 in_narration = False
                 continue
             if stripped:
-                clean = re.sub(r"\*+|_+", "", stripped)
-                # Filtrar líneas que son claramente instrucciones de dirección, no narración
-                if not clean.startswith(("Plano", "Iluminación", "Fondo", "Ambiente", "Encuadre")):
-                    parts.append(clean)
+                # Filtrar líneas que son instrucciones de dirección
+                if not any(stripped.startswith(p) for p in DIRECTION_PREFIXES):
+                    parts.append(stripped)
 
     narration = " ".join(parts).strip()
 
-    # Limpiar puntuación doble y espacios extra
-    narration = re.sub(r"\s+", " ", narration)
+    # Limpiar acotaciones, etiquetas de rol y markdown
+    narration = _clean_narration_text(narration)
+    # Colapsar espacios extra
+    narration = re.sub(r'\s+', ' ', narration)
     narration = re.sub(r'\.{3,}', '...', narration)
 
     if narration:
@@ -79,7 +114,8 @@ def extract_narration(script: str) -> str:
     lines = [l.strip() for l in script.split("\n") if l.strip()
              and not any(m in l for m in NON_NARRATION_MARKERS)
              and not l.strip().startswith("#")]
-    return " ".join(lines)[:3000]
+    fallback = " ".join(lines)[:3000]
+    return _clean_narration_text(fallback)
 
 
 def get_best_voice(api_key: str) -> str:
