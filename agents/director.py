@@ -683,7 +683,7 @@ Diferenciacion vs competencia:
     prompt_task = sanitize(f"""Genera 5-6 prompts JSON (uno por escena) para el guión de: {objetivo}
 
 Guión completo:
-{storytelling_result[:2500]}""")
+{storytelling_result[:4500]}""")
 
     post_issue_comment("🎨 **Fase 5 — Prompt Generator** en progreso…")
     prompt_result = run_tracked("prompt_generator.py", prompt_task,
@@ -704,9 +704,13 @@ Guión completo:
     video_url    = ""
     if elevenlabs_key and higgsfield_key:
         # Extraer URLs de imágenes para pasarlas al video assembler
-        _img_urls = list(dict.fromkeys(
-            _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
-        ))
+        # 1. URLs con extensión conocida
+        _ext_urls = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
+        # 2. URLs en sintaxis markdown ![label](url) — captura URLs sin extensión (Higgsfield/CDN)
+        _md_urls  = _re.findall(r"!\[[^\]]*\]\((https?://[^\s)]+)\)", imagen_result)
+        # 3. URLs de Higgsfield sin extensión: contienen "higgsfield" o "soul" en el path
+        _hf_urls  = _re.findall(r"(https?://(?:higgsfield\.ai|[^\s\"')]*higgsfield[^\s\"')])[\s\"')]", imagen_result)
+        _img_urls = list(dict.fromkeys(_ext_urls + _md_urls + _hf_urls))
         if _img_urls:
             video_task = sanitize(json.dumps({
                 "image_urls": _img_urls,
@@ -718,8 +722,11 @@ Guión completo:
                                        "Video Assembler — MP4 final", "video_assembler",
                                        paperclip_timeout=60)
             try:
-                _vid_data = json.loads(video_result)
-                video_url = _vid_data.get("video_url", "")
+                # video_result es stdout mixto — extraer bloque JSON
+                _vid_match = _re.search(r'\{[\s\S]*?"video_url"[\s\S]*?\}', video_result)
+                if _vid_match:
+                    _vid_data = json.loads(_vid_match.group(0))
+                    video_url = _vid_data.get("video_url", "")
             except Exception:
                 pass
         else:
@@ -744,8 +751,9 @@ Guión completo:
         synthesis = f"[Error en síntesis: {e}]"
 
     # ── Extraer URLs de imágenes ──────────────────────────────
-    _raw_urls  = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg)", imagen_result)
-    imagen_urls = list(dict.fromkeys(_raw_urls))
+    _raw_ext  = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
+    _raw_md   = _re.findall(r"!\[[^\]]*\]\((https?://[^\s)]+)\)", imagen_result)
+    imagen_urls = list(dict.fromkeys(_raw_ext + _raw_md))
 
     # ── Construir output final ────────────────────────────────
     imagen_gallery = ""
@@ -775,9 +783,12 @@ Guión completo:
     tts_section = ""
     if tts_result:
         try:
-            _tts = json.loads(tts_result)
-            if _tts.get("audio_url"):
-                tts_section = f"\n## 🎙️ VOZ EN OFF\n📥 [Descargar MP3]({_tts['audio_url']}) — {_tts.get('duration_estimate','')}\n\n"
+            # tts_result es stdout mixto (logs + JSON al final) — extraer el bloque JSON
+            _tts_match = _re.search(r'\{[\s\S]*?"audio_url"[\s\S]*?\}', tts_result)
+            if _tts_match:
+                _tts = json.loads(_tts_match.group(0))
+                if _tts.get("audio_url"):
+                    tts_section = f"\n## 🎙️ VOZ EN OFF\n📥 [Descargar MP3]({_tts['audio_url']}) — {_tts.get('duration_estimate','')}\n\n"
         except Exception:
             pass
 
