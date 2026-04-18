@@ -140,80 +140,109 @@ def normalize_images(image_paths: list, work_dir: str) -> list:
 def assemble_video(image_paths: list, audio_path: str,
                    output_path: str, scene_duration: float) -> bool:
     """
-    Crea el video con ffmpeg:
-    - Normaliza todas las imágenes a JPG primero
-    - Slideshow de imágenes con duración proporcional al audio
-    - Escala a 720x1280 (9:16 TikTok)
-    - Overlay de audio (narración)
+    Crea el video con ffmpeg usando el enfoque POR CLIP (no concat demuxer).
+    El concat demuxer con imágenes estáticas cuelga en ciertos ffmpeg — en
+    cambio, '-loop 1 -t DURATION' es fiable y no requiere seek.
+
+    Pasos:
+      1. Normalizar imágenes a JPG
+      2. Generar un clip MP4 silencioso por imagen con -loop 1
+      3. Concatenar clips con stream copy
+      4. Muxear audio en el video final
     """
     work_dir = os.path.dirname(output_path)
 
-    # Paso 1: normalizar imágenes a JPG para evitar problemas con WebP/PNG en concat
+    scale_filter = (
+        "scale=720:1280:force_original_aspect_ratio=decrease,"
+        "pad=720:1280:(ow-iw)/2:(oh-ih)/2:black"
+    )
+
+    # Paso 1: normalizar imágenes a JPG
     print(f"  🔄 Normalizando {len(image_paths)} imágenes a JPG...", flush=True)
     norm_paths = normalize_images(image_paths, work_dir)
-
     if not norm_paths:
         print("  ❌ Sin imágenes normalizadas", flush=True)
         return False
 
-    # Paso 2: construir filelist para concat demuxer
-    filelist = output_path.replace(".mp4", "_list.txt")
-    with open(filelist, "w", encoding="utf-8") as f:
-        for img in norm_paths:
-            # Escapar comillas simples en rutas
-            safe = img.replace("'", "'\\''")
-            f.write(f"file '{safe}'\n")
-            f.write(f"duration {scene_duration:.2f}\n")
-        # Repetir última imagen para que concat no corte el último frame
-        safe = norm_paths[-1].replace("'", "'\\''")
-        f.write(f"file '{safe}'\n")
-        f.write(f"duration 0.1\n")
+    # Paso 2: generar clip silencioso por imagen (-loop 1, ultrafast, sin seek)
+    clip_paths = []
+    per_clip_timeout = max(60, int(scene_duration * 3))  # headroom generoso
+    for i, img in enumerate(norm_paths):
+        clip = os.path.join(work_dir, f"clip_{i:02d}.mp4")
+        cmd = [
+            "ffmpeg", "-y",
+            "-loop", "1",          # loop la imagen como stream de video
+            "-framerate", "1",     # entrada a 1fps (reduce trabajo interno)
+            "-i", img,
+            "-vf", f"{scale_filter},fps=24",   # escalar + convertir a 24fps
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+            "-pix_fmt", "yuv420p",
+            "-t", f"{scene_duration:.3f}",     # duración exacta
+            "-an",                 # sin audio en el clip
+            clip
+        ]
+        print(f"  🎞️  Clip {i+1}/{len(norm_paths)}: {scene_duration:.1f}s desde {os.path.basename(img)}", flush=True)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=per_clip_timeout)
+        if r.returncode != 0:
+            print(f"  ❌ Clip {i+1} falló (código {r.returncode}):\n{r.stderr[-600:]}", flush=True)
+            return False
+        sz = os.path.getsize(clip) // 1024
+        print(f"  ✅ Clip {i+1} listo: {sz}KB", flush=True)
+        clip_paths.append(clip)
 
-    print(f"  📄 filelist: {filelist}", flush=True)
-    with open(filelist) as fl:
-        print(fl.read()[:400], flush=True)
-
-    scale_filter = (
-        "scale=720:1280:force_original_aspect_ratio=decrease,"
-        "pad=720:1280:(ow-iw)/2:(oh-ih)/2:black,"
-        "fps=24"
-    )
-
-    has_audio = bool(audio_path and os.path.exists(audio_path))
-
-    if has_audio:
+    # Paso 3: concatenar clips (stream copy → rápido)
+    if len(clip_paths) == 1:
+        silent_video = clip_paths[0]
+        print(f"  ⏩ Clip único — sin necesidad de concatenar", flush=True)
+    else:
+        filelist = os.path.join(work_dir, "clips_list.txt")
+        with open(filelist, "w", encoding="utf-8") as f:
+            for c in clip_paths:
+                f.write(f"file '{c}'\n")
+        silent_video = os.path.join(work_dir, "silent.mp4")
         cmd = [
             "ffmpeg", "-y",
             "-f", "concat", "-safe", "0", "-i", filelist,
+            "-c", "copy", silent_video
+        ]
+        print(f"  🔗 Concatenando {len(clip_paths)} clips...", flush=True)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            print(f"  ❌ Concat falló:\n{r.stderr[-600:]}", flush=True)
+            return False
+        print(f"  ✅ Clips concatenados", flush=True)
+
+    # Paso 4: muxear audio
+    has_audio = bool(audio_path and os.path.exists(audio_path))
+    if has_audio:
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", silent_video,
             "-i", audio_path,
-            "-vf", scale_filter,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-c:v", "copy",
             "-c:a", "aac", "-b:a", "128k",
-            "-pix_fmt", "yuv420p",
             "-movflags", "+faststart",
             "-shortest",
             output_path
         ]
+        print(f"  🎙️  Muxeando audio...", flush=True)
     else:
         cmd = [
             "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0", "-i", filelist,
-            "-vf", scale_filter,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-pix_fmt", "yuv420p",
+            "-i", silent_video,
+            "-c", "copy",
             "-movflags", "+faststart",
             output_path
         ]
+        print(f"  🔇 Video sin audio (mux directo)...", flush=True)
 
-    print(f"  🎬 Ejecutando ffmpeg (cmd: {' '.join(cmd[:8])}...)", flush=True)
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-    # Siempre imprimir stderr para diagnóstico (ffmpeg escribe info ahí)
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if r.stderr:
-        # Imprimir las últimas 1200 chars del stderr para ver errores completos
-        print(f"  📋 ffmpeg stderr (últimas líneas):\n{r.stderr[-1200:]}", flush=True)
+        print(f"  📋 mux stderr:\n{r.stderr[-600:]}", flush=True)
     if r.returncode != 0:
-        print(f"  ❌ ffmpeg salió con código {r.returncode}", flush=True)
+        print(f"  ❌ Mux falló (código {r.returncode})", flush=True)
         return False
+
     print(f"  ✅ Video ensamblado: {output_path}", flush=True)
     return True
 

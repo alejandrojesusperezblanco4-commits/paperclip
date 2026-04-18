@@ -556,8 +556,14 @@ def main():
         sub_env.pop("PAPERCLIP_ISSUE_TITLE", None)
         sub_env.pop("PAPERCLIP_ISSUE_BODY", None)
 
-        # TTS y Video Assembler necesitan más tiempo que el default de 120s
-        _subprocess_timeout = 180 if agent_key in ("tts", "video_assembler") else 120
+        # Video Assembler necesita hasta 270s (ffmpeg por imagen a ultrafast).
+        # TTS necesita ~90s (ElevenLabs + upload).
+        if agent_key == "video_assembler":
+            _subprocess_timeout = 270
+        elif agent_key == "tts":
+            _subprocess_timeout = 120
+        else:
+            _subprocess_timeout = 90
         result = run_agent_with_env(script, task, sub_env, label, timeout=_subprocess_timeout)
 
         # Cerrar el sub-issue con el resultado
