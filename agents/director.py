@@ -704,13 +704,11 @@ Guión completo:
     video_url    = ""
     if elevenlabs_key and higgsfield_key:
         # Extraer URLs de imágenes para pasarlas al video assembler
-        # 1. URLs con extensión conocida
+        # 1. URLs con extensión conocida (.png/.jpg/.jpeg/.webp)
         _ext_urls = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
         # 2. URLs en sintaxis markdown ![label](url) — captura URLs sin extensión (Higgsfield/CDN)
         _md_urls  = _re.findall(r"!\[[^\]]*\]\((https?://[^\s)]+)\)", imagen_result)
-        # 3. URLs de Higgsfield sin extensión: contienen "higgsfield" o "soul" en el path
-        _hf_urls  = _re.findall(r"(https?://(?:higgsfield\.ai|[^\s\"')]*higgsfield[^\s\"')])[\s\"')]", imagen_result)
-        _img_urls = list(dict.fromkeys(_ext_urls + _md_urls + _hf_urls))
+        _img_urls = list(dict.fromkeys(_ext_urls + _md_urls))
         if _img_urls:
             video_task = sanitize(json.dumps({
                 "image_urls": _img_urls,
