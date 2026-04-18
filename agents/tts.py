@@ -22,25 +22,64 @@ MODEL_ID        = "eleven_multilingual_v2"  # mejor para español
 
 
 def extract_narration(script: str) -> str:
-    """Extrae solo el texto de narración (🎙️) del guión de storytelling."""
+    """
+    Extrae solo el texto de narración (🎙️) del guión de storytelling.
+    También elimina secciones no narrativas: visual, micro-hook, duración, ficha técnica.
+    """
     parts = []
     in_narration = False
 
+    # Secciones que señalan que NO es narración y deben ignorarse
+    NON_NARRATION_MARKERS = (
+        "🎬", "⏱️", "━━", "⚡", "🎵", "📌", "#️⃣", "💬", "🔁",
+        "VISUAL:", "MICRO-HOOK", "DURACIÓN:", "MÚSICA:", "TÍTULO:",
+        "HASHTAGS:", "CTA FINAL:", "PARTE 2",
+    )
+
     for line in script.split("\n"):
         stripped = line.strip()
+
+        # Activar captura de narración
         if "🎙️" in stripped or "NARRACIÓN" in stripped.upper():
             in_narration = True
+            # Si la línea tiene contenido después del marcador, capturarlo
+            after = re.sub(r"🎙️.*?NARRACIÓN.*?[:：]?\s*", "", stripped, flags=re.IGNORECASE).strip()
+            if after:
+                clean = re.sub(r"\*+|_+", "", after)
+                parts.append(clean)
             continue
+
         if in_narration:
-            if stripped.startswith("🎬") or stripped.startswith("⏱️") or "━━" in stripped:
+            # Detener si encontramos un marcador de otra sección
+            if any(marker in stripped for marker in NON_NARRATION_MARKERS):
+                in_narration = False
+                continue
+            # Detener en encabezados de escena nuevos
+            if stripped.startswith("ESCENA") and stripped.isupper():
                 in_narration = False
                 continue
             if stripped:
                 clean = re.sub(r"\*+|_+", "", stripped)
-                parts.append(clean)
+                # Filtrar líneas que son claramente instrucciones de dirección, no narración
+                if not clean.startswith(("Plano", "Iluminación", "Fondo", "Ambiente", "Encuadre")):
+                    parts.append(clean)
 
     narration = " ".join(parts).strip()
-    return narration if narration else script[:3000]
+
+    # Limpiar puntuación doble y espacios extra
+    narration = re.sub(r"\s+", " ", narration)
+    narration = re.sub(r'\.{3,}', '...', narration)
+
+    if narration:
+        print(f"  📝 Narración extraída: {len(narration.split())} palabras", flush=True)
+        return narration
+
+    # Fallback: usar todo el texto del issue, quitando líneas de instrucción
+    print("  ⚠️  No se detectó sección 🎙️ — usando texto completo como narración", flush=True)
+    lines = [l.strip() for l in script.split("\n") if l.strip()
+             and not any(m in l for m in NON_NARRATION_MARKERS)
+             and not l.strip().startswith("#")]
+    return " ".join(lines)[:3000]
 
 
 def get_best_voice(api_key: str) -> str:
@@ -73,9 +112,9 @@ def generate_audio(text: str, voice_id: str, api_key: str, output_path: str) -> 
         "text": text,
         "model_id": MODEL_ID,
         "voice_settings": {
-            "stability": 0.45,
-            "similarity_boost": 0.75,
-            "style": 0.30,
+            "stability": 0.35,        # más bajo = más expresivo y dramático
+            "similarity_boost": 0.80,  # fidelidad a la voz base
+            "style": 0.55,             # más estilo = más emoción en pausas y énfasis
             "use_speaker_boost": True
         }
     }).encode("utf-8")
