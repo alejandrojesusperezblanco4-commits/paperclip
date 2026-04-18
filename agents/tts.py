@@ -150,12 +150,13 @@ def generate_audio(text: str, voice_id: str, api_key: str, output_path: str) -> 
 def upload_file(file_path: str) -> str:
     """
     Sube archivo probando varios servicios hasta que uno funcione.
-    Servicios en orden (2026):
-      1. transfer.sh  — PUT directo
-      2. GoFile       — obtiene servidor + POST
-      3. tmpfiles.org — multipart POST, JSON
-      4. uguu.se      — multipart POST
-      5. catbox.moe   — litterbox 72h
+    Orden de preferencia — priorizando URLs directas (reproducibles en <audio>):
+      1. Pixeldrain   — PUT directo, URL directa streaming ← PREFERIDO
+      2. transfer.sh  — PUT directo, URL directa
+      3. GoFile       — URL de página (no directa)
+      4. tmpfiles.org — multipart POST
+      5. uguu.se      — multipart POST
+      6. catbox.moe   — litterbox 72h
     """
     import mimetypes
     filename  = os.path.basename(file_path)
@@ -168,7 +169,28 @@ def upload_file(file_path: str) -> str:
     size_kb = len(file_data) / 1024
     print(f"  📤 Subiendo {filename} ({size_kb:.0f} KB)...", flush=True)
 
-    # ── 1. transfer.sh (PUT) ─────────────────────────────────────────────────
+    # ── 1. Pixeldrain (PUT, URL directa de streaming) ────────────────────────
+    try:
+        req = urllib.request.Request(
+            f"https://pixeldrain.com/api/file/{filename}",
+            data=file_data,
+            headers={
+                "Content-Type": mime,
+                "User-Agent": "paperclip-agent/1.0",
+            },
+            method="PUT"
+        )
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            pd = json.loads(resp.read().decode("utf-8"))
+        file_id = pd.get("id", "")
+        if file_id:
+            url = f"https://pixeldrain.com/api/file/{file_id}"
+            print(f"  ✅ Pixeldrain: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  Pixeldrain falló: {e}", flush=True)
+
+    # ── 2. transfer.sh (PUT) ─────────────────────────────────────────────────
     try:
         req = urllib.request.Request(
             f"https://transfer.sh/{filename}",
