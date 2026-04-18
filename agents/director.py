@@ -652,6 +652,7 @@ Diferenciacion vs competencia:
     # ── Fase 3: TTS (voz en off) ──────────────────────────────
     tts_result      = ""
     audio_path      = ""
+    audio_url_tts   = ""
     elevenlabs_key  = os.environ.get("ELEVENLABS_API_KEY", "")
     if elevenlabs_key:
         post_issue_comment("🎙️ **Fase 4 — TTS (voz en off)** en progreso…")
@@ -661,13 +662,14 @@ Diferenciacion vs competencia:
             extra_env={"ELEVENLABS_API_KEY": elevenlabs_key},
             paperclip_timeout=90,  # falla rápido → subprocess directo
         )
-        # Extraer audio_path del JSON que devuelve tts.py.
+        # Extraer audio_path y audio_url del JSON que devuelve tts.py.
         # tts_result mezcla logs + JSON en stdout → buscar el JSON con regex.
         try:
-            _m = _re.search(r'\{[\s\S]*?"audio_path"[\s\S]*?\}', tts_result)
+            _m = _re.search(r'\{[\s\S]*?"audio_(?:path|url)"[\s\S]*?\}', tts_result)
             if _m:
                 _tts_data = json.loads(_m.group(0))
-                audio_path = _tts_data.get("audio_path", "")
+                audio_path    = _tts_data.get("audio_path", "")
+                audio_url_tts = _tts_data.get("audio_url", "")
         except Exception:
             pass
         # Fallback: buscar el MP3 más reciente en /tmp si el parsing falló
@@ -676,6 +678,7 @@ Diferenciacion vs competencia:
             _mp3s = sorted(_glob.glob("/tmp/narration_*.mp3"), key=os.path.getmtime, reverse=True)
             audio_path = _mp3s[0] if _mp3s else ""
         print(f"🎙️ Audio path: {audio_path or 'no disponible'}", flush=True)
+        print(f"🔗 Audio URL TTS: {audio_url_tts[:80] if audio_url_tts else 'no disponible'}", flush=True)
     else:
         print("⚠️  ELEVENLABS_API_KEY no encontrada — saltando TTS", flush=True)
 
@@ -718,6 +721,7 @@ Guión completo:
             video_task = sanitize(json.dumps({
                 "image_urls": _img_urls,
                 "audio_path": audio_path,
+                "audio_url":  audio_url_tts,   # fallback si audio_path no existe en el contenedor
                 "tema": objetivo[:100],
             }, ensure_ascii=False))
             post_issue_comment("🎬 **Fase 7 — Video Assembler** en progreso… ensamblando MP4 final…")

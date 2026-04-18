@@ -48,11 +48,23 @@ Sé específico con datos reales. No inventes — solo lo que realmente existe p
 def search_visual_references(topic: str, api_key: str) -> str:
     """Busca referencias visuales reales usando Perplexity sonar vía OpenRouter."""
     try:
-        query = f"Visual references for AI image generation: {topic} — character appearance, color palette, iconic visual style, art direction"
+        # Detectar si es contenido animado/cartoon para ajustar la query
+        animated_keywords = [
+            "gumball", "spongebob", "rick and morty", "dragon ball", "naruto", "one piece",
+            "anime", "cartoon", "animated", "animation", "dibujo", "dibujos", "animado",
+            "fortnite", "minecraft", "pokemon", "simpsons", "futurama", "adventure time",
+            "steven universe", "gravity falls", "avatar", "spider-man", "batman", "superman",
+        ]
+        topic_lower = topic.lower()
+        is_animated = any(kw in topic_lower for kw in animated_keywords)
+        if is_animated:
+            query = f"Cartoon animation visual style reference: {topic} — exact character design, color palette, art style, animation aesthetic for AI image generation"
+        else:
+            query = f"Visual references for AI image generation: {topic} — character appearance, color palette, iconic visual style, art direction"
         result = call_llm(
             messages=[
                 {"role": "system", "content": VISUAL_SEARCH_PROMPT},
-                {"role": "user", "content": f"Busca referencias visuales reales para: {topic}\n\nQuery de búsqueda: {query}"}
+                {"role": "user", "content": f"Busca referencias visuales reales para: {topic}\n\nQuery de búsqueda: {query}\n\n{'IMPORTANTE: Este es contenido ANIMADO/CARTOON. Devuelve el estilo artístico exacto, paleta de colores del show, diseño de personajes (proporciones, rasgos cartoon), NO referencias fotorrealistas.' if is_animated else ''}"}
             ],
             api_key=api_key,
             max_tokens=800,
@@ -75,6 +87,22 @@ Recibes:
 1. El guión completo con narración y descripción visual por escena
 2. Referencias visuales REALES del tema (personaje físico exacto, paleta, estilo artístico)
 
+## ⚠️ DETECCIÓN CRÍTICA DE CONTENIDO ANIMADO / CARTOON:
+
+**ANTES de escribir cualquier prompt, determina si el tema involucra personajes animados, de videojuego, manga, anime, o universos ficticios de dibujos animados** (ejemplos: Gumball, SpongeBob, Rick and Morty, Dragon Ball, Naruto, Minecraft, Fortnite, etc.)
+
+Si ES contenido animado/cartoon/videojuego:
+- **NUNCA generes personas reales ni imágenes fotorrealistas** — el modelo interpretará "blue cat boy" como una persona real si no especificas el estilo
+- **SIEMPRE empieza el prompt con el estilo de arte**: "2D cartoon animation style, [show name] aesthetic, hand-drawn characters..."
+- Usa referencias al estilo visual del show/juego: paleta de colores plana, contornos gruesos, proporciones exageradas
+- Describe el personaje con sus rasgos de cartoon exactos (Gumball = blue anthropomorphic cat, round head, big eyes, no nose, wearing a white t-shirt)
+- Cierra con: "cartoon illustration, 2D animation, flat colors, bold outlines, NOT photorealistic, NOT 3D render"
+
+Si es contenido REALISTA (personas reales, historias humanas, negocios, etc.):
+- Aplica el flujo cinematic estándar descrito abajo
+
+---
+
 ## PRINCIPIOS DE UN PROMPT GANADOR PARA HIGGSFIELD SOUL:
 
 **Personaje consistente**: Define los rasgos del personaje principal en el primer prompt con máximo detalle (color de piel exacto, tipo de cabello, rasgos faciales, ropa) y repítelos LITERALMENTE en cada prompt. La coherencia visual entre escenas es crítica.
@@ -96,9 +124,12 @@ Recibes:
 
 **Paleta de colores que evoca**: Especifica tonos Hex o nombres exactos de colores para las sombras y luces. La paleta debe ser consistente en toda la secuencia.
 
-**Técnico de cine**: Siempre cierra con especificaciones técnicas que elevan la calidad: "shot on ARRI Alexa, anamorphic lens, shallow depth of field, film grain, cinematic color grade, 4K"
+**Técnico de cine** (solo para contenido realista): Siempre cierra con especificaciones técnicas que elevan la calidad: "shot on ARRI Alexa, anamorphic lens, shallow depth of field, film grain, cinematic color grade, 4K"
 
 ## ESTILOS POR NICHO (adapta al contenido que recibes):
+- **Animado/Cartoon**: 2D animation style, flat colors, bold outlines, match the exact show aesthetic, NOT photorealistic
+- **Anime/Manga**: anime illustration style, cel shading, vibrant colors, dramatic expressions, NOT photorealistic
+- **Videojuego 3D**: game render style, stylized 3D, match the game's art direction (e.g., Fortnite: vibrant stylized, Minecraft: voxel blocky)
 - Drama/historias personales: film noir moderno, paleta desaturada con un solo color de acento cálido (naranja/rojo), primer plano de manos o rostro, grain de película analógica
 - Finanzas/negocios: editorial contemporáneo, luces de oficina en contraste con luces de ciudad de noche, paleta azul-gris-plata, limpio y moderno
 - Fitness/salud: luz natural dura de exterior, sombras definidas en músculos, paleta naranja-terracota-negro, movimiento congelado o ligeramente borroso
@@ -115,12 +146,12 @@ Recibes:
       "title": "nombre corto de la escena",
       "aspect_ratio": "9:16",
       "resolution": "720p",
-      "prompt": "ENGLISH ONLY. Start with character description (physical details: skin tone, hair, clothing). Then action specific to this scene. Then body language expressing the exact emotion (no abstract words). Then camera angle and framing. Then lighting description with sources and quality. Then background/environment with color palette hex codes. Then technical specs. Minimum 100 words."
+      "prompt": "ENGLISH ONLY. For ANIMATED content: start with art style (e.g. '2D cartoon animation style, The Amazing World of Gumball aesthetic'), then character exact cartoon description, then scene action, then mood/lighting fitting the art style, then background. For REALISTIC content: start with character physical description, then action, then body language emotion, then camera angle, then lighting, then background with hex colors, then technical specs. Minimum 100 words."
     }
   ]
 }
 
-RECUERDA: Los primeros 15 palabras del prompt determinan el 70% del resultado. Empieza siempre con lo más importante: el personaje o elemento visual central y su estado emocional físico.
+RECUERDA: Los primeros 15 palabras del prompt determinan el 70% del resultado. Para animación: empieza con el estilo de arte. Para contenido real: empieza con el personaje o elemento visual central.
 """
 
 def call_openrouter(task: str, visual_refs: str, api_key: str) -> str:
