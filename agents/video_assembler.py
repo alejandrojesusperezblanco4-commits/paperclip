@@ -510,9 +510,15 @@ def main():
         sys.exit(1)
 
     # Calcular duración por escena
-    audio_dur     = get_audio_duration(audio_path) if audio_path else 0.0
-    scene_duration = max(4.0, audio_dur / len(image_paths)) if audio_dur else 5.0
-    total_dur      = scene_duration * len(image_paths)
+    audio_dur = get_audio_duration(audio_path) if audio_path else 0.0
+    print(f"  ⏱️  Duración audio: {audio_dur:.1f}s | Imágenes: {len(image_paths)}", flush=True)
+    if audio_dur and len(image_paths):
+        scene_duration = audio_dur / len(image_paths)
+        # Cap: máx 20s por escena para evitar slides interminables con pocas imágenes
+        scene_duration = min(max(4.0, scene_duration), 20.0)
+    else:
+        scene_duration = 5.0
+    total_dur = scene_duration * len(image_paths)
     print(f"  ⏱️  {len(image_paths)} escenas × {scene_duration:.1f}s = {total_dur:.0f}s total", flush=True)
 
     output_path = f"{tmp_dir}/video.mp4"

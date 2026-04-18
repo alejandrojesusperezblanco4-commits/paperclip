@@ -705,10 +705,15 @@ Guión completo:
     if elevenlabs_key and higgsfield_key:
         # Extraer URLs de imágenes para pasarlas al video assembler
         # 1. URLs con extensión conocida (.png/.jpg/.jpeg/.webp)
-        _ext_urls = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
-        # 2. URLs en sintaxis markdown ![label](url) — captura URLs sin extensión (Higgsfield/CDN)
-        _md_urls  = _re.findall(r"!\[[^\]]*\]\((https?://[^\s)]+)\)", imagen_result)
-        _img_urls = list(dict.fromkeys(_ext_urls + _md_urls))
+        _ext_urls  = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
+        # 2. **URL:** formato que imagen.py escribe explícitamente — más fiable que markdown
+        _bold_urls = _re.findall(r"\*\*URL:\*\*\s*(https?://\S+)", imagen_result)
+        # 3. URLs en sintaxis markdown ](url) — permisivo, no depende del label
+        _md_urls   = _re.findall(r"\]\((https?://[^\s)]+)\)", imagen_result)
+        _img_urls  = list(dict.fromkeys(_ext_urls + _bold_urls + _md_urls))
+        print(f"  🖼️  URLs de imágenes detectadas: {len(_img_urls)}", flush=True)
+        for _u in _img_urls[:6]:
+            print(f"     • {_u[:90]}", flush=True)
         if _img_urls:
             video_task = sanitize(json.dumps({
                 "image_urls": _img_urls,
@@ -748,10 +753,11 @@ Guión completo:
     except Exception as e:
         synthesis = f"[Error en síntesis: {e}]"
 
-    # ── Extraer URLs de imágenes ──────────────────────────────
-    _raw_ext  = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
-    _raw_md   = _re.findall(r"!\[[^\]]*\]\((https?://[^\s)]+)\)", imagen_result)
-    imagen_urls = list(dict.fromkeys(_raw_ext + _raw_md))
+    # ── Extraer URLs de imágenes para galería ────────────────
+    _raw_ext   = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
+    _raw_bold  = _re.findall(r"\*\*URL:\*\*\s*(https?://\S+)", imagen_result)
+    _raw_md    = _re.findall(r"\]\((https?://[^\s)]+)\)", imagen_result)
+    imagen_urls = list(dict.fromkeys(_raw_ext + _raw_bold + _raw_md))
 
     # ── Construir output final ────────────────────────────────
     imagen_gallery = ""
