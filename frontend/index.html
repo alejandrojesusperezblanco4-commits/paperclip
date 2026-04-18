@@ -273,6 +273,52 @@
     .gallery-caption { font-size: 10px; color: var(--sub); margin-top: 4px; text-align: center; }
     .gallery-error { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 11px; color: var(--red); opacity: 0.7; }
 
+    /* Video player */
+    .video-wrap {
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      max-width: 360px;
+      margin: 0 auto;
+      aspect-ratio: 9/16;
+      position: relative;
+    }
+    .video-wrap video {
+      width: 100%; height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .video-placeholder {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; gap: 10px;
+      color: var(--sub); font-size: 12px;
+      padding: 20px; text-align: center;
+    }
+    .video-placeholder .big-icon { font-size: 40px; opacity: 0.4; }
+    .btn-download {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 18px; border-radius: 8px;
+      background: var(--accent); color: #fff;
+      font-size: 12.5px; font-weight: 600;
+      text-decoration: none; border: none; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-download:hover { background: var(--accent2); }
+    .btn-download.secondary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-download.secondary:hover { border-color: var(--muted); }
+    audio {
+      width: 100%;
+      height: 36px;
+      border-radius: 6px;
+      outline: none;
+    }
+    audio::-webkit-media-controls-panel { background: var(--surface); }
+
     .script-content {
       font-size: 12.5px; line-height: 1.7; color: var(--text);
       white-space: pre-wrap; max-height: 360px; overflow-y: auto; padding-right: 4px;
@@ -360,6 +406,16 @@
     .stage.done { cursor:pointer; }
     .stage.done:hover { border-color:var(--accent); background:rgba(168,85,247,0.06); }
     .stage.nav-active { border-color:var(--accent) !important; background:rgba(168,85,247,0.12) !important; }
+
+    /* Left panel scrollable */
+    .panel-left-scroll {
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-left-scroll::-webkit-scrollbar { width: 3px; }
+    .panel-left-scroll::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
   </style>
 </head>
 <body>
@@ -376,112 +432,138 @@
 
   <!-- ── LEFT PANEL ── -->
   <div class="panel-left">
+    <div class="panel-left-scroll">
 
-    <!-- Agent selector -->
-    <div class="agent-tabs" id="agentTabs">
-      <div class="agent-tab active" data-agent="director" onclick="selectAgent('director')">
-        <div class="tab-icon">🎬</div>
-        <div class="tab-info">
-          <div class="tab-name">Director</div>
-          <div class="tab-desc">Pipeline completo</div>
+      <!-- Agent selector -->
+      <div class="agent-tabs" id="agentTabs">
+        <div class="agent-tab active" data-agent="director" onclick="selectAgent('director')">
+          <div class="tab-icon">🎬</div>
+          <div class="tab-info">
+            <div class="tab-name">Director</div>
+            <div class="tab-desc">Pipeline completo</div>
+          </div>
+        </div>
+        <div class="agent-tab" data-agent="search" onclick="selectAgent('search')">
+          <div class="tab-icon">🔍</div>
+          <div class="tab-info">
+            <div class="tab-name">Deep Search</div>
+            <div class="tab-desc">Tendencias en tiempo real</div>
+          </div>
+        </div>
+        <div class="agent-tab" data-agent="analyzer" onclick="selectAgent('analyzer')">
+          <div class="tab-icon">📊</div>
+          <div class="tab-info">
+            <div class="tab-name">Channel Analyzer</div>
+            <div class="tab-desc">Analiza canales rivales</div>
+          </div>
+        </div>
+        <div class="agent-tab" data-agent="story" onclick="selectAgent('story')">
+          <div class="tab-icon">✍️</div>
+          <div class="tab-info">
+            <div class="tab-name">Storytelling</div>
+            <div class="tab-desc">Guión en 4-5 escenas</div>
+          </div>
+        </div>
+        <div class="agent-tab" data-agent="prompt" onclick="selectAgent('prompt')">
+          <div class="tab-icon">🎨</div>
+          <div class="tab-info">
+            <div class="tab-name">Prompt Generator</div>
+            <div class="tab-desc">Prompts para Higgsfield</div>
+          </div>
+        </div>
+        <div class="agent-tab" data-agent="imagen" onclick="selectAgent('imagen')">
+          <div class="tab-icon">🖼️</div>
+          <div class="tab-info">
+            <div class="tab-name">Imagen AI</div>
+            <div class="tab-desc">Genera con Higgsfield Soul</div>
+          </div>
+        </div>
+        <div class="agent-tab" data-agent="tts" onclick="selectAgent('tts')">
+          <div class="tab-icon">🎙️</div>
+          <div class="tab-info">
+            <div class="tab-name">TTS — Voz en off</div>
+            <div class="tab-desc">Narración con ElevenLabs</div>
+          </div>
+        </div>
+        <div class="agent-tab" data-agent="video" onclick="selectAgent('video')">
+          <div class="tab-icon">📱</div>
+          <div class="tab-info">
+            <div class="tab-name">Video Assembler</div>
+            <div class="tab-desc">MP4 9:16 TikTok/Reels</div>
+          </div>
         </div>
       </div>
-      <div class="agent-tab" data-agent="search" onclick="selectAgent('search')">
-        <div class="tab-icon">🔍</div>
-        <div class="tab-info">
-          <div class="tab-name">Deep Search</div>
-          <div class="tab-desc">Tendencias en tiempo real</div>
-        </div>
-      </div>
-      <div class="agent-tab" data-agent="analyzer" onclick="selectAgent('analyzer')">
-        <div class="tab-icon">📊</div>
-        <div class="tab-info">
-          <div class="tab-name">Channel Analyzer</div>
-          <div class="tab-desc">Analiza canales rivales</div>
-        </div>
-      </div>
-      <div class="agent-tab" data-agent="story" onclick="selectAgent('story')">
-        <div class="tab-icon">✍️</div>
-        <div class="tab-info">
-          <div class="tab-name">Storytelling</div>
-          <div class="tab-desc">Guión en 4-5 escenas</div>
-        </div>
-      </div>
-      <div class="agent-tab" data-agent="prompt" onclick="selectAgent('prompt')">
-        <div class="tab-icon">🎨</div>
-        <div class="tab-info">
-          <div class="tab-name">Prompt Generator</div>
-          <div class="tab-desc">Prompts para Higgsfield</div>
-        </div>
-      </div>
-      <div class="agent-tab" data-agent="imagen" onclick="selectAgent('imagen')">
-        <div class="tab-icon">🖼️</div>
-        <div class="tab-info">
-          <div class="tab-name">Imagen AI</div>
-          <div class="tab-desc">Genera con Higgsfield Soul</div>
-        </div>
-      </div>
-    </div>
 
-    <div class="divider"></div>
+      <div class="divider"></div>
 
-    <!-- Input -->
-    <div class="input-section">
-      <div class="panel-label" id="inputLabel">Historia / tema</div>
-      <textarea id="topicInput" class="input-area" placeholder="Ej: Ella descubre que su esposo la engañó con su mejor amiga…"></textarea>
-      <div class="progress-bar-wrap" id="progressWrap" style="display:none">
-        <div class="progress-bar" id="progressBar" style="width:5%"></div>
+      <!-- Input -->
+      <div class="input-section">
+        <div class="panel-label" id="inputLabel">Historia / tema</div>
+        <textarea id="topicInput" class="input-area" placeholder="Ej: Ella descubre que su esposo la engañó con su mejor amiga…"></textarea>
+        <div class="progress-bar-wrap" id="progressWrap" style="display:none">
+          <div class="progress-bar" id="progressBar" style="width:5%"></div>
+        </div>
+        <button class="btn-run" id="btnRun" onclick="startRun()">
+          ✦ Ejecutar
+        </button>
       </div>
-      <button class="btn-run" id="btnRun" onclick="startRun()">
-        ✦ Ejecutar
-      </button>
-    </div>
 
-    <!-- Pipeline stages (Director only) -->
-    <div class="pipeline-section" id="pipelineSection">
-      <div class="panel-label">Pipeline</div>
-      <div class="stages" id="stages">
-        <div class="stage waiting" id="stage-director">
-          <div class="stage-icon">🎬</div>
-          <div class="stage-name">Director</div>
-          <div class="stage-badge">En espera</div>
-        </div>
-        <div class="stage waiting" id="stage-search">
-          <div class="stage-icon">🔍</div>
-          <div class="stage-name">Deep Search</div>
-          <div class="stage-badge">En espera</div>
-        </div>
-        <div class="stage waiting" id="stage-analyzer">
-          <div class="stage-icon">📊</div>
-          <div class="stage-name">Channel Analyzer</div>
-          <div class="stage-badge">En espera</div>
-        </div>
-        <div class="stage waiting" id="stage-story">
-          <div class="stage-icon">✍️</div>
-          <div class="stage-name">Storytelling</div>
-          <div class="stage-badge">En espera</div>
-        </div>
-        <div class="stage waiting" id="stage-prompt">
-          <div class="stage-icon">🎨</div>
-          <div class="stage-name">Prompt Generator</div>
-          <div class="stage-badge">En espera</div>
-        </div>
-        <div class="stage waiting" id="stage-imagen">
-          <div class="stage-icon">🖼️</div>
-          <div class="stage-name">Imagen AI</div>
-          <div class="stage-badge">En espera</div>
+      <!-- Pipeline stages (Director only) -->
+      <div class="pipeline-section" id="pipelineSection">
+        <div class="panel-label">Pipeline</div>
+        <div class="stages" id="stages">
+          <div class="stage waiting" id="stage-director">
+            <div class="stage-icon">🎬</div>
+            <div class="stage-name">Director</div>
+            <div class="stage-badge">En espera</div>
+          </div>
+          <div class="stage waiting" id="stage-search">
+            <div class="stage-icon">🔍</div>
+            <div class="stage-name">Deep Search</div>
+            <div class="stage-badge">En espera</div>
+          </div>
+          <div class="stage waiting" id="stage-analyzer">
+            <div class="stage-icon">📊</div>
+            <div class="stage-name">Channel Analyzer</div>
+            <div class="stage-badge">En espera</div>
+          </div>
+          <div class="stage waiting" id="stage-story">
+            <div class="stage-icon">✍️</div>
+            <div class="stage-name">Storytelling</div>
+            <div class="stage-badge">En espera</div>
+          </div>
+          <div class="stage waiting" id="stage-prompt">
+            <div class="stage-icon">🎨</div>
+            <div class="stage-name">Prompt Generator</div>
+            <div class="stage-badge">En espera</div>
+          </div>
+          <div class="stage waiting" id="stage-imagen">
+            <div class="stage-icon">🖼️</div>
+            <div class="stage-name">Imagen AI</div>
+            <div class="stage-badge">En espera</div>
+          </div>
+          <div class="stage waiting" id="stage-tts">
+            <div class="stage-icon">🎙️</div>
+            <div class="stage-name">TTS — Voz en off</div>
+            <div class="stage-badge">En espera</div>
+          </div>
+          <div class="stage waiting" id="stage-video">
+            <div class="stage-icon">📱</div>
+            <div class="stage-name">Video Assembler</div>
+            <div class="stage-badge">En espera</div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- History -->
-    <div class="history-section">
-      <div class="history-header">
-        <div class="panel-label">Historial</div>
+      <!-- History -->
+      <div class="history-section">
+        <div class="history-header">
+          <div class="panel-label">Historial</div>
+        </div>
+        <div class="history-list" id="historyList"></div>
       </div>
-      <div class="history-list" id="historyList"></div>
-    </div>
 
+    </div><!-- /panel-left-scroll -->
   </div>
 
   <!-- ── RIGHT PANEL ── -->
@@ -501,7 +583,7 @@
 ──────────────────────────────────────── */
 const API_BASE    = 'https://spirited-charm-production.up.railway.app';
 const COMPANY_ID  = '4d39bc9c-a76c-4558-a3b0-2a3267124dc0';
-const PROJECT_ID  = 'ebb963af-a5b1-461e-af6f-0dc1927b83ce'; // Historias en sombra
+const PROJECT_ID  = 'ebb963af-a5b1-461e-af6f-0dc1927b83ce';
 const POLL_MS     = 4000;
 
 /* ────────────────────────────────────────
@@ -551,10 +633,26 @@ const AGENTS = {
   imagen: {
     icon: '🖼️', name: 'Imagen AI',
     label: 'JSON del Prompt Generator',
-    placeholder: '💡 Para mejores resultados: pega el JSON que genera el Prompt Generator (campo "scene_prompts").\n\nSi describes una escena en texto, se genera 1 imagen con prompt genérico.',
+    placeholder: '💡 Pega el JSON del Prompt Generator (campo "scene_prompts").\n\nO describe una escena en texto para 1 imagen.',
     agentId: '2492962a-b9f0-4611-90e2-c7ccca5aa281',
     showPipeline: false,
     resultType: 'images',
+  },
+  tts: {
+    icon: '🎙️', name: 'TTS — Voz en off',
+    label: 'Guión / texto a narrar',
+    placeholder: 'Pega el guión del Storytelling o escribe el texto que quieres narrar con ElevenLabs…',
+    agentId: '0d43b313-77b5-481b-83cc-a41485823f8e',
+    showPipeline: false,
+    resultType: 'audio',
+  },
+  video: {
+    icon: '📱', name: 'Video Assembler',
+    label: 'URLs de imágenes + audio (JSON o texto)',
+    placeholder: 'Pega el JSON del Imagen Generator con "image_urls" y "audio_url", o simplemente las URLs separadas por salto de línea.',
+    agentId: '28f0a4aa-a230-4d82-aedf-4c327ab4a506',
+    showPipeline: false,
+    resultType: 'video',
   },
 };
 
@@ -564,6 +662,10 @@ const SUB_STAGE_MAP = [
   { key: 'storytelling',     stage: 'story'    },
   { key: 'prompt generator', stage: 'prompt'   },
   { key: 'imagen generator', stage: 'imagen'   },
+  { key: 'tts',              stage: 'tts'      },
+  { key: 'voz en off',       stage: 'tts'      },
+  { key: 'video assembler',  stage: 'video'    },
+  { key: 'ensamblando',      stage: 'video'    },
 ];
 
 /* ────────────────────────────────────────
@@ -580,26 +682,20 @@ let runHistory     = JSON.parse(localStorage.getItem('hs_history') || '[]');
    AGENT SELECTOR
 ──────────────────────────────────────── */
 function selectAgent(key) {
-  if (currentIssueId) return; // no cambiar mientras corre
+  if (currentIssueId) return;
   currentAgent = key;
   const cfg = AGENTS[key];
 
-  // Update tabs
   document.querySelectorAll('.agent-tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`[data-agent="${key}"]`).classList.add('active');
 
-  // Update input
   document.getElementById('inputLabel').textContent = cfg.label;
   document.getElementById('topicInput').placeholder = cfg.placeholder;
   document.getElementById('topicInput').value = '';
 
-  // Pipeline visibility
   document.getElementById('pipelineSection').style.display = cfg.showPipeline ? '' : 'none';
-
-  // Update button label
   document.getElementById('btnRun').innerHTML = `${cfg.icon} Ejecutar ${cfg.name}`;
 
-  // Reset right panel
   document.getElementById('rightPanel').innerHTML = `
     <div class="empty-state">
       <div class="empty-icon">${cfg.icon}</div>
@@ -610,12 +706,14 @@ function selectAgent(key) {
 
 function getAgentDesc(key) {
   const descs = {
-    director:  'Coordina los 5 agentes en secuencia: busca tendencias, analiza competencia, crea guión, genera prompts e imágenes.',
+    director:  'Coordina los 7 agentes en secuencia: busca tendencias, analiza competencia, crea guión, genera prompts, imágenes, voz en off y video final.',
     search:    'Busca en TikTok, YouTube, Reddit, Twitter y Google Trends qué está viral ahora mismo.',
     analyzer:  'Disecciona canales exitosos: hooks, estructura, thumbnails, ritmo de cortes y fórmula ganadora.',
     story:     'Crea un guión cinematográfico de 4-5 escenas con hook brutal, narración en primera persona y CTA final.',
     prompt:    'Genera 5-6 prompts ultra-detallados para Higgsfield Soul, uno por escena, con coherencia visual total.',
-    imagen:    'Genera imágenes cinématicas 9:16 con Higgsfield Soul. Puedes pegar el JSON del Prompt Generator.',
+    imagen:    'Genera imágenes cinemáticas 9:16 con Higgsfield Soul. Puedes pegar el JSON del Prompt Generator.',
+    tts:       'Convierte el guión en narración de voz dramática usando ElevenLabs. Descarga el MP3 resultante.',
+    video:     'Ensambla las imágenes generadas + la narración de voz en un MP4 9:16 listo para TikTok, Reels y Shorts.',
   };
   return descs[key] || '';
 }
@@ -623,7 +721,7 @@ function getAgentDesc(key) {
 /* ────────────────────────────────────────
    STAGES
 ──────────────────────────────────────── */
-const STAGE_IDS = ['director','search','analyzer','story','prompt','imagen'];
+const STAGE_IDS = ['director','search','analyzer','story','prompt','imagen','tts','video'];
 
 function setStage(id, state) {
   const el = document.getElementById(`stage-${id}`);
@@ -680,7 +778,6 @@ async function startRun() {
     if (!currentIssueId) throw new Error('No se obtuvo ID del issue');
     addLog(`▸ Issue #${currentIssueId.slice(0,8)}… asignado a ${cfg.name}`, 'accent');
 
-    // Enviar mensaje al chat para disparar al agente (igual que escribir en el inbox)
     await fetch(`${API_BASE}/api/issues/${currentIssueId}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -692,11 +789,10 @@ async function startRun() {
     pollTimer = setInterval(pollMain, POLL_MS);
     if (cfg.showPipeline) subPollTimer = setInterval(pollSubIssues, POLL_MS);
 
-    // Animate progress bar
     const tick = setInterval(() => {
       if (!startTime) { clearInterval(tick); return; }
       const elapsed = (Date.now() - startTime) / 1000;
-      const totalSec = cfg.showPipeline ? 180 : 60;
+      const totalSec = cfg.showPipeline ? 240 : 90;
       const pct = Math.min(90, Math.round((elapsed / totalSec) * 100));
       document.getElementById('progressBar').style.width = pct + '%';
     }, 2000);
@@ -746,7 +842,7 @@ async function pollSubIssues() {
   if (!currentIssueId) return;
   try {
     const res = await fetch(
-      `${API_BASE}/api/companies/${COMPANY_ID}/issues?parentId=${currentIssueId}&limit=10`,
+      `${API_BASE}/api/companies/${COMPANY_ID}/issues?parentId=${currentIssueId}&limit=20`,
       { credentials: 'include' }
     );
     if (!res.ok) return;
@@ -764,7 +860,7 @@ async function pollSubIssues() {
       if (state === 'done') done++;
     });
 
-    const pct = Math.min(90, Math.round(((done + 1) / 7) * 100));
+    const pct = Math.min(90, Math.round(((done + 1) / 9) * 100));
     document.getElementById('progressBar').style.width = pct + '%';
   } catch(e) { /* silencioso */ }
 }
@@ -776,7 +872,6 @@ async function fetchLastComment(issueId) {
     const data = await res.json();
     const comments = data.comments || data || [];
     if (!Array.isArray(comments) || !comments.length) return '';
-    // Buscar el comentario más largo (el del agente, no el del usuario)
     const sorted = [...comments].sort((a, b) => {
       const lenA = (a.body || a.content || a.text || '').length;
       const lenB = (b.body || b.content || b.text || '').length;
@@ -784,6 +879,43 @@ async function fetchLastComment(issueId) {
     });
     return sorted[0].body || sorted[0].content || sorted[0].text || '';
   } catch(e) { return ''; }
+}
+
+/* ────────────────────────────────────────
+   URL EXTRACTORS
+──────────────────────────────────────── */
+function extractVideoUrl(text) {
+  // 1. JSON field "video_url"
+  const jsonM = text.match(/"video_url"\s*:\s*"(https?:\/\/[^"]+)"/);
+  if (jsonM) return jsonM[1];
+  // 2. Markdown link [Descargar MP4](url)
+  const mdM = text.match(/\[Descargar MP4\]\((https?:\/\/[^\s)]+)\)/i);
+  if (mdM) return mdM[1];
+  // 3. Direct .mp4 URL
+  const mp4M = text.match(/https?:\/\/[^\s"')\]]+\.mp4/i);
+  if (mp4M) return mp4M[0];
+  return '';
+}
+
+function extractAudioUrl(text) {
+  // 1. JSON field "audio_url"
+  const jsonM = text.match(/"audio_url"\s*:\s*"(https?:\/\/[^"]+)"/);
+  if (jsonM) return jsonM[1];
+  // 2. Markdown link [Descargar MP3](url)
+  const mdM = text.match(/\[Descargar MP3\]\((https?:\/\/[^\s)]+)\)/i);
+  if (mdM) return mdM[1];
+  // 3. Direct .mp3 URL
+  const mp3M = text.match(/https?:\/\/[^\s"')\]]+\.mp3/i);
+  if (mp3M) return mp3M[0];
+  return '';
+}
+
+function isDirectMedia(url) {
+  // URLs that serve media directly (not download pages)
+  return /\.(mp4|mp3|webm|ogg)(\?|$)/i.test(url)
+    || url.includes('transfer.sh')
+    || url.includes('uguu.se')
+    || url.includes('tmpfiles.org/dl');
 }
 
 /* ────────────────────────────────────────
@@ -806,6 +938,8 @@ function showResults(raw, data) {
     case 'images':    right.innerHTML = header + buildImagesResult(raw);   break;
     case 'script':    right.innerHTML = header + buildScriptResult(raw);   break;
     case 'prompts':   right.innerHTML = header + buildPromptsResult(raw);  break;
+    case 'audio':     right.innerHTML = header + buildAudioResult(raw);    break;
+    case 'video':     right.innerHTML = header + buildVideoResult(raw);    break;
     default:          right.innerHTML = header + buildMarkdownResult(raw); break;
   }
 }
@@ -814,7 +948,6 @@ function showResults(raw, data) {
 function mdToHtml(text) {
   if (!text) return '';
 
-  // Inline formatter (escapes HTML then applies markdown patterns)
   function inline(s) {
     s = s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
@@ -823,7 +956,6 @@ function mdToHtml(text) {
     return s;
   }
 
-  // Strip HTML <details> blocks (embedded raw reports) — keep only synthesis
   const detailsStart = text.indexOf('<details>');
   const clean = detailsStart > 0 ? text.slice(0, detailsStart) : text;
 
@@ -862,7 +994,6 @@ function mdToHtml(text) {
       html += `<li>${inline(ol[1])}</li>`;
       continue;
     }
-    // Markdown image: ![alt](url)
     const imgM = t.match(/^!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)$/);
     if (imgM) {
       closeList();
@@ -876,29 +1007,134 @@ function mdToHtml(text) {
   return html;
 }
 
-/* ── Extract ALL image URLs from text (no extension required) ── */
+/* ── Extract ALL image URLs from text ── */
 function extractImageUrls(text) {
   const seen = new Set();
   const push = u => { const c = u.split(')')[0].split('"')[0]; if (c && !seen.has(c)) { seen.add(c); } };
-  // 1. Markdown image syntax: ![...](url)
   for (const m of text.matchAll(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/g)) push(m[1]);
-  // 2. **URL:** lines
   for (const m of text.matchAll(/\*\*URL:\*\*\s*(https?:\/\/[^\s\n)]+)/g)) push(m[1]);
-  // 3. URLs with common image extensions
   for (const m of text.matchAll(/https?:\/\/[^\s)"'\]]+\.(?:png|jpg|jpeg|webp|gif)/gi)) push(m[0]);
   return [...seen];
 }
-function extractImageUrl(text) { return extractImageUrls(text)[0] || ''; }
 
-/* Director: tabbed result — one tab per agent */
+/* ────────────────────────────────────────
+   RESULT BUILDERS
+──────────────────────────────────────── */
+
+/* ── Audio player (TTS agent) ── */
+function buildAudioResult(raw) {
+  const audioUrl = extractAudioUrl(raw);
+  const narration = (() => {
+    const m = raw.match(/"narration_text"\s*:\s*"([^"]+)"/);
+    return m ? m[1] : '';
+  })();
+  const duration = (() => {
+    const m = raw.match(/"duration_estimate"\s*:\s*"([^"]+)"/);
+    return m ? m[1] : '';
+  })();
+  const sizeKb = (() => {
+    const m = raw.match(/"file_size_kb"\s*:\s*([\d.]+)/);
+    return m ? parseFloat(m[1]).toFixed(0) + ' KB' : '';
+  })();
+
+  return `
+    <div class="card">
+      <div class="card-header"><span class="card-icon">🎙️</span><span class="card-title">Narración generada${duration ? ' · ' + duration : ''}</span></div>
+      ${audioUrl ? `
+        <div style="margin-bottom:14px">
+          <audio controls src="${escHtml(audioUrl)}">
+            Tu navegador no soporta audio HTML5.
+          </audio>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a href="${escHtml(audioUrl)}" target="_blank" class="btn-download">⬇️ Descargar MP3${sizeKb ? ' · ' + sizeKb : ''}</a>
+        </div>
+      ` : `
+        <div style="color:var(--sub);font-size:12px;padding:12px 0">No se encontró URL de audio en la respuesta.</div>
+      `}
+      ${narration ? `
+        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Narración</div>
+          <div style="font-size:12.5px;line-height:1.7;color:var(--text);font-style:italic">"${escHtml(narration)}"</div>
+        </div>
+      ` : ''}
+    </div>
+    <div class="card card-raw" style="margin-top:0">
+      <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver salida completa</div>
+      <div class="raw-body">${escHtml(raw)}</div>
+    </div>`;
+}
+
+/* ── Video player (Video Assembler agent) ── */
+function buildVideoResult(raw) {
+  const videoUrl = extractVideoUrl(raw);
+  const audioUrl = extractAudioUrl(raw);
+  const scenes = (() => { const m = raw.match(/"scenes"\s*:\s*(\d+)/); return m ? m[1] : ''; })();
+  const durationS = (() => { const m = raw.match(/"duration_s"\s*:\s*(\d+)/); return m ? m[1] + 's' : ''; })();
+  const sizeMb = (() => { const m = raw.match(/"file_size_mb"\s*:\s*([\d.]+)/); return m ? parseFloat(m[1]).toFixed(1) + ' MB' : ''; })();
+
+  const isDirect = videoUrl && isDirectMedia(videoUrl);
+
+  return `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-icon">📱</span>
+        <span class="card-title">Video MP4 9:16${scenes ? ' · ' + scenes + ' escenas' : ''}${durationS ? ' · ' + durationS : ''}${sizeMb ? ' · ' + sizeMb : ''}</span>
+      </div>
+
+      ${videoUrl ? `
+        <div class="video-wrap" style="margin-bottom:16px">
+          ${isDirect ? `
+            <video controls playsinline preload="metadata">
+              <source src="${escHtml(videoUrl)}" type="video/mp4">
+            </video>
+          ` : `
+            <div class="video-placeholder">
+              <div class="big-icon">🎬</div>
+              <div style="font-weight:600;color:var(--text)">Video listo</div>
+              <div style="font-size:11px">Abre el link para reproducirlo</div>
+            </div>
+          `}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:${audioUrl ? '16px' : '0'}">
+          <a href="${escHtml(videoUrl)}" target="_blank" rel="noopener" class="btn-download">
+            ${isDirect ? '⬇️ Descargar MP4' : '▶️ Abrir video'}${sizeMb ? ' · ' + sizeMb : ''}
+          </a>
+          ${isDirect ? `<a href="${escHtml(videoUrl)}" target="_blank" rel="noopener" class="btn-download secondary">🔗 Abrir en nueva pestaña</a>` : ''}
+        </div>
+      ` : `
+        <div style="color:var(--sub);font-size:12px;padding:12px 0 20px">
+          No se encontró URL de video en la respuesta.
+        </div>
+      `}
+
+      ${audioUrl ? `
+        <div style="border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🎙️ Narración de voz</div>
+          <audio controls src="${escHtml(audioUrl)}" style="width:100%">
+            Tu navegador no soporta audio HTML5.
+          </audio>
+          <div style="margin-top:8px">
+            <a href="${escHtml(audioUrl)}" target="_blank" rel="noopener" class="btn-download secondary" style="font-size:11.5px;padding:6px 14px">⬇️ Descargar MP3</a>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+    <div class="card card-raw" style="margin-top:0">
+      <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver salida completa</div>
+      <div class="raw-body">${escHtml(raw)}</div>
+    </div>`;
+}
+
+/* ── Director: tabbed result ── */
 function buildDirectorResult(raw) {
   const imageUrls = extractImageUrls(raw);
+  const videoUrl  = extractVideoUrl(raw);
+  const audioUrl  = extractAudioUrl(raw);
 
-  // Split synthesis (before <details>) from embedded agent reports
   const detailsIdx = raw.indexOf('<details>');
   const synthesis  = detailsIdx > 0 ? raw.slice(0, detailsIdx).trim() : raw;
 
-  // Parse each <details> block by summary label
   function extractDetail(label) {
     const re = new RegExp('<details>[\\s\\S]*?<summary>[^<]*' + label + '[^<]*<\\/summary>([\\s\\S]*?)<\\/details>', 'i');
     const m = raw.match(re); return m ? m[1].trim() : '';
@@ -909,20 +1145,19 @@ function buildDirectorResult(raw) {
     story:    extractDetail('Storytelling'),
     prompts:  extractDetail('Prompt Generator'),
     images:   extractDetail('Imagen Generator'),
+    tts:      extractDetail('TTS'),
+    video:    extractDetail('Video'),
   };
 
-  // Parse Imagen Generator JSON for richer gallery (label + prompt per scene)
   let richImages = [];
   try {
     const jsonM = sections.images.match(/```json\s*([\s\S]+?)```/);
     if (jsonM) richImages = JSON.parse(jsonM[1]);
   } catch(e) {}
-  // Fallback: build from raw URLs + labels from **URL:** lines
   if (!richImages.length && imageUrls.length) {
     richImages = imageUrls.map((url,i) => ({ url, label: `Escena ${i+1}`, prompt: '' }));
   }
 
-  // Image gallery HTML — uses richImages for proper labels/prompts
   const galleryHtml = richImages.length
     ? `<div class="image-gallery" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-top:8px">
         ${richImages.map(img => img.url ? `
@@ -937,7 +1172,6 @@ function buildDirectorResult(raw) {
        </div>`
     : `<div style="color:var(--sub);font-size:12px;padding:20px 0;text-align:center">Sin imágenes generadas</div>`;
 
-  // Parse prompt JSON for nice display
   let promptsHtml = '';
   try {
     const jsonM = sections.prompts.match(/\{[\s\S]+\}/);
@@ -954,10 +1188,40 @@ function buildDirectorResult(raw) {
     promptsHtml = `<div class="md-render">${mdToHtml(sections.prompts)}</div>`;
   }
 
+  // Video tab HTML
+  const isDirect = videoUrl && isDirectMedia(videoUrl);
+  const videoTabHtml = videoUrl ? `
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+      <div class="video-wrap" style="flex-shrink:0;width:220px">
+        ${isDirect
+          ? `<video controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain"><source src="${escHtml(videoUrl)}" type="video/mp4"></video>`
+          : `<div class="video-placeholder"><div class="big-icon">🎬</div><div style="font-size:11px;color:var(--sub)">Abre el link<br>para ver</div></div>`
+        }
+      </div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;padding-top:4px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Video final</div>
+          <a href="${escHtml(videoUrl)}" target="_blank" rel="noopener" class="btn-download">
+            ${isDirect ? '⬇️ Descargar MP4' : '▶️ Abrir video'}
+          </a>
+        </div>
+        ${audioUrl ? `
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🎙️ Audio narración</div>
+            <audio controls src="${escHtml(audioUrl)}" style="width:100%"></audio>
+            <div style="margin-top:6px"><a href="${escHtml(audioUrl)}" target="_blank" class="btn-download secondary" style="font-size:11px;padding:5px 12px">⬇️ MP3</a></div>
+          </div>
+        ` : ''}
+      </div>
+    </div>` : `<div style="color:var(--sub);font-size:12.5px;padding:20px 0;text-align:center">⚠️ El video no fue generado todavía o no se encontró URL</div>`;
+
+  const nImages = richImages.filter(i=>i.url).length || imageUrls.length;
+
   return `
     <div class="art-tabs" id="artTabs">
       <button class="art-tab active" data-art="summary" onclick="switchArtTab('summary',this)">🎬 Resumen</button>
-      <button class="art-tab" data-art="images" onclick="switchArtTab('images',this)">🖼️ Imágenes${richImages.length ? ' · '+richImages.filter(i=>i.url).length : (imageUrls.length ? ' · '+imageUrls.length : '')}</button>
+      ${videoUrl ? `<button class="art-tab" data-art="videoTab" onclick="switchArtTab('videoTab',this)">📱 Video</button>` : ''}
+      <button class="art-tab" data-art="images" onclick="switchArtTab('images',this)">🖼️ Imágenes${nImages ? ' · '+nImages : ''}</button>
       <button class="art-tab" data-art="story" onclick="switchArtTab('story',this)">✍️ Guión</button>
       <button class="art-tab" data-art="search" onclick="switchArtTab('search',this)">🔍 Deep Search</button>
       <button class="art-tab" data-art="analyzer" onclick="switchArtTab('analyzer',this)">📊 Canal</button>
@@ -968,28 +1232,32 @@ function buildDirectorResult(raw) {
       <div class="card"><div class="md-render">${mdToHtml(synthesis)}</div></div>
     </div>
 
+    <div id="art-panel-videoTab" class="art-panel">
+      <div class="card">${videoTabHtml}</div>
+    </div>
+
     <div id="art-panel-images" class="art-panel">
       <div class="card">
-        <div class="card-header"><span class="card-icon">🖼️</span><span class="card-title">Imágenes generadas · ${richImages.filter(i=>i.url).length || imageUrls.length} escenas</span></div>
+        <div class="card-header"><span class="card-icon">🖼️</span><span class="card-title">Imágenes generadas · ${nImages} escenas</span></div>
         ${galleryHtml}
       </div>
     </div>
 
     <div id="art-panel-story" class="art-panel">
-      <div class="card"><div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(sections.story || '_(sin datos — ver raw)_')}</div></div>
+      <div class="card"><div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(sections.story || '_(sin datos)_')}</div></div>
     </div>
 
     <div id="art-panel-search" class="art-panel">
-      <div class="card"><div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(sections.search || '_(sin datos — ver raw)_')}</div></div>
+      <div class="card"><div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(sections.search || '_(sin datos)_')}</div></div>
     </div>
 
     <div id="art-panel-analyzer" class="art-panel">
-      <div class="card"><div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(sections.analyzer || '_(sin datos — ver raw)_')}</div></div>
+      <div class="card"><div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(sections.analyzer || '_(sin datos)_')}</div></div>
     </div>
 
     <div id="art-panel-prompts" class="art-panel">
       <div class="card">
-        <div class="card-header"><span class="card-icon">🎨</span><span class="card-title">Prompts · ${(() => { try { const m=sections.prompts.match(/\{[\s\S]+\}/); return m ? (JSON.parse(m[0])?.scene_prompts?.length||0) : 0; } catch(e){return 0;} })()} escenas</span></div>
+        <div class="card-header"><span class="card-icon">🎨</span><span class="card-title">Prompts</span></div>
         <div style="max-height:500px;overflow-y:auto">${promptsHtml}</div>
       </div>
     </div>
@@ -1002,24 +1270,18 @@ function buildDirectorResult(raw) {
     </div>`;
 }
 
-/* Images gallery */
+/* ── Images gallery ── */
 function buildImagesResult(raw) {
   let images = [];
-  // 1. Try JSON block
   try {
     const jsonMatch = raw.match(/```json\s*([\s\S]+?)```/);
     if (jsonMatch) images = JSON.parse(jsonMatch[1]);
   } catch(e) {}
 
-  // 2. Fallback: extract markdown image lines  ![label](url)
   if (!images.length) {
     const mdImgs = [...raw.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g)];
-    if (mdImgs.length) {
-      images = mdImgs.map(m => ({ url: m[2], label: m[1] || 'Imagen', status: 'ok' }));
-    }
+    if (mdImgs.length) images = mdImgs.map(m => ({ url: m[2], label: m[1] || 'Imagen', status: 'ok' }));
   }
-
-  // 3. Fallback: **URL:** lines
   if (!images.length) {
     const urlLines = [...raw.matchAll(/\*\*URL:\*\*\s*(https?:\/\/[^\s\n)]+)/g)];
     images = urlLines.map((m,i) => ({ url: m[1], label: `Imagen ${i+1}`, status: 'ok' }));
@@ -1050,7 +1312,6 @@ function buildImagesResult(raw) {
     </div>`;
 }
 
-/* Script result — render as markdown */
 function buildScriptResult(raw) {
   return `
     <div class="card" style="grid-column:1/-1">
@@ -1059,7 +1320,6 @@ function buildScriptResult(raw) {
     </div>`;
 }
 
-/* Prompts JSON */
 function buildPromptsResult(raw) {
   let parsed = null;
   try { parsed = JSON.parse(raw); } catch(e) {}
@@ -1084,7 +1344,6 @@ function buildPromptsResult(raw) {
     </div>`;
 }
 
-/* Generic markdown */
 function buildMarkdownResult(raw) {
   return `
     <div class="card" style="grid-column:1/-1">
@@ -1126,7 +1385,6 @@ function addLog(msg, cls='') {
   el.appendChild(line);
   el.scrollTop = el.scrollHeight;
 }
-
 
 /* ────────────────────────────────────────
    HISTORY
@@ -1208,14 +1466,12 @@ function formatMs(ms) {
   return s > 60 ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`;
 }
 
-/* ── Agent result tab switcher ── */
+/* ── Tab switcher ── */
 function switchArtTab(tabId, btn) {
-  // Switch panels
   document.querySelectorAll('.art-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('art-panel-' + tabId);
   if (panel) panel.classList.add('active');
 
-  // Switch tab buttons
   document.querySelectorAll('.art-tab').forEach(t => t.classList.remove('active'));
   if (btn) btn.classList.add('active');
   else {
@@ -1223,8 +1479,7 @@ function switchArtTab(tabId, btn) {
     if (found) found.classList.add('active');
   }
 
-  // Highlight matching pipeline stage
-  const TAB_TO_STAGE = { summary:'director', images:'imagen', story:'story', search:'search', analyzer:'analyzer', prompts:'prompt' };
+  const TAB_TO_STAGE = { summary:'director', videoTab:'video', images:'imagen', story:'story', search:'search', analyzer:'analyzer', prompts:'prompt' };
   document.querySelectorAll('.stage').forEach(s => s.classList.remove('nav-active'));
   const stageId = TAB_TO_STAGE[tabId];
   if (stageId) {
@@ -1233,9 +1488,9 @@ function switchArtTab(tabId, btn) {
   }
 }
 
-/* Wire pipeline stages as tab navigation once Director results are visible */
+/* Wire pipeline stages as tab navigation */
 function activatePipelineNav() {
-  const STAGE_TO_TAB = { director:'summary', search:'search', analyzer:'analyzer', story:'story', prompt:'prompts', imagen:'images' };
+  const STAGE_TO_TAB = { director:'summary', search:'search', analyzer:'analyzer', story:'story', prompt:'prompts', imagen:'images', video:'videoTab' };
   STAGE_IDS.forEach(id => {
     const el = document.getElementById('stage-' + id);
     if (!el) return;
