@@ -20,15 +20,64 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 
+_IMAGE_MAGIC = {
+    b"\xff\xd8\xff": "jpg",
+    b"\x89PNG":      "png",
+    b"RIFF":         "webp",  # RIFF....WEBP
+    b"GIF8":         "gif",
+}
+
+def _is_real_image(data: bytes) -> bool:
+    """Verifica que los bytes sean una imagen real (no HTML de error 403/404)."""
+    for magic in _IMAGE_MAGIC:
+        if data[:len(magic)] == magic:
+            return True
+    # WebP extra check: RIFF....WEBP
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return True
+    return False
+
+
 def download_image(url: str, path: str) -> bool:
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "identity",
+        "Referer": "https://higgsfield.ai/",
+        "Cache-Control": "no-cache",
+    }
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=30) as r:
-            with open(path, "wb") as f:
-                f.write(r.read())
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=45) as r:
+            data = r.read()
+        if not _is_real_image(data):
+            print(f"  ⚠️  Respuesta no es imagen ({len(data)}B, inicio: {data[:20]}): {url[:60]}", flush=True)
+            return False
+        with open(path, "wb") as f:
+            f.write(data)
+        print(f"  ✅ Imagen descargada ({len(data)//1024}KB): {path}", flush=True)
         return True
     except Exception as e:
         print(f"  ⚠️  Error descargando {url[:60]}: {e}", flush=True)
+        return False
+
+
+def convert_to_jpg(src: str, dst: str) -> bool:
+    """Convierte cualquier formato de imagen a JPG con ffmpeg."""
+    try:
+        r = subprocess.run(
+            ["ffmpeg", "-y", "-i", src,
+             "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+             "-q:v", "2", dst],
+            capture_output=True, text=True, timeout=30
+        )
+        return r.returncode == 0 and os.path.exists(dst)
+    except Exception:
         return False
 
 
@@ -70,22 +119,59 @@ def get_audio_duration(path: str) -> float:
         return 0.0
 
 
+def normalize_images(image_paths: list, work_dir: str) -> list:
+    """
+    Convierte todas las imágenes a JPG estándar para máxima compatibilidad con ffmpeg.
+    WebP y otros formatos raros pueden fallar en el concat demuxer.
+    """
+    normalized = []
+    for i, src in enumerate(image_paths):
+        dst = os.path.join(work_dir, f"norm_{i+1:02d}.jpg")
+        if convert_to_jpg(src, dst):
+            normalized.append(dst)
+            print(f"  🔄 Normalizada: {os.path.basename(src)} → {os.path.basename(dst)}", flush=True)
+        else:
+            # Si la conversión falla, intentar usar la original
+            print(f"  ⚠️  No se pudo normalizar {os.path.basename(src)}, usando original", flush=True)
+            normalized.append(src)
+    return normalized
+
+
 def assemble_video(image_paths: list, audio_path: str,
                    output_path: str, scene_duration: float) -> bool:
     """
     Crea el video con ffmpeg:
+    - Normaliza todas las imágenes a JPG primero
     - Slideshow de imágenes con duración proporcional al audio
     - Escala a 720x1280 (9:16 TikTok)
     - Overlay de audio (narración)
-    - Fade in/out entre escenas
     """
+    work_dir = os.path.dirname(output_path)
+
+    # Paso 1: normalizar imágenes a JPG para evitar problemas con WebP/PNG en concat
+    print(f"  🔄 Normalizando {len(image_paths)} imágenes a JPG...", flush=True)
+    norm_paths = normalize_images(image_paths, work_dir)
+
+    if not norm_paths:
+        print("  ❌ Sin imágenes normalizadas", flush=True)
+        return False
+
+    # Paso 2: construir filelist para concat demuxer
     filelist = output_path.replace(".mp4", "_list.txt")
-    with open(filelist, "w") as f:
-        for img in image_paths:
-            f.write(f"file '{img}'\n")
+    with open(filelist, "w", encoding="utf-8") as f:
+        for img in norm_paths:
+            # Escapar comillas simples en rutas
+            safe = img.replace("'", "'\\''")
+            f.write(f"file '{safe}'\n")
             f.write(f"duration {scene_duration:.2f}\n")
-        # Duplicar última imagen para evitar corte brusco al final
-        f.write(f"file '{image_paths[-1]}'\n")
+        # Repetir última imagen para que concat no corte el último frame
+        safe = norm_paths[-1].replace("'", "'\\''")
+        f.write(f"file '{safe}'\n")
+        f.write(f"duration 0.1\n")
+
+    print(f"  📄 filelist: {filelist}", flush=True)
+    with open(filelist) as fl:
+        print(fl.read()[:400], flush=True)
 
     scale_filter = (
         "scale=720:1280:force_original_aspect_ratio=decrease,"
@@ -93,7 +179,7 @@ def assemble_video(image_paths: list, audio_path: str,
         "fps=24"
     )
 
-    has_audio = audio_path and os.path.exists(audio_path)
+    has_audio = bool(audio_path and os.path.exists(audio_path))
 
     if has_audio:
         cmd = [
@@ -119,54 +205,161 @@ def assemble_video(image_paths: list, audio_path: str,
             output_path
         ]
 
-    print(f"  🎬 Ejecutando ffmpeg...", flush=True)
+    print(f"  🎬 Ejecutando ffmpeg (cmd: {' '.join(cmd[:8])}...)", flush=True)
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    # Siempre imprimir stderr para diagnóstico (ffmpeg escribe info ahí)
+    if r.stderr:
+        # Imprimir las últimas 1200 chars del stderr para ver errores completos
+        print(f"  📋 ffmpeg stderr (últimas líneas):\n{r.stderr[-1200:]}", flush=True)
     if r.returncode != 0:
-        print(f"  ❌ ffmpeg error:\n{r.stderr[-800:]}", flush=True)
+        print(f"  ❌ ffmpeg salió con código {r.returncode}", flush=True)
         return False
     print(f"  ✅ Video ensamblado: {output_path}", flush=True)
     return True
 
 
 def upload_file(file_path: str) -> str:
-    """Sube archivo probando varios servicios hasta que uno funcione."""
+    """
+    Sube archivo probando varios servicios hasta que uno funcione.
+    Servicios en orden de preferencia (2026):
+      1. transfer.sh  — PUT directo, URL permanente
+      2. GoFile       — requiere obtener servidor primero, luego upload
+      3. tmpfiles.org — multipart POST, JSON response
+      4. uguu.se      — multipart POST, texto plano
+      5. catbox.moe   — litterbox (72h)
+    """
     import mimetypes
-    mime     = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-    filename = os.path.basename(file_path)
-    boundary = "----PaperclipBoundary"
+    filename  = os.path.basename(file_path)
+    mime      = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+    boundary  = "----PaperclipBoundary7MA4YWxkTrZu0gW"
 
     with open(file_path, "rb") as f:
         file_data = f.read()
 
-    def _multipart_post(url: str, field: str, timeout: int = 120) -> str:
+    size_mb = len(file_data) / 1024 / 1024
+    print(f"  📤 Subiendo {filename} ({size_mb:.1f} MB)...", flush=True)
+
+    # ── 1. transfer.sh (PUT) ─────────────────────────────────────────────────
+    try:
+        req = urllib.request.Request(
+            f"https://transfer.sh/{filename}",
+            data=file_data,
+            headers={
+                "Content-Type": mime,
+                "User-Agent": "paperclip-agent/1.0",
+                "Max-Days": "7",
+            },
+            method="PUT"
+        )
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            url = resp.read().decode("utf-8").strip()
+        if url.startswith("http"):
+            print(f"  ✅ transfer.sh: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  transfer.sh falló: {e}", flush=True)
+
+    # ── 2. GoFile (GET server + POST upload) ─────────────────────────────────
+    try:
+        # Obtener servidor disponible
+        with urllib.request.urlopen("https://api.gofile.io/servers", timeout=10) as r:
+            servers_data = json.loads(r.read().decode("utf-8"))
+        server = servers_data["data"]["servers"][0]["name"]
+        # Subir al servidor obtenido
         body = (
             f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
             f"Content-Type: {mime}\r\n\r\n"
         ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
         req = urllib.request.Request(
-            url, data=body,
+            f"https://{server}.gofile.io/contents/uploadFile",
+            data=body,
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "User-Agent": "paperclip-agent/1.0",
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            gf = json.loads(resp.read().decode("utf-8"))
+        url = gf.get("data", {}).get("downloadPage", "")
+        if url.startswith("http"):
+            print(f"  ✅ GoFile: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  GoFile falló: {e}", flush=True)
+
+    # ── 3. tmpfiles.org ───────────────────────────────────────────────────────
+    try:
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
+        req = urllib.request.Request(
+            "https://tmpfiles.org/api/v1/upload",
+            data=body,
             headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8").strip()
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            tj = json.loads(resp.read().decode("utf-8"))
+        url = tj.get("data", {}).get("url", "")
+        if url.startswith("http"):
+            # tmpfiles devuelve la página de descarga; convertir a descarga directa
+            url = url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
+            print(f"  ✅ tmpfiles.org: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  tmpfiles.org falló: {e}", flush=True)
 
-    services = [
-        ("https://0x0.st",       "file"),
-        ("https://file.io",      "file"),
-        ("https://litterbox.catbox.moe/resources/internals/api.php", "fileToUpload"),
-    ]
-    for url, field in services:
-        try:
-            result = _multipart_post(url, field)
-            if url == "https://file.io":
-                result = json.loads(result).get("link", result)
-            if result.startswith("http"):
-                print(f"  ✅ Subido a {url.split('/')[2]}: {result}", flush=True)
-                return result
-        except Exception as e:
-            print(f"  ⚠️  {url.split('/')[2]} falló: {e}", flush=True)
+    # ── 4. uguu.se ────────────────────────────────────────────────────────────
+    try:
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="files[]"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
+        req = urllib.request.Request(
+            "https://uguu.se/upload",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            uj = json.loads(resp.read().decode("utf-8"))
+        url = uj.get("files", [{}])[0].get("url", "")
+        if url.startswith("http"):
+            print(f"  ✅ uguu.se: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  uguu.se falló: {e}", flush=True)
+
+    # ── 5. Litterbox catbox.moe (72h) ─────────────────────────────────────────
+    try:
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n'
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="time"\r\n\r\n72h\r\n'
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="fileToUpload"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
+        req = urllib.request.Request(
+            "https://litterbox.catbox.moe/resources/internals/api.php",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            url = resp.read().decode("utf-8").strip()
+        if url.startswith("http"):
+            print(f"  ✅ catbox.moe: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  catbox.moe falló: {e}", flush=True)
+
     raise Exception("Todos los servicios de upload fallaron")
 
 

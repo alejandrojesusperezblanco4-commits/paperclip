@@ -109,46 +109,140 @@ def generate_audio(text: str, voice_id: str, api_key: str, output_path: str) -> 
 
 
 def upload_file(file_path: str) -> str:
-    """Sube archivo probando varios servicios hasta que uno funcione."""
+    """
+    Sube archivo probando varios servicios hasta que uno funcione.
+    Servicios en orden (2026):
+      1. transfer.sh  — PUT directo
+      2. GoFile       — obtiene servidor + POST
+      3. tmpfiles.org — multipart POST, JSON
+      4. uguu.se      — multipart POST
+      5. catbox.moe   — litterbox 72h
+    """
     import mimetypes
-    mime     = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-    filename = os.path.basename(file_path)
-    boundary = "----PaperclipBoundary"
+    filename  = os.path.basename(file_path)
+    mime      = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+    boundary  = "----PaperclipBoundary7MA4YWxkTrZu0gW"
 
     with open(file_path, "rb") as f:
         file_data = f.read()
 
-    def _multipart_post(url: str, field: str) -> str:
+    size_kb = len(file_data) / 1024
+    print(f"  📤 Subiendo {filename} ({size_kb:.0f} KB)...", flush=True)
+
+    # ── 1. transfer.sh (PUT) ─────────────────────────────────────────────────
+    try:
+        req = urllib.request.Request(
+            f"https://transfer.sh/{filename}",
+            data=file_data,
+            headers={
+                "Content-Type": mime,
+                "User-Agent": "paperclip-agent/1.0",
+                "Max-Days": "7",
+            },
+            method="PUT"
+        )
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            url = resp.read().decode("utf-8").strip()
+        if url.startswith("http"):
+            print(f"  ✅ transfer.sh: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  transfer.sh falló: {e}", flush=True)
+
+    # ── 2. GoFile ─────────────────────────────────────────────────────────────
+    try:
+        with urllib.request.urlopen("https://api.gofile.io/servers", timeout=10) as r:
+            servers_data = json.loads(r.read().decode("utf-8"))
+        server = servers_data["data"]["servers"][0]["name"]
         body = (
             f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
             f"Content-Type: {mime}\r\n\r\n"
         ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
         req = urllib.request.Request(
-            url, data=body,
+            f"https://{server}.gofile.io/contents/uploadFile",
+            data=body,
             headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            return resp.read().decode("utf-8").strip()
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            gf = json.loads(resp.read().decode("utf-8"))
+        url = gf.get("data", {}).get("downloadPage", "")
+        if url.startswith("http"):
+            print(f"  ✅ GoFile: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  GoFile falló: {e}", flush=True)
 
-    # Intentar servicios en orden
-    services = [
-        ("https://0x0.st",       "file"),
-        ("https://file.io",      "file"),
-        ("https://litterbox.catbox.moe/resources/internals/api.php", "fileToUpload"),
-    ]
-    for url, field in services:
-        try:
-            result = _multipart_post(url, field)
-            # file.io devuelve JSON
-            if url == "https://file.io":
-                result = json.loads(result).get("link", result)
-            if result.startswith("http"):
-                print(f"  ✅ Subido a {url.split('/')[2]}: {result}", flush=True)
-                return result
-        except Exception as e:
-            print(f"  ⚠️  {url.split('/')[2]} falló: {e}", flush=True)
+    # ── 3. tmpfiles.org ───────────────────────────────────────────────────────
+    try:
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
+        req = urllib.request.Request(
+            "https://tmpfiles.org/api/v1/upload",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            tj = json.loads(resp.read().decode("utf-8"))
+        url = tj.get("data", {}).get("url", "").replace("tmpfiles.org/", "tmpfiles.org/dl/")
+        if url.startswith("http"):
+            print(f"  ✅ tmpfiles.org: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  tmpfiles.org falló: {e}", flush=True)
+
+    # ── 4. uguu.se ────────────────────────────────────────────────────────────
+    try:
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="files[]"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
+        req = urllib.request.Request(
+            "https://uguu.se/upload",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            uj = json.loads(resp.read().decode("utf-8"))
+        url = uj.get("files", [{}])[0].get("url", "")
+        if url.startswith("http"):
+            print(f"  ✅ uguu.se: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  uguu.se falló: {e}", flush=True)
+
+    # ── 5. Litterbox catbox.moe (72h) ─────────────────────────────────────────
+    try:
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n'
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="time"\r\n\r\n72h\r\n'
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="fileToUpload"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
+        req = urllib.request.Request(
+            "https://litterbox.catbox.moe/resources/internals/api.php",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            url = resp.read().decode("utf-8").strip()
+        if url.startswith("http"):
+            print(f"  ✅ catbox.moe: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  catbox.moe falló: {e}", flush=True)
+
     raise Exception("Todos los servicios de upload fallaron")
 
 
