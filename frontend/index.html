@@ -913,6 +913,7 @@ function extractAudioUrl(text) {
 function isDirectMedia(url) {
   // URLs that serve media directly (not download pages)
   return /\.(mp4|mp3|webm|ogg)(\?|$)/i.test(url)
+    || url.includes('litter.catbox.moe')
     || url.includes('pixeldrain.com/api/file/')
     || url.includes('transfer.sh')
     || url.includes('uguu.se')

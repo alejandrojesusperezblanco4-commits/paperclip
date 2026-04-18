@@ -150,13 +150,13 @@ def generate_audio(text: str, voice_id: str, api_key: str, output_path: str) -> 
 def upload_file(file_path: str) -> str:
     """
     Sube archivo probando varios servicios hasta que uno funcione.
-    Orden de preferencia — priorizando URLs directas (reproducibles en <audio>):
-      1. Pixeldrain   — PUT directo, URL directa streaming ← PREFERIDO
-      2. transfer.sh  — PUT directo, URL directa
-      3. GoFile       — URL de página (no directa)
-      4. tmpfiles.org — multipart POST
-      5. uguu.se      — multipart POST
-      6. catbox.moe   — litterbox 72h
+    Orden de preferencia — URLs directas primero (reproducibles en <audio>/<video>):
+      1. Litterbox catbox.moe — URL directa litter.catbox.moe/*.mp3  ← PREFERIDO
+      2. tmpfiles.org/dl/     — URL directa
+      3. uguu.se              — URL directa
+      4. Pixeldrain           — URL directa (falla en Railway)
+      5. transfer.sh          — URL directa (falla en Railway)
+      6. GoFile               — URL de página — último recurso
     """
     import mimetypes
     filename  = os.path.basename(file_path)
@@ -169,73 +169,35 @@ def upload_file(file_path: str) -> str:
     size_kb = len(file_data) / 1024
     print(f"  📤 Subiendo {filename} ({size_kb:.0f} KB)...", flush=True)
 
-    # ── 1. Pixeldrain (PUT, URL directa de streaming) ────────────────────────
+    # ── 1. Litterbox catbox.moe (72h, URL directa) ───────────────────────────
     try:
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n'
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="time"\r\n\r\n72h\r\n'
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="fileToUpload"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
         req = urllib.request.Request(
-            f"https://pixeldrain.com/api/file/{filename}",
-            data=file_data,
+            "https://litterbox.catbox.moe/resources/internals/api.php",
+            data=body,
             headers={
-                "Content-Type": mime,
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
                 "User-Agent": "paperclip-agent/1.0",
             },
-            method="PUT"
-        )
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            pd = json.loads(resp.read().decode("utf-8"))
-        file_id = pd.get("id", "")
-        if file_id:
-            url = f"https://pixeldrain.com/api/file/{file_id}"
-            print(f"  ✅ Pixeldrain: {url}", flush=True)
-            return url
-    except Exception as e:
-        print(f"  ⚠️  Pixeldrain falló: {e}", flush=True)
-
-    # ── 2. transfer.sh (PUT) ─────────────────────────────────────────────────
-    try:
-        req = urllib.request.Request(
-            f"https://transfer.sh/{filename}",
-            data=file_data,
-            headers={
-                "Content-Type": mime,
-                "User-Agent": "paperclip-agent/1.0",
-                "Max-Days": "7",
-            },
-            method="PUT"
+            method="POST"
         )
         with urllib.request.urlopen(req, timeout=90) as resp:
             url = resp.read().decode("utf-8").strip()
         if url.startswith("http"):
-            print(f"  ✅ transfer.sh: {url}", flush=True)
+            print(f"  ✅ catbox.moe: {url}", flush=True)
             return url
     except Exception as e:
-        print(f"  ⚠️  transfer.sh falló: {e}", flush=True)
+        print(f"  ⚠️  catbox.moe falló: {e}", flush=True)
 
-    # ── 2. GoFile ─────────────────────────────────────────────────────────────
-    try:
-        with urllib.request.urlopen("https://api.gofile.io/servers", timeout=10) as r:
-            servers_data = json.loads(r.read().decode("utf-8"))
-        server = servers_data["data"]["servers"][0]["name"]
-        body = (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-            f"Content-Type: {mime}\r\n\r\n"
-        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
-        req = urllib.request.Request(
-            f"https://{server}.gofile.io/contents/uploadFile",
-            data=body,
-            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            gf = json.loads(resp.read().decode("utf-8"))
-        url = gf.get("data", {}).get("downloadPage", "")
-        if url.startswith("http"):
-            print(f"  ✅ GoFile: {url}", flush=True)
-            return url
-    except Exception as e:
-        print(f"  ⚠️  GoFile falló: {e}", flush=True)
-
-    # ── 3. tmpfiles.org ───────────────────────────────────────────────────────
+    # ── 2. tmpfiles.org (URL directa /dl/) ───────────────────────────────────
     try:
         body = (
             f"--{boundary}\r\n"
@@ -257,7 +219,7 @@ def upload_file(file_path: str) -> str:
     except Exception as e:
         print(f"  ⚠️  tmpfiles.org falló: {e}", flush=True)
 
-    # ── 4. uguu.se ────────────────────────────────────────────────────────────
+    # ── 3. uguu.se (URL directa) ──────────────────────────────────────────────
     try:
         body = (
             f"--{boundary}\r\n"
@@ -279,30 +241,64 @@ def upload_file(file_path: str) -> str:
     except Exception as e:
         print(f"  ⚠️  uguu.se falló: {e}", flush=True)
 
-    # ── 5. Litterbox catbox.moe (72h) ─────────────────────────────────────────
+    # ── 4. Pixeldrain (URL directa — falla en Railway) ────────────────────────
     try:
+        req = urllib.request.Request(
+            f"https://pixeldrain.com/api/file/{filename}",
+            data=file_data,
+            headers={"Content-Type": mime, "User-Agent": "paperclip-agent/1.0"},
+            method="PUT"
+        )
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            pd = json.loads(resp.read().decode("utf-8"))
+        file_id = pd.get("id", "")
+        if file_id:
+            url = f"https://pixeldrain.com/api/file/{file_id}"
+            print(f"  ✅ Pixeldrain: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  Pixeldrain falló: {e}", flush=True)
+
+    # ── 5. transfer.sh (URL directa — falla en Railway) ──────────────────────
+    try:
+        req = urllib.request.Request(
+            f"https://transfer.sh/{filename}",
+            data=file_data,
+            headers={"Content-Type": mime, "User-Agent": "paperclip-agent/1.0", "Max-Days": "7"},
+            method="PUT"
+        )
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            url = resp.read().decode("utf-8").strip()
+        if url.startswith("http"):
+            print(f"  ✅ transfer.sh: {url}", flush=True)
+            return url
+    except Exception as e:
+        print(f"  ⚠️  transfer.sh falló: {e}", flush=True)
+
+    # ── 6. GoFile (último recurso — URL de página) ────────────────────────────
+    try:
+        with urllib.request.urlopen("https://api.gofile.io/servers", timeout=10) as r:
+            servers_data = json.loads(r.read().decode("utf-8"))
+        server = servers_data["data"]["servers"][0]["name"]
         body = (
             f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n'
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="time"\r\n\r\n72h\r\n'
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="fileToUpload"; filename="{filename}"\r\n'
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
             f"Content-Type: {mime}\r\n\r\n"
         ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
         req = urllib.request.Request(
-            "https://litterbox.catbox.moe/resources/internals/api.php",
+            f"https://{server}.gofile.io/contents/uploadFile",
             data=body,
             headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=90) as resp:
-            url = resp.read().decode("utf-8").strip()
+            gf = json.loads(resp.read().decode("utf-8"))
+        url = gf.get("data", {}).get("downloadPage", "")
         if url.startswith("http"):
-            print(f"  ✅ catbox.moe: {url}", flush=True)
+            print(f"  ✅ GoFile (página): {url}", flush=True)
             return url
     except Exception as e:
-        print(f"  ⚠️  catbox.moe falló: {e}", flush=True)
+        print(f"  ⚠️  GoFile falló: {e}", flush=True)
 
     raise Exception("Todos los servicios de upload fallaron")
 
