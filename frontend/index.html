@@ -872,12 +872,16 @@ async function fetchLastComment(issueId) {
     const data = await res.json();
     const comments = data.comments || data || [];
     if (!Array.isArray(comments) || !comments.length) return '';
-    const sorted = [...comments].sort((a, b) => {
-      const lenA = (a.body || a.content || a.text || '').length;
-      const lenB = (b.body || b.content || b.text || '').length;
-      return lenB - lenA;
-    });
-    return sorted[0].body || sorted[0].content || sorted[0].text || '';
+
+    const getText = c => c.body || c.content || c.text || '';
+
+    // 1. Buscar el comentario del director por su marcador único
+    const directorComment = comments.find(c => getText(c).includes('PAQUETE COMPLETO DE CONTENIDO'));
+    if (directorComment) return getText(directorComment);
+
+    // 2. Fallback: el comentario más largo (heurístico anterior)
+    const sorted = [...comments].sort((a, b) => getText(b).length - getText(a).length);
+    return getText(sorted[0]);
   } catch(e) { return ''; }
 }
 

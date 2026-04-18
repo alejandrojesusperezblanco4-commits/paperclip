@@ -813,35 +813,35 @@ Guión completo:
 <details>
 <summary>🔍 Deep Search - Tendencias completas</summary>
 
-{deep_search_result}
+{deep_search_result[:3000]}
 </details>
 
 <details>
 <summary>🔭 Channel Analyzer - Análisis competencia</summary>
 
-{channel_result}
+{channel_result[:2000]}
 </details>
 
 <details>
 <summary>✨ Storytelling - Guión completo (4-5 escenas)</summary>
 
-{storytelling_result}
+{storytelling_result[:3500]}
 </details>
 
 <details>
 <summary>🪄 Prompt Generator - Prompts de imágenes (5-6)</summary>
 
-{prompt_result}
+{prompt_result[:3500]}
 </details>
 
 <details>
 <summary>🖼️ Imagen Generator - Imágenes generadas con Higgsfield Soul</summary>
 
-{imagen_result}
+{imagen_result[:3000]}
 </details>
-{"<details><summary>🎙️ TTS - Audio narración</summary>" + chr(10) + tts_result + chr(10) + "</details>" if tts_result else ""}
-{"<details><summary>🎬 Video Assembler - Video final</summary>" + chr(10) + video_result + chr(10) + "</details>" if video_result else ""}
-{"<details><summary>📚 Source Reader - Fuentes procesadas</summary>" + chr(10) + source_result + chr(10) + "</details>" if source_result else ""}
+{("<details><summary>🎙️ TTS - Audio narración</summary>" + chr(10) + tts_result[-2000:] + chr(10) + "</details>") if tts_result else ""}
+{("<details><summary>🎬 Video Assembler - Video final</summary>" + chr(10) + video_result[-2000:] + chr(10) + "</details>") if video_result else ""}
+{("<details><summary>📚 Source Reader - Fuentes procesadas</summary>" + chr(10) + source_result[-2000:] + chr(10) + "</details>") if source_result else ""}
 """
     print(output, flush=True)
 
