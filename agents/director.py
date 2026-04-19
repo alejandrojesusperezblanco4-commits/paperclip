@@ -429,7 +429,9 @@ def main():
         # Detectar URLs en el body para saber si hay source ingestion
         _body_urls = _re.findall(r"https?://[^\s<>\"'\)\]]+", issue_body) if issue_body else []
         _has_src   = len(_body_urls) > 0
-        _total_agents = (1 if _has_src else 0) + (7 if has_tts and has_hf else 5)
+        # Agentes base: DS + CA + Story + Prompt = 4
+        # Con TTS: +1, con Higgsfield: +Imagen +VP Generator +Imagen Video +VA = +4
+        _total_agents = (1 if _has_src else 0) + 4 + (1 if has_tts else 0) + (4 if has_hf else 0)
 
         # ── Kickoff message ──────────────────────────────────────
         _phase  = 1
@@ -454,8 +456,10 @@ def main():
         _phases += f"{_phase}️⃣ **Prompt Generator** — prompts de imagen por escena\n"; _phase += 1
         if has_hf:
             _phases += f"{_phase}️⃣ **Imagen Generator** — imágenes con Higgsfield Soul\n"; _phase += 1
+            _phases += f"{_phase}️⃣ **Video Prompt Generator** — motion prompts por escena\n"; _phase += 1
+            _phases += f"{_phase}️⃣ **Imagen Video** — clips animados con Higgsfield DOP\n"; _phase += 1
         if has_tts and has_hf:
-            _phases += f"{_phase}️⃣ **Video Assembler** — MP4 final con voz en off\n"; _phase += 1
+            _phases += f"{_phase}️⃣ **Video Assembler** — MP4 final 9:16 con voz en off\n"; _phase += 1
 
         _eta = 10 if _has_src and has_tts and has_hf else (8 if has_tts and has_hf else 5)
 
