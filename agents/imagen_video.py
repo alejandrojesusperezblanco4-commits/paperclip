@@ -27,7 +27,7 @@ import urllib.error
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
-from api_client import post_issue_result, post_issue_comment, resolve_issue_context
+from api_client import post_issue_result, post_issue_comment, resolve_issue_context, post_parent_update
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -334,6 +334,9 @@ def main():
     output = "\n".join(lines)
     print(output, flush=True)
     post_issue_result(output)
+    # Notificar al issue padre (Director) para que Studio muestre los clips
+    # aunque el Director ya haya cerrado su issue
+    post_parent_update("imagen_video", output)
 
 
 if __name__ == "__main__":

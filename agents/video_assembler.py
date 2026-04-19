@@ -14,7 +14,7 @@ import subprocess
 import time
 import urllib.request
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
-from api_client import post_issue_result, post_issue_comment, resolve_issue_context
+from api_client import post_issue_result, post_issue_comment, resolve_issue_context, post_parent_update
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -623,14 +623,19 @@ def main():
     }, ensure_ascii=False, indent=2)
 
     print(result)
-    post_issue_result(
+    _va_output = (
         "🎬 **Video listo**\n\n"
         + (f"📥 [Descargar MP4]({video_url})\n" if video_url else "")
+        + (f"**FINAL_VIDEO_URL:** {video_url}\n" if video_url else "")
         + f"🎞️ Modo: {mode_label} — {scenes} escenas — {round(total_dur)}s\n"
         f"📦 {file_size/1024/1024:.1f} MB\n"
         f"{'🎙️ Con voz en off' if audio_path else '⚠️ Sin audio'}\n\n"
         "Listo para TikTok, Reels y YouTube Shorts. 🚀"
     )
+    post_issue_result(_va_output)
+    # Notificar al issue padre (Director) para que Studio muestre el video final
+    # aunque el Director ya haya cerrado su issue
+    post_parent_update("video_assembler", _va_output)
 
 
 if __name__ == "__main__":

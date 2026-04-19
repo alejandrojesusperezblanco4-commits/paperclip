@@ -587,6 +587,9 @@ def main():
             sub_env.pop("PAPERCLIP_ISSUE_ID", None)
         sub_env.pop("PAPERCLIP_ISSUE_TITLE", None)
         sub_env.pop("PAPERCLIP_ISSUE_BODY", None)
+        # Pasar ID del issue padre para que los sub-agentes puedan notificar Studio directamente
+        if issue_id:
+            sub_env["PAPERCLIP_PARENT_ISSUE_ID"] = issue_id
 
         # Video Assembler necesita hasta 270s (ffmpeg por imagen a ultrafast).
         # TTS necesita ~90s (ElevenLabs + upload).

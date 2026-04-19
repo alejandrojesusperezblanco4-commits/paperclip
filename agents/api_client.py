@@ -212,6 +212,49 @@ def post_issue_comment(message: str) -> None:
         pass
 
 
+def post_parent_update(agent_name: str, output: str) -> None:
+    """Publica actualización al issue PADRE cuando un sub-agente termina de forma asíncrona.
+    Esto permite que Studio muestre los resultados de Imagen Video y Video Assembler
+    aunque el Director ya haya cerrado su issue.
+    Usa un marcador especial que Studio detecta al hacer polling de comentarios."""
+    parent_id = os.environ.get("PAPERCLIP_PARENT_ISSUE_ID", "").strip()
+    api_url   = os.environ.get("PAPERCLIP_API_URL", "http://localhost:7777").strip()
+    if not parent_id or not api_url:
+        return
+
+    headers = {"Content-Type": "application/json"}
+    api_key = os.environ.get("PAPERCLIP_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    else:
+        agent_id   = os.environ.get("PAPERCLIP_AGENT_ID", "")
+        company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
+        run_id     = os.environ.get("PAPERCLIP_RUN_ID", "agent-run")
+        secret     = (os.environ.get("PAPERCLIP_AGENT_JWT_SECRET") or
+                      os.environ.get("BETTER_AUTH_SECRET", "")).strip()
+        if secret and agent_id:
+            try:
+                token = _make_jwt(agent_id, company_id, run_id, secret)
+                headers["Authorization"] = f"Bearer {token}"
+            except Exception:
+                pass
+
+    # Marcador especial que Studio detecta al hacer polling
+    marker = f"<!--PC_AGENT_UPDATE:{agent_name}-->\n{output[:9500]}"
+    data = json.dumps({"body": marker}).encode("utf-8")
+    req  = urllib.request.Request(
+        f"{api_url}/api/issues/{parent_id}/comments",
+        data=data, headers=headers, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15): pass
+        print(f"✅ Studio notificado → issue padre {parent_id} ({agent_name})",
+              file=__import__("sys").stderr, flush=True)
+    except Exception as e:
+        print(f"⚠️  No se pudo notificar al issue padre: {e}",
+              file=__import__("sys").stderr, flush=True)
+
+
 def post_issue_result(output: str) -> None:
     """Cierra el issue de Paperclip y publica el output como comentario.
     Lee las variables de entorno que Paperclip inyecta automáticamente.

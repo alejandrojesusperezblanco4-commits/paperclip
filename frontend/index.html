@@ -715,8 +715,10 @@ const SUB_STAGE_MAP = [
 ──────────────────────────────────────── */
 let currentAgent   = 'director';
 let currentIssueId = null;
-let pollTimer      = null;
-let subPollTimer   = null;
+let pollTimer        = null;
+let subPollTimer     = null;
+let agentUpdateTimer = null;    // sondea comentarios del issue padre tras cierre del Director
+let agentUpdatesFound = new Set(); // qué agentes ya notificaron
 let startTime      = null;
 let runHistory     = JSON.parse(localStorage.getItem('hs_history') || '[]');
 
@@ -866,12 +868,18 @@ async function pollMain() {
       const raw = await fetchLastComment(currentIssueId);
       showResults(raw, data);
       saveHistory({ id: currentIssueId, agent: currentAgent, topic: document.getElementById('topicInput').value.trim(), ts: Date.now(), raw });
-      if (AGENTS[currentAgent].showPipeline) activatePipelineNav();
+      if (AGENTS[currentAgent].showPipeline) {
+        activatePipelineNav();
+        // Imagen Video y Video Assembler terminan DESPUÉS del Director.
+        // Seguir sondeando comentarios del issue para detectar su llegada.
+        startAgentUpdatePolling(currentIssueId);
+      }
       resetUI(false);
 
     } else if (status === 'cancelled') {
       clearInterval(pollTimer);
       clearInterval(subPollTimer);
+      clearInterval(agentUpdateTimer);
       startTime = null;
       showError('El pipeline fue cancelado.');
       resetUI();
@@ -1183,6 +1191,7 @@ function buildDirectorResult(raw) {
   const imageUrls = extractImageUrls(raw);
   const videoUrl  = extractVideoUrl(raw);
   const audioUrl  = extractAudioUrl(raw);
+  const topic     = (document.getElementById('topicInput')?.value || '').trim();
 
   const detailsIdx = raw.indexOf('<details>');
   const synthesis  = detailsIdx > 0 ? raw.slice(0, detailsIdx).trim() : raw;
@@ -1283,13 +1292,23 @@ function buildDirectorResult(raw) {
     }
   } catch(e) {}
 
+  // Fusionar con clips acumulados de runs anteriores del mismo tema (Punto 2)
+  if (directorClips.length) accumulateContent(topic, 'clips', directorClips);
+  const allAccumClips = getAccumulated(topic, 'clips');
+  const mergedClips = allAccumClips.length ? allAccumClips : directorClips;
+
+  // Fusionar video final acumulado
+  if (videoUrl) accumulateContent(topic, 'videos', [videoUrl]);
+  const accumVideos = getAccumulated(topic, 'videos');
+  const mergedVideoUrl = accumVideos.length ? accumVideos[accumVideos.length - 1] : videoUrl;
+
   const nImages = richImages.filter(i=>i.url).length || imageUrls.length;
 
   return `
     <div class="art-tabs" id="artTabs">
       <button class="art-tab active" data-art="summary" onclick="switchArtTab('summary',this)">🎬 Resumen</button>
-      ${videoUrl ? `<button class="art-tab" data-art="videoTab" onclick="switchArtTab('videoTab',this)">📱 Video</button>` : ''}
-      ${directorClips.length ? `<button class="art-tab" data-art="clipsTab" onclick="switchArtTab('clipsTab',this)">🎬 Clips · ${directorClips.length}</button>` : ''}
+      ${mergedVideoUrl ? `<button class="art-tab" data-art="videoTab" onclick="switchArtTab('videoTab',this)">📱 Video</button>` : ''}
+      ${mergedClips.length ? `<button class="art-tab" data-art="clipsTab" onclick="switchArtTab('clipsTab',this)">🎬 Clips · ${mergedClips.length}</button>` : '<button class="art-tab" data-art="clipsTab" onclick="switchArtTab(\'clipsTab\',this)" style="opacity:0.5">🎬 Clips (en proceso…)</button>'}
       <button class="art-tab" data-art="images" onclick="switchArtTab('images',this)">🖼️ Imágenes${nImages ? ' · '+nImages : ''}</button>
       <button class="art-tab" data-art="story" onclick="switchArtTab('story',this)">✍️ Guión</button>
       <button class="art-tab" data-art="search" onclick="switchArtTab('search',this)">🔍 Deep Search</button>
@@ -1307,24 +1326,34 @@ function buildDirectorResult(raw) {
 
     <div id="art-panel-clipsTab" class="art-panel">
       <div class="card">
-        <div class="card-header"><span class="card-icon">🎬</span><span class="card-title">Clips animados · ${directorClips.length}</span></div>
-        ${directorClips.length
-          ? directorClips.map((url,i) => {
+        <div class="card-header">
+          <span class="card-icon">🎬</span>
+          <span class="card-title">Clips animados · ${mergedClips.length}${mergedClips.length === 0 ? ' <span style="color:var(--sub);font-size:10px">(Imagen Video aún procesando…)</span>' : ''}</span>
+        </div>
+        ${mergedClips.length
+          ? mergedClips.map((url, i) => {
               const direct = isDirectMedia(url);
               return `<div style="margin-bottom:20px">
-                <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px">Clip Escena ${i+1}</div>
+                <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px">🎬 Clip Escena ${i+1}</div>
                 <div class="video-wrap" style="max-width:220px;margin:0 0 8px">
                   ${direct
                     ? `<video controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain"><source src="${escHtml(url)}" type="video/mp4"></video>`
                     : `<div class="video-placeholder"><div class="big-icon">🎬</div><div style="font-size:11px">Abre el link</div></div>`
                   }
                 </div>
-                <a href="${escHtml(url)}" target="_blank" rel="noopener" class="btn-download" style="font-size:11px;padding:6px 12px">
-                  ${direct ? '⬇️ Descargar' : '▶️ Abrir'}
-                </a>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <a href="${escHtml(url)}" target="_blank" rel="noopener" class="btn-download" style="font-size:11px;padding:6px 12px">
+                    ${direct ? '⬇️ Descargar' : '▶️ Abrir'}
+                  </a>
+                  ${direct ? `<a href="${escHtml(url)}" target="_blank" rel="noopener" class="btn-download secondary" style="font-size:11px;padding:6px 12px">🔗 Nueva pestaña</a>` : ''}
+                </div>
               </div>`;
             }).join('')
-          : `<div style="color:var(--sub);font-size:12px;padding:12px 0">Sin clips en este pipeline</div>`
+          : `<div style="color:var(--sub);font-size:12px;padding:20px 0;text-align:center">
+              <div style="font-size:24px;margin-bottom:8px">⏳</div>
+              <div>Imagen Video sigue animando…</div>
+              <div style="font-size:11px;margin-top:4px">Studio actualizará esta pestaña automáticamente cuando termine.</div>
+            </div>`
         }
       </div>
     </div>
@@ -1649,6 +1678,11 @@ function loadHistory(idx) {
 ──────────────────────────────────────── */
 function resetUI(withWaiting=true) {
   currentIssueId = null;
+  if (withWaiting) {
+    // Si se reinicia completamente, parar el polling de agentes tardíos
+    clearInterval(agentUpdateTimer);
+    agentUpdatesFound.clear();
+  }
   const cfg = AGENTS[currentAgent];
   document.getElementById('btnRun').disabled  = false;
   document.getElementById('btnRun').innerHTML = `${cfg.icon} Ejecutar ${cfg.name}`;
@@ -1718,6 +1752,208 @@ function activatePipelineNav() {
     el.onclick = () => switchArtTab(tabId, null);
     el.title = 'Ver resultado de este agente';
   });
+}
+
+/* ────────────────────────────────────────
+   AGENT UPDATE POLLING
+   Sondea comentarios del issue del Director después de que cierra.
+   Imagen Video y Video Assembler publican con el marcador
+   <!--PC_AGENT_UPDATE:AGENTNAME--> cuando terminan.
+──────────────────────────────────────── */
+function normalizeAccumKey(s) {
+  return 'pc_accum_' + s.toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,80);
+}
+
+function accumulateContent(topic, type, newItems) {
+  if (!topic || !newItems.length) return;
+  const key = normalizeAccumKey(topic);
+  const stored = JSON.parse(localStorage.getItem(key) || '{}');
+  const existing = stored[type] || [];
+  stored[type] = [...new Set([...existing, ...newItems])]; // dedup por URL
+  stored.ts = Date.now();
+  localStorage.setItem(key, JSON.stringify(stored));
+}
+
+function getAccumulated(topic, type) {
+  if (!topic) return [];
+  const key = normalizeAccumKey(topic);
+  const stored = JSON.parse(localStorage.getItem(key) || '{}');
+  return stored[type] || [];
+}
+
+function startAgentUpdatePolling(issueId) {
+  if (agentUpdateTimer) clearInterval(agentUpdateTimer);
+  agentUpdatesFound.clear();
+  const MAX_MS = 15 * 60 * 1000; // 15 minutos
+  const pollStart = Date.now();
+
+  agentUpdateTimer = setInterval(async () => {
+    if (Date.now() - pollStart > MAX_MS) {
+      clearInterval(agentUpdateTimer);
+      return;
+    }
+    await checkAgentUpdates(issueId);
+    // Parar cuando ambos agentes de video hayan reportado
+    if (agentUpdatesFound.has('imagen_video') && agentUpdatesFound.has('video_assembler')) {
+      clearInterval(agentUpdateTimer);
+    }
+  }, 8000);
+}
+
+async function checkAgentUpdates(issueId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/issues/${issueId}/comments`, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const comments = data.comments || data || [];
+    if (!Array.isArray(comments)) return;
+
+    for (const c of comments) {
+      const body = c.body || c.content || c.text || '';
+      const match = body.match(/<!--PC_AGENT_UPDATE:(\w+)-->\n?([\s\S]*)/);
+      if (!match) continue;
+      const agentName = match[1];
+      const content   = match[2];
+      if (agentUpdatesFound.has(agentName)) continue; // ya procesado
+
+      agentUpdatesFound.add(agentName);
+      applyAgentUpdate(agentName, content);
+    }
+  } catch(e) { /* silencioso */ }
+}
+
+function applyAgentUpdate(agentName, content) {
+  const topic = (document.getElementById('topicInput')?.value || '').trim();
+
+  if (agentName === 'imagen_video') {
+    // Extraer clips del contenido del agente
+    let newClips = [];
+    try {
+      const jm = content.match(/```json\s*([\s\S]+?)```/);
+      if (jm) newClips = (JSON.parse(jm[1]).video_clips || []).filter(Boolean);
+    } catch(e) {}
+    if (!newClips.length) {
+      for (const m of content.matchAll(/\*\*VIDEO_CLIP:\*\*\s*(https?:\/\/[^\s\n]+)/g)) newClips.push(m[1]);
+    }
+    if (!newClips.length) {
+      for (const m of content.matchAll(/https?:\/\/[^\s"')\]]+\.mp4/gi)) newClips.push(m[0]);
+    }
+
+    if (newClips.length) {
+      accumulateContent(topic, 'clips', newClips);
+      const allClips = getAccumulated(topic, 'clips');
+      updateClipsPanel(allClips.length ? allClips : newClips);
+      setStage('imagen_video', 'done');
+    }
+  }
+
+  if (agentName === 'video_assembler') {
+    const videoUrl = extractVideoUrl(content);
+    // Buscar también FINAL_VIDEO_URL
+    const finalMatch = content.match(/\*\*FINAL_VIDEO_URL:\*\*\s*(https?:\/\/[^\s\n]+)/);
+    const url = finalMatch ? finalMatch[1] : videoUrl;
+
+    if (url) {
+      accumulateContent(topic, 'videos', [url]);
+      updateVideoPanel(url, content);
+      setStage('video', 'done');
+    }
+  }
+}
+
+function updateClipsPanel(clips) {
+  if (!clips || !clips.length) return;
+  const panel = document.getElementById('art-panel-clipsTab');
+  if (!panel) return;
+
+  // Añadir o actualizar el botón de la pestaña
+  const tabs = document.getElementById('artTabs');
+  if (tabs) {
+    let btn = tabs.querySelector('[data-art="clipsTab"]');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'art-tab';
+      btn.dataset.art = 'clipsTab';
+      btn.onclick = () => switchArtTab('clipsTab', btn);
+      tabs.appendChild(btn);
+    }
+    btn.innerHTML = `🎬 Clips · ${clips.length}`;
+  }
+
+  // Renderizar contenido del panel
+  panel.innerHTML = `<div class="card">
+    <div class="card-header">
+      <span class="card-icon">🎬</span>
+      <span class="card-title">Clips animados · ${clips.length} <span style="color:#4ade80;font-size:10px;margin-left:6px">✓ Actualizado</span></span>
+    </div>
+    ${clips.map((url, i) => {
+      const direct = isDirectMedia(url);
+      return `<div style="margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px">🎬 Clip Escena ${i + 1}</div>
+        <div class="video-wrap" style="max-width:240px;margin:0 0 10px">
+          ${direct
+            ? `<video controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain"><source src="${escHtml(url)}" type="video/mp4"></video>`
+            : `<div class="video-placeholder"><div class="big-icon">🎬</div><div style="font-size:11px">Abre el link</div></div>`
+          }
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a href="${escHtml(url)}" target="_blank" rel="noopener" class="btn-download" style="font-size:11px;padding:6px 12px">
+            ${direct ? '⬇️ Descargar clip' : '▶️ Abrir clip'}
+          </a>
+          ${direct ? `<a href="${escHtml(url)}" target="_blank" rel="noopener" class="btn-download secondary" style="font-size:11px;padding:6px 12px">🔗 Nueva pestaña</a>` : ''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  // Auto-cambiar a la pestaña de clips cuando llegan
+  switchArtTab('clipsTab', document.querySelector('[data-art="clipsTab"]'));
+}
+
+function updateVideoPanel(videoUrl, raw) {
+  if (!videoUrl) return;
+  const panel = document.getElementById('art-panel-videoTab');
+  if (!panel) return;
+
+  // Añadir o actualizar botón de pestaña
+  const tabs = document.getElementById('artTabs');
+  if (tabs) {
+    let btn = tabs.querySelector('[data-art="videoTab"]');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'art-tab';
+      btn.dataset.art = 'videoTab';
+      btn.onclick = () => switchArtTab('videoTab', btn);
+      // Insertar justo después del botón de clips si existe
+      const clipsBtn = tabs.querySelector('[data-art="clipsTab"]');
+      if (clipsBtn) clipsBtn.after(btn);
+      else tabs.appendChild(btn);
+    }
+    btn.innerHTML = `📱 Video`;
+  }
+
+  const isDirect = isDirectMedia(videoUrl);
+  panel.innerHTML = `<div class="card">
+    <div class="card-header">
+      <span class="card-icon">📱</span>
+      <span class="card-title">Video MP4 9:16 <span style="color:#4ade80;font-size:10px;margin-left:6px">✓ Listo</span></span>
+    </div>
+    <div class="video-wrap" style="margin-bottom:16px">
+      ${isDirect
+        ? `<video controls playsinline preload="metadata"><source src="${escHtml(videoUrl)}" type="video/mp4"></video>`
+        : `<div class="video-placeholder"><div class="big-icon">🎬</div><div style="font-weight:600;color:var(--text)">Video listo</div><div style="font-size:11px">Abre el link para reproducirlo</div></div>`
+      }
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a href="${escHtml(videoUrl)}" target="_blank" rel="noopener" class="btn-download">
+        ${isDirect ? '⬇️ Descargar MP4' : '▶️ Abrir video'}
+      </a>
+      ${isDirect ? `<a href="${escHtml(videoUrl)}" target="_blank" rel="noopener" class="btn-download secondary">🔗 Nueva pestaña</a>` : ''}
+    </div>
+  </div>`;
+
+  // Auto-cambiar a la pestaña de video cuando llega
+  switchArtTab('videoTab', document.querySelector('[data-art="videoTab"]'));
 }
 
 /* ── Init ── */
