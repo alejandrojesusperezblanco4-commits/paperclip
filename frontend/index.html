@@ -1812,36 +1812,27 @@ function startAgentUpdatePolling(issueId) {
 }
 
 async function checkAgentUpdates(issueId) {
-  // Estrategia: sondear sub-issues por parentId.
-  // Paperclip no permite comentarios ni cambios en issues cerrados (409),
-  // así que no podemos leer comentarios del issue del Director.
-  // En cambio, leemos los sub-issues que Paperclip sí mantiene accesibles.
+  // Los agentes imagen_video y video_assembler llaman post_parent_update()
+  // que publica <!--PC_AGENT_UPDATE:NOMBRE--> en el issue del Director.
+  // Paperclip SÍ permite leer (GET) comentarios de issues cerrados.
+  // Los agentes también PUEDEN escribir (POST) en issues cerrados de otros agentes.
   try {
-    const res = await fetch(
-      `${API_BASE}/api/companies/${COMPANY_ID}/issues?parentId=${issueId}&limit=30`,
-      { credentials: 'include' }
-    );
+    const res = await fetch(`${API_BASE}/api/issues/${issueId}/comments`, { credentials: 'include' });
     if (!res.ok) return;
     const data = await res.json();
-    const issues = data.issues || data || [];
-    if (!Array.isArray(issues)) return;
+    const comments = data.comments || data || [];
+    if (!Array.isArray(comments)) return;
 
-    for (const iss of issues) {
-      const title  = (iss.title || '').toLowerCase();
-      const status = (iss.status || '').toLowerCase();
-      if (status !== 'done') continue;
+    for (const c of comments) {
+      const body = c.body || c.content || c.text || '';
+      const match = body.match(/<!--PC_AGENT_UPDATE:(\w+)-->\n?([\s\S]*)/);
+      if (!match) continue;
+      const agentName = match[1];
+      const content   = match[2];
+      if (agentUpdatesFound.has(agentName)) continue; // ya procesado
 
-      if (title.includes('imagen video') && !agentUpdatesFound.has('imagen_video')) {
-        agentUpdatesFound.add('imagen_video');
-        const result = await fetchLastComment(iss.id);
-        if (result) applyAgentUpdate('imagen_video', result);
-      }
-
-      if ((title.includes('video assembler') || title.includes('assembler')) && !agentUpdatesFound.has('video_assembler')) {
-        agentUpdatesFound.add('video_assembler');
-        const result = await fetchLastComment(iss.id);
-        if (result) applyAgentUpdate('video_assembler', result);
-      }
+      agentUpdatesFound.add(agentName);
+      applyAgentUpdate(agentName, content);
     }
   } catch(e) { /* silencioso */ }
 }
