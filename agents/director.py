@@ -30,14 +30,16 @@ sys.stderr.reconfigure(encoding="utf-8")
 
 # ── IDs de los sub-agentes registrados en Paperclip ─────────────────────────
 SUB_AGENT_IDS = {
-    "source_reader":     "a6cc7b6e-cde3-4464-9cbf-3241b979dc6b",
-    "deep_search":       "a1d8d0b8-9ada-4980-9b5f-663b34ba2c80",
-    "channel_analyzer":  "0f784ca9-93b0-4384-ba7c-1e079bb8797b",
-    "storytelling":      "061ed6b8-27b1-4a31-8758-19af856b45d3",
-    "prompt_generator":  "64e2cb07-75e1-4ca2-8b6c-05a78b66613f",
-    "imagen_generator":  "2492962a-b9f0-4611-90e2-c7ccca5aa281",
-    "tts":               "0d43b313-77b5-481b-83cc-a41485823f8e",
-    "video_assembler":   "28f0a4aa-a230-4d82-aedf-4c327ab4a506",
+    "source_reader":        "a6cc7b6e-cde3-4464-9cbf-3241b979dc6b",
+    "deep_search":          "a1d8d0b8-9ada-4980-9b5f-663b34ba2c80",
+    "channel_analyzer":     "0f784ca9-93b0-4384-ba7c-1e079bb8797b",
+    "storytelling":         "061ed6b8-27b1-4a31-8758-19af856b45d3",
+    "prompt_generator":     "64e2cb07-75e1-4ca2-8b6c-05a78b66613f",
+    "imagen_generator":     "2492962a-b9f0-4611-90e2-c7ccca5aa281",
+    "video_prompt_generator": "",   # nuevo — sin ID Paperclip aún → subprocess directo
+    "imagen_video":         "",     # nuevo — sin ID Paperclip aún → subprocess directo
+    "tts":                  "0d43b313-77b5-481b-83cc-a41485823f8e",
+    "video_assembler":      "28f0a4aa-a230-4d82-aedf-4c327ab4a506",
 }
 
 AGENTS_DIR = Path(__file__).parent
@@ -507,7 +509,8 @@ def main():
     # directo como subprocess para no desperdiciar tiempo en el timeout de 240s.
     # El Director tiene un límite de ~300s en Railway — si TTS espera 240s, muere todo.
     # Estos agentes se crean como sub-issue (visibilidad en inbox) pero se ejecutan localmente.
-    SUBPROCESS_ONLY = {"tts", "video_assembler", "source_reader"}
+    SUBPROCESS_ONLY = {"tts", "video_assembler", "source_reader",
+                        "video_prompt_generator", "imagen_video"}
 
     # ── Helper: orquesta un sub-agente vía Paperclip ──────────
     def run_tracked(script: str, task: str, label: str, agent_key: str,
@@ -702,34 +705,75 @@ Guión completo:
     else:
         print("⚠️  HIGGSFIELD_API_KEY no encontrada — saltando Imagen Generator", flush=True)
 
-    # ── Fase 5: Video (imágenes + voz) ───────────────────────
+    # ── Extraer URLs de imágenes ──────────────────────────────
+    _ext_urls  = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
+    _bold_urls = _re.findall(r"\*\*URL:\*\*\s*(https?://\S+)", imagen_result)
+    _md_urls   = _re.findall(r"\]\((https?://[^\s)]+)\)", imagen_result)
+    _img_urls  = list(dict.fromkeys(_ext_urls + _bold_urls + _md_urls))
+    print(f"  🖼️  URLs de imágenes detectadas: {len(_img_urls)}", flush=True)
+    for _u in _img_urls[:6]:
+        print(f"     • {_u[:90]}", flush=True)
+
+    # ── Fase 6b: Video Prompt Generator (motion prompts) ─────
+    video_prompt_result = ""
+    if higgsfield_key and _img_urls:
+        post_issue_comment("🎬 **Fase 6b — Video Prompt Generator** en progreso… diseñando movimientos de cámara…")
+        _vp_task = sanitize(
+            storytelling_result[:1500] + "\n\n---\n\n" +
+            "\n".join(f"Escena {i+1}: {u}" for i, u in enumerate(_img_urls))
+        )
+        video_prompt_result = run_tracked(
+            "video_prompt_generator.py", _vp_task,
+            "Video Prompt Generator — Motion prompts", "video_prompt_generator",
+        )
+
+    # ── Fase 6c: Imagen Video — Higgsfield DOP (animar imágenes) ─
+    imagen_video_result = ""
+    _video_clip_urls    = []
+    if higgsfield_key and video_prompt_result and _img_urls:
+        post_issue_comment("🎞️ **Fase 6c — Imagen Video (DOP)** en progreso… animando cada imagen (3-5 min)…")
+        imagen_video_result = run_tracked(
+            "imagen_video.py", video_prompt_result,
+            "Imagen Video — Higgsfield DOP", "imagen_video",
+            extra_env={"HIGGSFIELD_API_KEY": higgsfield_key},
+            paperclip_timeout=60,
+        )
+        # Extraer URLs de clips animados del output
+        _clip_bold = _re.findall(r"\*\*VIDEO_CLIP:\*\*\s*(https?://\S+)", imagen_video_result)
+        _clip_json = []
+        try:
+            _jm = _re.search(r'"video_clips"\s*:\s*(\[[\s\S]*?\])', imagen_video_result)
+            if _jm:
+                _clip_json = [u for u in json.loads(_jm.group(1)) if u]
+        except Exception:
+            pass
+        _video_clip_urls = list(dict.fromkeys(_clip_bold + _clip_json))
+        print(f"  🎞️  Clips animados detectados: {len(_video_clip_urls)}", flush=True)
+        for _u in _video_clip_urls[:6]:
+            print(f"     • {_u[:90]}", flush=True)
+
+    # ── Fase 7: Video Assembler (clips o imágenes + voz) ─────
     video_result = ""
     video_url    = ""
     if elevenlabs_key and higgsfield_key:
-        # Extraer URLs de imágenes para pasarlas al video assembler
-        # 1. URLs con extensión conocida (.png/.jpg/.jpeg/.webp)
-        _ext_urls  = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
-        # 2. **URL:** formato que imagen.py escribe explícitamente — más fiable que markdown
-        _bold_urls = _re.findall(r"\*\*URL:\*\*\s*(https?://\S+)", imagen_result)
-        # 3. URLs en sintaxis markdown ](url) — permisivo, no depende del label
-        _md_urls   = _re.findall(r"\]\((https?://[^\s)]+)\)", imagen_result)
-        _img_urls  = list(dict.fromkeys(_ext_urls + _bold_urls + _md_urls))
-        print(f"  🖼️  URLs de imágenes detectadas: {len(_img_urls)}", flush=True)
-        for _u in _img_urls[:6]:
-            print(f"     • {_u[:90]}", flush=True)
-        if _img_urls:
+        # Preferir clips animados; si falló DOP, usar imágenes estáticas como fallback
+        _use_clips  = bool(_video_clip_urls)
+        _use_images = bool(_img_urls) and not _use_clips
+
+        if _use_clips or _use_images:
             video_task = sanitize(json.dumps({
-                "image_urls": _img_urls,
-                "audio_path": audio_path,
-                "audio_url":  audio_url_tts,   # fallback si audio_path no existe en el contenedor
-                "tema": objetivo[:100],
+                "video_clips":  _video_clip_urls,   # clips animados (vacío → usa imágenes)
+                "image_urls":   _img_urls,          # fallback si no hay clips
+                "audio_path":   audio_path,
+                "audio_url":    audio_url_tts,
+                "tema":         objetivo[:100],
             }, ensure_ascii=False))
-            post_issue_comment("🎬 **Fase 7 — Video Assembler** en progreso… ensamblando MP4 final…")
+            _mode = "clips animados" if _use_clips else "imágenes estáticas (fallback)"
+            post_issue_comment(f"🎬 **Fase 7 — Video Assembler** en progreso… ensamblando con {_mode}…")
             video_result = run_tracked("video_assembler.py", video_task,
                                        "Video Assembler — MP4 final", "video_assembler",
                                        paperclip_timeout=60)
             try:
-                # video_result es stdout mixto — extraer bloque JSON
                 _vid_match = _re.search(r'\{[\s\S]*?"video_url"[\s\S]*?\}', video_result)
                 if _vid_match:
                     _vid_data = json.loads(_vid_match.group(0))
@@ -737,7 +781,7 @@ Guión completo:
             except Exception:
                 pass
         else:
-            print("⚠️  Sin imágenes o audio — saltando Video Assembler", flush=True)
+            print("⚠️  Sin imágenes ni clips — saltando Video Assembler", flush=True)
 
     # ── Síntesis ejecutiva ────────────────────────────────────
     print(f"\n{'='*60}", flush=True)

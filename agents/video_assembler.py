@@ -80,6 +80,117 @@ def extract_image_urls(text: str) -> list:
     return list(dict.fromkeys(urls))
 
 
+def download_video_clip(url: str, path: str) -> bool:
+    """Descarga un clip de video MP4 desde URL."""
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept":          "*/*",
+        "Accept-Encoding": "identity",
+        "Referer":         "https://cloud.higgsfield.ai/",
+    }
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=120) as r:
+            data = r.read()
+        if len(data) < 5000:
+            print(f"  ⚠️  Clip demasiado pequeño ({len(data)}B): {url[:70]}", flush=True)
+            return False
+        with open(path, "wb") as f:
+            f.write(data)
+        print(f"  ✅ Clip descargado: {path} ({len(data)//1024}KB)", flush=True)
+        return True
+    except Exception as e:
+        print(f"  ⚠️  Error descargando clip {url[:70]}: {e}", flush=True)
+        return False
+
+
+def assemble_from_clips(clip_paths: list, audio_path: str,
+                        output_path: str) -> tuple:
+    """
+    Concatena clips MP4 pre-animados y añade audio.
+    Devuelve (ok: bool, total_dur: float).
+    """
+    work_dir = os.path.dirname(output_path)
+
+    # Normalizar todos los clips a la misma resolución/fps para concat
+    norm_clips = []
+    scale_filter = (
+        "scale=720:1280:force_original_aspect_ratio=decrease,"
+        "pad=720:1280:(ow-iw)/2:(oh-ih)/2:black,fps=24"
+    )
+    for i, src in enumerate(clip_paths):
+        dst = os.path.join(work_dir, f"norm_clip_{i:02d}.mp4")
+        cmd = [
+            "ffmpeg", "-y", "-i", src,
+            "-vf", scale_filter,
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+            "-pix_fmt", "yuv420p", "-an", dst,
+        ]
+        print(f"  🔄 Normalizando clip {i+1}/{len(clip_paths)}...", flush=True)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if r.returncode == 0 and os.path.exists(dst) and os.path.getsize(dst) > 1000:
+            norm_clips.append(dst)
+            print(f"  ✅ Clip {i+1} normalizado ({os.path.getsize(dst)//1024}KB)", flush=True)
+        else:
+            print(f"  ⚠️  Clip {i+1} no se pudo normalizar — omitido", flush=True)
+            print(f"     stderr: {r.stderr[-400:]}", flush=True)
+
+    if not norm_clips:
+        print("  ❌ Sin clips normalizados", flush=True)
+        return False, 0.0
+
+    # Concatenar clips
+    if len(norm_clips) == 1:
+        silent_video = norm_clips[0]
+    else:
+        filelist = os.path.join(work_dir, "norm_clips_list.txt")
+        with open(filelist, "w") as f:
+            for c in norm_clips:
+                f.write(f"file '{c}'\n")
+        silent_video = os.path.join(work_dir, "silent_from_clips.mp4")
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0", "-i", filelist,
+            "-c", "copy", silent_video,
+        ]
+        print(f"  🔗 Concatenando {len(norm_clips)} clips...", flush=True)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            print(f"  ❌ Concat falló:\n{r.stderr[-600:]}", flush=True)
+            return False, 0.0
+
+    total_dur = get_audio_duration(silent_video)
+
+    # Añadir audio
+    has_audio = bool(audio_path and os.path.exists(audio_path))
+    if has_audio:
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", silent_video, "-i", audio_path,
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart", "-shortest",
+            output_path,
+        ]
+    else:
+        cmd = [
+            "ffmpeg", "-y", "-i", silent_video,
+            "-c", "copy", "-movflags", "+faststart",
+            output_path,
+        ]
+    print(f"  🎙️  {'Muxeando audio...' if has_audio else 'Video sin audio...'}", flush=True)
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if r.returncode != 0:
+        print(f"  ❌ Mux falló:\n{r.stderr[-600:]}", flush=True)
+        return False, total_dur
+
+    print(f"  ✅ Video ensamblado desde clips: {output_path} ({os.path.getsize(output_path)//1024}KB)", flush=True)
+    return True, total_dur
+
+
 def extract_audio_url(text: str) -> str:
     """Extrae URL de audio MP3 del texto (para modo standalone)."""
     m = re.search(r"https?://[^\s\"')]+\.mp3", text)
@@ -423,14 +534,7 @@ def main():
     if issue_body:
         raw = issue_body
 
-    post_issue_comment(
-        "🎬 Ensamblando video...\n\n"
-        "Descargo imágenes, busco audio y genero el MP4 9:16 listo para TikTok/Reels.\n\n"
-        "**Formato aceptado en la descripción:**\n"
-        "- URLs de imágenes (.png/.jpg)\n"
-        "- URL de audio (.mp3) — opcional\n"
-        "- O JSON: `{\"image_urls\": [...], \"audio_url\": \"...\"}`"
-    )
+    post_issue_comment("🎬 Ensamblando video MP4 9:16…")
 
     # Parsear input — acepta JSON o texto libre con URLs
     data = {}
@@ -441,25 +545,26 @@ def main():
         except Exception:
             pass
 
-    image_urls = data.get("image_urls") or extract_image_urls(raw)
-    audio_path = data.get("audio_path", "")
-    audio_url  = data.get("audio_url", "") or extract_audio_url(raw)
+    video_clips = data.get("video_clips") or []   # clips animados del DOP (preferido)
+    image_urls  = data.get("image_urls")  or extract_image_urls(raw)  # fallback estático
+    audio_path  = data.get("audio_path", "")
+    audio_url   = data.get("audio_url", "") or extract_audio_url(raw)
 
-    print(f"📋 image_urls recibidas ({len(image_urls)}):", flush=True)
-    for u in image_urls:
+    print(f"🎞️  video_clips recibidos: {len(video_clips)}", flush=True)
+    for u in video_clips[:6]:
         print(f"   • {u[:100]}", flush=True)
-    print(f"🎙️  audio_path recibido: '{audio_path}'", flush=True)
-    print(f"🔗 audio_url recibido: '{audio_url[:80] if audio_url else ''}'", flush=True)
+    print(f"🖼️  image_urls recibidas: {len(image_urls)}", flush=True)
+    print(f"🎙️  audio_path: '{audio_path}'", flush=True)
+    print(f"🔗 audio_url:  '{audio_url[:80] if audio_url else ''}'", flush=True)
 
     timestamp = int(time.time())
     tmp_dir   = f"/tmp/video_{timestamp}"
     os.makedirs(tmp_dir, exist_ok=True)
 
-    # Resolver audio: prioridad → ruta local → URL → glob /tmp
+    # ── Resolver audio ────────────────────────────────────────
     if audio_path and os.path.exists(audio_path):
         print(f"🎙️  Audio local: {audio_path}", flush=True)
     elif audio_url:
-        # Modo standalone: descargar audio desde URL
         print(f"🎙️  Descargando audio desde URL: {audio_url[:60]}", flush=True)
         downloaded = f"{tmp_dir}/narration.mp3"
         if download_audio(audio_url, downloaded):
@@ -467,65 +572,78 @@ def main():
         else:
             audio_path = ""
     else:
-        # Fallback: buscar MP3 más reciente en /tmp (cuando corre tras TTS en el Director)
         mp3s = sorted(glob.glob("/tmp/narration_*.mp3"), key=os.path.getmtime, reverse=True)
         audio_path = mp3s[0] if mp3s else ""
         if audio_path:
             print(f"🎙️  Audio encontrado en /tmp: {audio_path}", flush=True)
         else:
-            print("🎙️  Sin audio — se generará video mudo", flush=True)
-
-    print(f"🖼️  {len(image_urls)} imágenes", flush=True)
-    print(f"🎙️  Audio final: {audio_path or 'ninguno (video mudo)'}", flush=True)
-
-    if not image_urls:
-        print("ERROR: sin imágenes para ensamblar", file=sys.stderr)
-        sys.exit(1)
-
-    timestamp = int(time.time())
-    tmp_dir   = f"/tmp/video_{timestamp}"
-    os.makedirs(tmp_dir, exist_ok=True)
-
-    # Descargar imágenes
-    image_paths = []
-    for i, url in enumerate(image_urls):
-        # Extraer extensión solo del path de la URL (ignorar dominio y query params)
-        from urllib.parse import urlparse as _urlparse
-        _url_path = _urlparse(url).path          # e.g. "/outputs/abc.webp"
-        _basename = _url_path.rsplit("/", 1)[-1] # e.g. "abc.webp"
-        if "." in _basename:
-            ext = _basename.rsplit(".", 1)[-1][:8]  # máx 8 chars para evitar basura
-        else:
-            ext = "jpg"  # default seguro — ffmpeg detecta el formato real
-        # Validar que sea extensión de imagen conocida
-        if ext.lower() not in {"jpg", "jpeg", "png", "webp", "avif", "gif", "bmp"}:
-            ext = "jpg"
-        path = f"{tmp_dir}/scene_{i+1:02d}.{ext}"
-        print(f"  📥 Imagen {i+1}/{len(image_urls)} [{ext}]: {url[:80]}", flush=True)
-        if download_image(url, path):
-            image_paths.append(path)
-
-    if not image_paths:
-        print("ERROR: no se pudieron descargar las imágenes", file=sys.stderr)
-        sys.exit(1)
-
-    # Calcular duración por escena
-    audio_dur = get_audio_duration(audio_path) if audio_path else 0.0
-    print(f"  ⏱️  Duración audio: {audio_dur:.1f}s | Imágenes: {len(image_paths)}", flush=True)
-    if audio_dur and len(image_paths):
-        scene_duration = audio_dur / len(image_paths)
-        # Cap: máx 20s por escena para evitar slides interminables con pocas imágenes
-        scene_duration = min(max(4.0, scene_duration), 20.0)
-    else:
-        scene_duration = 5.0
-    total_dur = scene_duration * len(image_paths)
-    print(f"  ⏱️  {len(image_paths)} escenas × {scene_duration:.1f}s = {total_dur:.0f}s total", flush=True)
+            print("🎙️  Sin audio — video mudo", flush=True)
 
     output_path = f"{tmp_dir}/video.mp4"
-    ok = assemble_video(image_paths, audio_path, output_path, scene_duration)
+    total_dur   = 0.0
+    scenes      = 0
 
-    if not ok:
-        print("ERROR: ffmpeg falló", file=sys.stderr)
+    # ── MODO A: clips animados (Higgsfield DOP) ───────────────
+    if video_clips:
+        print(f"\n🎞️  MODO: clips animados ({len(video_clips)} clips)", flush=True)
+        clip_paths = []
+        for i, url in enumerate(video_clips):
+            path = f"{tmp_dir}/clip_{i+1:02d}.mp4"
+            print(f"  📥 Clip {i+1}/{len(video_clips)}: {url[:80]}", flush=True)
+            if download_video_clip(url, path):
+                clip_paths.append(path)
+
+        if not clip_paths:
+            print("⚠️  No se descargaron clips — cayendo a modo imágenes", flush=True)
+            video_clips = []  # forzar fallback
+
+        if clip_paths:
+            ok, total_dur = assemble_from_clips(clip_paths, audio_path, output_path)
+            scenes = len(clip_paths)
+            if not ok:
+                print("⚠️  assemble_from_clips falló — cayendo a modo imágenes", flush=True)
+                video_clips = []  # forzar fallback
+
+    # ── MODO B: imágenes estáticas (slideshow) ────────────────
+    if not video_clips:
+        print(f"\n🖼️  MODO: imágenes estáticas ({len(image_urls)} URLs)", flush=True)
+        if not image_urls:
+            print("ERROR: sin imágenes ni clips para ensamblar", file=sys.stderr)
+            sys.exit(1)
+
+        image_paths = []
+        for i, url in enumerate(image_urls):
+            from urllib.parse import urlparse as _urlparse
+            _url_path = _urlparse(url).path
+            _basename = _url_path.rsplit("/", 1)[-1]
+            ext = _basename.rsplit(".", 1)[-1][:8] if "." in _basename else "jpg"
+            if ext.lower() not in {"jpg", "jpeg", "png", "webp", "avif", "gif", "bmp"}:
+                ext = "jpg"
+            path = f"{tmp_dir}/scene_{i+1:02d}.{ext}"
+            print(f"  📥 Imagen {i+1}/{len(image_urls)} [{ext}]: {url[:80]}", flush=True)
+            if download_image(url, path):
+                image_paths.append(path)
+
+        if not image_paths:
+            print("ERROR: no se pudieron descargar imágenes", file=sys.stderr)
+            sys.exit(1)
+
+        audio_dur = get_audio_duration(audio_path) if audio_path else 0.0
+        if audio_dur and len(image_paths):
+            scene_duration = min(max(4.0, audio_dur / len(image_paths)), 20.0)
+        else:
+            scene_duration = 5.0
+        total_dur = scene_duration * len(image_paths)
+        scenes    = len(image_paths)
+        print(f"  ⏱️  {scenes} escenas × {scene_duration:.1f}s = {total_dur:.0f}s total", flush=True)
+
+        ok = assemble_video(image_paths, audio_path, output_path, scene_duration)
+        if not ok:
+            print("ERROR: ffmpeg falló", file=sys.stderr)
+            sys.exit(1)
+
+    if not os.path.exists(output_path):
+        print("ERROR: output_path no existe tras ensamblado", file=sys.stderr)
         sys.exit(1)
 
     file_size = os.path.getsize(output_path)
@@ -539,9 +657,11 @@ def main():
         print(f"  ⚠️  Upload falló: {e}", flush=True)
         video_url = ""
 
+    mode_label = "animado (DOP)" if data.get("video_clips") else "slideshow"
     result = json.dumps({
         "video_url":    video_url,
-        "scenes":       len(image_paths),
+        "mode":         mode_label,
+        "scenes":       scenes,
         "duration_s":   round(total_dur),
         "file_size_mb": round(file_size / 1024 / 1024, 1),
         "has_audio":    bool(audio_path),
@@ -551,10 +671,10 @@ def main():
     post_issue_result(
         "🎬 **Video listo**\n\n"
         + (f"📥 [Descargar MP4]({video_url})\n" if video_url else "")
-        + f"🖼️ {len(image_paths)} escenas — {total_dur:.0f}s\n"
+        + f"🎞️ Modo: {mode_label} — {scenes} escenas — {round(total_dur)}s\n"
         f"📦 {file_size/1024/1024:.1f} MB\n"
-        f"{'🎙️ Con voz en off' if audio_path else '⚠️ Sin audio (TTS no disponible)'}\n\n"
-        "Listo para subir a TikTok, Instagram Reels o YouTube Shorts. 🚀"
+        f"{'🎙️ Con voz en off' if audio_path else '⚠️ Sin audio'}\n\n"
+        "Listo para TikTok, Reels y YouTube Shorts. 🚀"
     )
 
 
