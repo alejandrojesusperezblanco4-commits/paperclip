@@ -36,8 +36,8 @@ SUB_AGENT_IDS = {
     "storytelling":         "061ed6b8-27b1-4a31-8758-19af856b45d3",
     "prompt_generator":     "64e2cb07-75e1-4ca2-8b6c-05a78b66613f",
     "imagen_generator":     "2492962a-b9f0-4611-90e2-c7ccca5aa281",
-    "video_prompt_generator": "",   # nuevo — sin ID Paperclip aún → subprocess directo
-    "imagen_video":         "",     # nuevo — sin ID Paperclip aún → subprocess directo
+    "video_prompt_generator": os.environ.get("VIDEO_PROMPT_GENERATOR_AGENT_ID", ""),
+    "imagen_video":         os.environ.get("IMAGEN_VIDEO_AGENT_ID", ""),
     "tts":                  "0d43b313-77b5-481b-83cc-a41485823f8e",
     "video_assembler":      "28f0a4aa-a230-4d82-aedf-4c327ab4a506",
 }
@@ -509,8 +509,13 @@ def main():
     # directo como subprocess para no desperdiciar tiempo en el timeout de 240s.
     # El Director tiene un límite de ~300s en Railway — si TTS espera 240s, muere todo.
     # Estos agentes se crean como sub-issue (visibilidad en inbox) pero se ejecutan localmente.
-    SUBPROCESS_ONLY = {"tts", "video_assembler", "source_reader",
-                        "video_prompt_generator", "imagen_video"}
+    # video_prompt_generator e imagen_video salen de SUBPROCESS_ONLY cuando
+    # tienen un ID real de Paperclip → corren en su propio proceso Railway.
+    _subprocess_base = {"tts", "video_assembler", "source_reader"}
+    _maybe_delegated = {"video_prompt_generator", "imagen_video"}
+    SUBPROCESS_ONLY = _subprocess_base | {
+        k for k in _maybe_delegated if not SUB_AGENT_IDS.get(k)
+    }
 
     # ── Helper: orquesta un sub-agente vía Paperclip ──────────
     def run_tracked(script: str, task: str, label: str, agent_key: str,
@@ -735,11 +740,15 @@ Guión completo:
     _video_clip_urls    = []
     if higgsfield_key and video_prompt_result and _img_urls:
         post_issue_comment("🎞️ **Fase 6c — Imagen Video (DOP)** en progreso… animando cada imagen (3-5 min)…")
+        # Cuando imagen_video es un agente Paperclip real (ID != ""),
+        # corre en su propio proceso Railway → le damos 240s de polling.
+        # Cuando es subprocess directo, el timeout del OS ya aplica.
+        _iv_paperclip_timeout = 240 if SUB_AGENT_IDS.get("imagen_video") else 60
         imagen_video_result = run_tracked(
             "imagen_video.py", video_prompt_result,
             "Imagen Video — Higgsfield DOP", "imagen_video",
             extra_env={"HIGGSFIELD_API_KEY": higgsfield_key},
-            paperclip_timeout=60,
+            paperclip_timeout=_iv_paperclip_timeout,
         )
         # Extraer URLs de clips animados del output
         _clip_bold = _re.findall(r"\*\*VIDEO_CLIP:\*\*\s*(https?://\S+)", imagen_video_result)
