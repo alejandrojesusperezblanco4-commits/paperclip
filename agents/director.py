@@ -727,6 +727,73 @@ Diferenciacion vs competencia:
     else:
         print("⚠️  ELEVENLABS_API_KEY no encontrada — saltando TTS", flush=True)
 
+    # ── Fase 3b: Decisión de estilo visual (LLM) ─────────────
+    # Basándose en las tendencias (Deep Search) y el guión (Storytelling),
+    # el Director elige automáticamente el Soul Style y el DoP Motion
+    # más apropiados para el contenido.
+    soul_style_choice = ""
+    dop_motion_choice = ""
+
+    _style_prompt = """Eres un director de arte de contenido viral en TikTok/YouTube.
+Analiza las tendencias detectadas y el guión, y elige las opciones de producción visual óptimas.
+
+SOUL STYLES disponibles (elige 1, o deja vacío para base):
+Retratos/Makeup: Creatures, Babydoll MakeUp, Glazed doll skin makeup, Paper Face, Object Makeup
+Moda/Editorial: Medieval, Spotlight, Quiet luxury, FashionShow, 90's Editorial, Avant-garde, Grunge, Fairycore, Coquette core, Bimbocore, Indie sleaze, Gorpcore, Tumblr
+Y2K/Retro: DigitalCam, 2000s Cam, Y2K, 90s Grain, Vintage PhotoBooth, VHS
+Cámara/Efecto: Glitch, CCTV, iPhone, Overexposed, Realistic, Fisheye, Datamosh
+Escenarios: Subway, Library, Rainy Day, Sunset beach, Night Beach, Amalfi Summer, Gallery, Foggy Morning, Flight mode
+Surreal/Arte: Artwork, Mixed Media, Duplicate, Angel Wings, Giant Accessory, Geominimal, Clouded Dream
+Lifestyle: Selfcare, Graffiti, Tokyo Streetstyle, Paparazzi, Movie, Sand
+General: General, Realistic
+
+DOP MOTIONS disponibles (elige 1, o "auto" para arco narrativo automático):
+Cámara: Dolly In, Dolly Out, Dolly Zoom In, Arc Left, Arc Right, Crane Up, Crane Down, Crash Zoom In, Super Dolly In, Whip Pan, FPV Drone, Overhead, Snorricam, Zoom In
+Efectos: Focus Change, Glitch, VHS, Datamosh, Lens Flare, Glowshift, Paparazzi
+Personaje: Catwalk, Levitation, Agent Reveal, Soul Jump
+General: General, Handheld
+
+Responde SOLO con JSON válido (sin explicaciones fuera del JSON):
+{
+  "soul_style": "nombre exacto del estilo o vacío",
+  "dop_motion": "nombre exacto del motion o auto",
+  "razon": "1 línea explicando la elección"
+}"""
+
+    _style_user = f"""TENDENCIAS DETECTADAS:
+{deep_search_result[:600]}
+
+NICHO/TEMA: {objetivo[:150]}
+
+TONO DEL GUIÓN (primeras líneas):
+{storytelling_result[:300]}"""
+
+    try:
+        _style_response = call_llm(
+            messages=[
+                {"role": "system", "content": _style_prompt},
+                {"role": "user",   "content": _style_user},
+            ],
+            api_key=api_key,
+            max_tokens=150,
+            temperature=0.3,
+            title="Director — Decisión de estilo visual",
+            model="anthropic/claude-3-5-haiku",
+            timeout=20,
+            retries=1,
+        )
+        _style_m = _re.search(r'\{[\s\S]*?\}', _style_response)
+        if _style_m:
+            _style_data   = json.loads(_style_m.group(0))
+            soul_style_choice = (_style_data.get("soul_style") or "").strip()
+            dop_motion_choice = (_style_data.get("dop_motion") or "").strip()
+            _razon            = _style_data.get("razon", "")
+            print(f"🎨 Estilo elegido: soul_style='{soul_style_choice}' | dop_motion='{dop_motion_choice}'", flush=True)
+            if _razon:
+                print(f"   📝 {_razon}", flush=True)
+    except Exception as _se:
+        print(f"⚠️  No se pudo elegir estilo automáticamente: {_se}", flush=True)
+
     # ── Fase 4: Imágenes ──────────────────────────────────────
     prompt_task = sanitize(f"""Genera 5-6 prompts JSON (uno por escena) para el guión de: {objetivo}
 
@@ -914,18 +981,23 @@ Guión completo:
             "tema":       objetivo[:100],
         }
         # Construir tarea: ASSEMBLER_PARAMS primero + JSON con image_urls para el agente
-        _iv_input = json.dumps({
+        # Incluir dop_motion si el LLM eligió uno específico (no "auto")
+        _iv_json: dict = {
             "image_urls": _img_urls,
             "source":     "popcorn_auto",
-        }, ensure_ascii=False)
+        }
+        if dop_motion_choice and dop_motion_choice.lower() != "auto":
+            _iv_json["dop_motion"] = dop_motion_choice
+        _iv_input = json.dumps(_iv_json, ensure_ascii=False)
         _iv_task = (
             f"ASSEMBLER_PARAMS:{json.dumps(_asm_params, ensure_ascii=False)}\n\n"
             + _iv_input
         )
+        _motion_label = f" · motion: **{dop_motion_choice}**" if dop_motion_choice and dop_motion_choice.lower() != "auto" else " · arco narrativo automático"
         post_issue_comment(
             f"🎞️ **Fase 6b — Imagen Video (DoP Turbo)** en proceso…\n"
-            f"Generando {len(_img_urls) - 1} clips de transición entre las {len(_img_urls)} escenas. "
-            f"Puede tardar 4-8 min."
+            f"Generando {len(_img_urls) - 1} clips de transición entre las {len(_img_urls)} escenas"
+            f"{_motion_label}. Puede tardar 4-8 min."
         )
         imagen_video_result = run_tracked(
             "imagen_video.py", sanitize(_iv_task),

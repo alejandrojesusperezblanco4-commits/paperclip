@@ -304,6 +304,23 @@ def extract_prompts(input_text: str) -> tuple:
                     })
                 print(f"  ✅ {len(prompts)} escenas extraídas  estilo={soul_style or 'base'}", flush=True)
                 return prompts, soul_style, style_strength
+
+            # Input de Studio: {"soul_style": "X", "prompt": "texto del tema"}
+            raw_prompt = data.get("prompt", "").strip()
+            if raw_prompt:
+                aspect = data.get("aspect_ratio", "9:16")
+                prompts = [{
+                    "prompt": (
+                        f"Cinematic vertical TikTok scene: {raw_prompt}. "
+                        "Dramatic lighting, photorealistic, ultra-detailed, 9:16 format, "
+                        "emotional storytelling visual, shot on Sony A7 III."
+                    ),
+                    "aspect_ratio": aspect,
+                    "label": "Escena 1: Thumbnail principal",
+                }]
+                print(f"  ✅ Prompt de Studio extraído  estilo={soul_style or 'base'}", flush=True)
+                return prompts, soul_style, style_strength
+
         except (json.JSONDecodeError, KeyError) as e:
             print(f"  ⚠️  No se pudo parsear JSON: {e} — usando fallback", flush=True)
 
