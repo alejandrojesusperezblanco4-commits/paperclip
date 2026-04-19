@@ -348,6 +348,15 @@ def main():
 
     print("🎞️  IMAGEN VIDEO — DOP TURBO FIRST-LAST FRAME", flush=True)
 
+    # ── Extraer dop_motion override (si viene de Studio) ──────
+    dop_motion_override = None
+    _dop_match = re.search(r'"dop_motion"\s*:\s*"([^"]+)"', raw)
+    if _dop_match:
+        dop_motion_override = _dop_match.group(1).strip()
+        print(f"  🎬 Motion override: {dop_motion_override}", flush=True)
+        # Limpiar del raw para que extract_image_urls no se confunda
+        raw = re.sub(r',?\s*"dop_motion"\s*:\s*"[^"]+"', '', raw)
+
     # ── Extraer imágenes de entrada ───────────────────────────
     image_urls = extract_image_urls(raw)
 
@@ -369,13 +378,13 @@ def main():
 
     # Mostrar el plan de motions antes de empezar
     for i in range(n_clips):
-        m = select_motions(i, n_clips)
+        m = [dop_motion_override] if dop_motion_override else select_motions(i, n_clips)
         print(f"  📋 Clip {i+1}: {m}", flush=True)
 
     results = [None] * n_clips
 
     def run(idx, first_url, last_url):
-        motions = select_motions(idx, n_clips)
+        motions = [dop_motion_override] if dop_motion_override else select_motions(idx, n_clips)
         return idx, generate_transition_clip(
             idx           = idx + 1,
             image_url     = first_url,

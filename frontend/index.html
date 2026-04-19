@@ -660,6 +660,150 @@
           </div>
         </div>
 
+        <!-- DoP Motion selector (visible solo para Imagen Video) -->
+        <div id="dopMotionSection" style="display:none;margin-top:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:10px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">🎬 Motion</div>
+            <select id="dopMotionSelect" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;outline:none">
+              <option value="">Auto (arco narrativo)</option>
+              <optgroup label="📷 Cámara / Movimientos">
+                <option value="360 Orbit">360 Orbit</option>
+                <option value="3D Rotation">3D Rotation</option>
+                <option value="Arc Left">Arc Left</option>
+                <option value="Arc Right">Arc Right</option>
+                <option value="Crane Down">Crane Down</option>
+                <option value="Crane Over The Head">Crane Over The Head</option>
+                <option value="Crane Up">Crane Up</option>
+                <option value="Crash Zoom In">Crash Zoom In</option>
+                <option value="Crash Zoom Out">Crash Zoom Out</option>
+                <option value="Dolly In">Dolly In</option>
+                <option value="Dolly Left">Dolly Left</option>
+                <option value="Dolly Out">Dolly Out</option>
+                <option value="Dolly Right">Dolly Right</option>
+                <option value="Dolly Zoom In">Dolly Zoom In</option>
+                <option value="Dolly Zoom Out">Dolly Zoom Out</option>
+                <option value="Double Dolly">Double Dolly</option>
+                <option value="Dutch Angle">Dutch Angle</option>
+                <option value="FPV Drone">FPV Drone</option>
+                <option value="Handheld">Handheld</option>
+                <option value="Hyperlapse">Hyperlapse</option>
+                <option value="Incline">Incline</option>
+                <option value="Jib Down">Jib Down</option>
+                <option value="Jib Up">Jib Up</option>
+                <option value="Lazy Susan">Lazy Susan</option>
+                <option value="Low Shutter">Low Shutter</option>
+                <option value="Overhead">Overhead</option>
+                <option value="Snorricam">Snorricam</option>
+                <option value="Super Dolly In">Super Dolly In</option>
+                <option value="Super Dolly Out">Super Dolly Out</option>
+                <option value="Tilt Down">Tilt Down</option>
+                <option value="Tilt up">Tilt up</option>
+                <option value="Whip Pan">Whip Pan</option>
+                <option value="YoYo Zoom">YoYo Zoom</option>
+                <option value="Zoom In">Zoom In</option>
+                <option value="Zoom Out">Zoom Out</option>
+              </optgroup>
+              <optgroup label="✨ Efectos visuales / Lente">
+                <option value="Abstract">Abstract</option>
+                <option value="Datamosh">Datamosh</option>
+                <option value="Diamond">Diamond</option>
+                <option value="Dirty Lens">Dirty Lens</option>
+                <option value="Duplicate">Duplicate</option>
+                <option value="Earth Zoom Out">Earth Zoom Out</option>
+                <option value="Fisheye">Fisheye</option>
+                <option value="Focus Change">Focus Change</option>
+                <option value="Glam">Glam</option>
+                <option value="Glowshift">Glowshift</option>
+                <option value="Innerlight">Innerlight</option>
+                <option value="Invisible">Invisible</option>
+                <option value="Lens Crack">Lens Crack</option>
+                <option value="Lens Flare">Lens Flare</option>
+                <option value="Object POV">Object POV</option>
+                <option value="Paparazzi">Paparazzi</option>
+                <option value="Roll Transition">Roll Transition</option>
+                <option value="Static">Static</option>
+                <option value="Super 8MM">Super 8MM</option>
+                <option value="VHS">VHS</option>
+                <option value="Wiggle">Wiggle</option>
+              </optgroup>
+              <optgroup label="🏃 Personaje / Movimiento humano">
+                <option value="Action Run">Action Run</option>
+                <option value="Agent Reveal">Agent Reveal</option>
+                <option value="Angel Wings">Angel Wings</option>
+                <option value="Baseball Kick">Baseball Kick</option>
+                <option value="Basketball Dunks">Basketball Dunks</option>
+                <option value="Boxing">Boxing</option>
+                <option value="Buckle Up">Buckle Up</option>
+                <option value="Catwalk">Catwalk</option>
+                <option value="Downhill POV">Downhill POV</option>
+                <option value="Face Punch">Face Punch</option>
+                <option value="Flying">Flying</option>
+                <option value="Head Off">Head Off</option>
+                <option value="Head Tracking">Head Tracking</option>
+                <option value="Kiss">Kiss</option>
+                <option value="Levitation">Levitation</option>
+                <option value="Moonwalk Left">Moonwalk Left</option>
+                <option value="Moonwalk Right">Moonwalk Right</option>
+                <option value="Rap Flex">Rap Flex</option>
+                <option value="Robo Arm">Robo Arm</option>
+                <option value="Skateboard Glide">Skateboard Glide</option>
+                <option value="Skateboard Ollie">Skateboard Ollie</option>
+                <option value="Skate Cruise">Skate Cruise</option>
+                <option value="Ski Carving">Ski Carving</option>
+                <option value="Ski Powder">Ski Powder</option>
+                <option value="Snowboard Carving">Snowboard Carving</option>
+                <option value="Snowboard Powder">Snowboard Powder</option>
+                <option value="Soul Jump">Soul Jump</option>
+              </optgroup>
+              <optgroup label="🔮 Transformación / Body">
+                <option value="Black Tears">Black Tears</option>
+                <option value="Bloom Mouth">Bloom Mouth</option>
+                <option value="Clone Explosion">Clone Explosion</option>
+                <option value="Disintegration">Disintegration</option>
+                <option value="Eyes In">Eyes In</option>
+                <option value="Floral Eyes">Floral Eyes</option>
+                <option value="Freezing">Freezing</option>
+                <option value="Garden Bloom">Garden Bloom</option>
+                <option value="Glowing Fish">Glowing Fish</option>
+                <option value="Head Explosion">Head Explosion</option>
+                <option value="Medusa Gorgona">Medusa Gorgona</option>
+                <option value="Melting">Melting</option>
+                <option value="Morphskin">Morphskin</option>
+                <option value="Mouth In">Mouth In</option>
+                <option value="Skin Surge">Skin Surge</option>
+                <option value="Tentacles">Tentacles</option>
+                <option value="Thunder God">Thunder God</option>
+                <option value="Turning Metal">Turning Metal</option>
+              </optgroup>
+              <optgroup label="💥 Explosiones / Partículas / Naturaleza">
+                <option value="Building Explosion">Building Explosion</option>
+                <option value="Bullet Time">Bullet Time</option>
+                <option value="Car Chasing">Car Chasing</option>
+                <option value="Car Explosion">Car Explosion</option>
+                <option value="Car Grip">Car Grip</option>
+                <option value="Fire Breathe">Fire Breathe</option>
+                <option value="Flood">Flood</option>
+                <option value="Powder Explosion">Powder Explosion</option>
+                <option value="Sand Storm">Sand Storm</option>
+                <option value="Set on Fire">Set on Fire</option>
+                <option value="Wind to Face">Wind to Face</option>
+              </optgroup>
+              <optgroup label="🐟 Criaturas / Elementos">
+                <option value="Floating Fish">Floating Fish</option>
+                <option value="Jelly Drift">Jelly Drift</option>
+                <option value="Timelapse Human">Timelapse Human</option>
+                <option value="Timelapse Landscape">Timelapse Landscape</option>
+                <option value="Through Object In">Through Object In</option>
+                <option value="Through Object Out">Through Object Out</option>
+              </optgroup>
+              <optgroup label="⚡ General">
+                <option value="General">General</option>
+                <option value="Push To Glass">Push To Glass</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
         <div class="progress-bar-wrap" id="progressWrap" style="display:none">
           <div class="progress-bar" id="progressBar" style="width:5%"></div>
         </div>
@@ -886,9 +1030,12 @@ function selectAgent(key) {
   document.getElementById('topicInput').value = '';
 
   document.getElementById('pipelineSection').style.display = cfg.showPipeline ? '' : 'none';
-  // Mostrar selector de estilo Soul solo para agentes que usan Higgsfield Soul directamente
+  // Mostrar selector de estilo Soul solo para Imagen AI
   const showStyle = ['imagen'].includes(key);
   document.getElementById('soulStyleSection').style.display = showStyle ? '' : 'none';
+  // Mostrar selector de motion DoP solo para Imagen Video
+  const showMotion = ['imagen_video'].includes(key);
+  document.getElementById('dopMotionSection').style.display = showMotion ? '' : 'none';
   document.getElementById('btnRun').innerHTML = `${cfg.icon} Ejecutar ${cfg.name}`;
 
   document.getElementById('rightPanel').innerHTML = `
@@ -980,6 +1127,8 @@ async function startRun() {
 
   try {
     // Para el agente Imagen con estilo: incluir soul_style en la descripción del issue
+    // Para Imagen Video con motion: incluir dop_motion en la descripción
+    const dopMotion = document.getElementById('dopMotionSelect')?.value || '';
     let description = topic;
     if (currentAgent === 'imagen' && soulStyle.id) {
       description = JSON.stringify({
@@ -987,6 +1136,16 @@ async function startRun() {
         soul_style_strength: soulStyle.strength,
         prompt:              topic,
       });
+    } else if (currentAgent === 'imagen_video' && dopMotion) {
+      // Intentar parsear el topic como JSON y añadir dop_motion
+      try {
+        const parsed = JSON.parse(topic);
+        parsed.dop_motion = dopMotion;
+        description = JSON.stringify(parsed);
+      } catch {
+        // Si no es JSON, crear wrapper
+        description = JSON.stringify({ dop_motion: dopMotion, input: topic });
+      }
     }
 
     const body = { title: topic, description, projectId: PROJECT_ID };
@@ -1009,8 +1168,8 @@ async function startRun() {
     currentRunIssueId = currentIssueId; // guardar antes de que resetUI lo borre
     addLog(`▸ Issue #${currentIssueId.slice(0,8)}… asignado a ${cfg.name}`, 'accent');
 
-    // El comentario inicial es el input del agente (puede incluir estilo Soul)
-    const commentBody = (currentAgent === 'imagen' && soulStyle.id) ? description : topic;
+    // El comentario inicial es el input del agente (puede incluir estilo Soul o motion DoP)
+    const commentBody = (description !== topic) ? description : topic;
     await fetch(`${API_BASE}/api/issues/${currentIssueId}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
