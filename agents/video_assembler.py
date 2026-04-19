@@ -81,7 +81,7 @@ def extract_image_urls(text: str) -> list:
 
 
 def download_video_clip(url: str, path: str) -> bool:
-    """Descarga un clip de video MP4 desde URL."""
+    """Descarga un clip de video MP4 desde URL — streaming a disco, sin cargar en RAM."""
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -95,13 +95,18 @@ def download_video_clip(url: str, path: str) -> bool:
     try:
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=120) as r:
-            data = r.read()
-        if len(data) < 5000:
-            print(f"  ⚠️  Clip demasiado pequeño ({len(data)}B): {url[:70]}", flush=True)
+            with open(path, "wb") as f:
+                total = 0
+                while True:
+                    chunk = r.read(256 * 1024)  # 256KB a la vez — sin cargar todo en RAM
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    total += len(chunk)
+        if total < 5000:
+            print(f"  ⚠️  Clip demasiado pequeño ({total}B): {url[:70]}", flush=True)
             return False
-        with open(path, "wb") as f:
-            f.write(data)
-        print(f"  ✅ Clip descargado: {path} ({len(data)//1024}KB)", flush=True)
+        print(f"  ✅ Clip descargado: {path} ({total//1024}KB)", flush=True)
         return True
     except Exception as e:
         print(f"  ⚠️  Error descargando clip {url[:70]}: {e}", flush=True)
@@ -138,11 +143,12 @@ def assemble_from_clips(clip_paths: list, audio_path: str,
         cmd = [
             "ffmpeg", "-y", "-i", src,
             "-vf", scale_filter,
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
             "-pix_fmt", "yuv420p",
             "-colorspace", "bt709",
             "-color_primaries", "bt709",
             "-color_trc", "bt709",
+            "-threads", "2",
             "-movflags", "+faststart",
             "-an", dst,
         ]
@@ -214,12 +220,16 @@ def extract_audio_url(text: str) -> str:
 
 
 def download_audio(url: str, output_path: str) -> bool:
-    """Descarga un MP3 desde URL a output_path."""
+    """Descarga un MP3 desde URL a output_path — streaming a disco."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=60) as r:
             with open(output_path, "wb") as f:
-                f.write(r.read())
+                while True:
+                    chunk = r.read(256 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
         print(f"  ✅ Audio descargado: {output_path}", flush=True)
         return True
     except Exception as e:
@@ -382,69 +392,50 @@ def assemble_video(image_paths: list, audio_path: str,
 
 def upload_file(file_path: str) -> str:
     """
-    Sube archivo probando varios servicios hasta que uno funcione.
-    Orden de preferencia — directas primero (reproducibles en <video>/<audio>):
-      1. Litterbox catbox.moe — URL directa litter.catbox.moe/*.mp4  ← PREFERIDO
-      2. tmpfiles.org/dl/    — URL directa de descarga
-      3. uguu.se             — URL directa
-      4. Pixeldrain          — URL directa (falla por connection reset en Railway)
-      5. transfer.sh         — URL directa (falla por network unreachable en Railway)
-      6. GoFile              — URL de página — último recurso
+    Sube archivo usando curl (streaming — no carga el archivo en RAM de Python).
+    Orden de preferencia:
+      1. Litterbox catbox.moe  — URL directa ← PREFERIDO
+      2. tmpfiles.org/dl/      — URL directa
+      3. uguu.se               — URL directa
+      4. GoFile                — URL de página (último recurso)
     """
-    import mimetypes
-    filename  = os.path.basename(file_path)
-    mime      = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-    boundary  = "----PaperclipBoundary7MA4YWxkTrZu0gW"
+    filename = os.path.basename(file_path)
+    size_mb  = os.path.getsize(file_path) / 1024 / 1024
+    print(f"  📤 Subiendo {filename} ({size_mb:.1f} MB) con curl...", flush=True)
 
-    with open(file_path, "rb") as f:
-        file_data = f.read()
+    def run_curl(cmd: list, timeout: int = 240) -> str:
+        """Ejecuta curl y devuelve stdout; devuelve '' si falla."""
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            return r.stdout.strip()
+        except Exception as e:
+            print(f"    curl error: {e}", flush=True)
+            return ""
 
-    size_mb = len(file_data) / 1024 / 1024
-    print(f"  📤 Subiendo {filename} ({size_mb:.1f} MB)...", flush=True)
-
-    # ── 1. Litterbox catbox.moe (72h, URL directa) ───────────────────────────
+    # ── 1. Litterbox catbox.moe ───────────────────────────────────────────────
     try:
-        body = (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n'
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="time"\r\n\r\n72h\r\n'
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="fileToUpload"; filename="{filename}"\r\n'
-            f"Content-Type: {mime}\r\n\r\n"
-        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
-        req = urllib.request.Request(
+        out = run_curl([
+            "curl", "-s", "--max-time", "240",
+            "-F", "reqtype=fileupload",
+            "-F", "time=72h",
+            "-F", f"fileToUpload=@{file_path};type=video/mp4",
             "https://litterbox.catbox.moe/resources/internals/api.php",
-            data=body,
-            headers={
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
-                "User-Agent": "paperclip-agent/1.0",
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            url = resp.read().decode("utf-8").strip()
-        if url.startswith("http"):
-            print(f"  ✅ catbox.moe: {url}", flush=True)
-            return url
+        ])
+        if out.startswith("http"):
+            print(f"  ✅ catbox.moe: {out}", flush=True)
+            return out
+        print(f"  ⚠️  catbox.moe respuesta inesperada: {out[:120]}", flush=True)
     except Exception as e:
         print(f"  ⚠️  catbox.moe falló: {e}", flush=True)
 
-    # ── 2. tmpfiles.org (URL directa /dl/) ───────────────────────────────────
+    # ── 2. tmpfiles.org ───────────────────────────────────────────────────────
     try:
-        body = (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-            f"Content-Type: {mime}\r\n\r\n"
-        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
-        req = urllib.request.Request(
+        out = run_curl([
+            "curl", "-s", "--max-time", "180",
+            "-F", f"file=@{file_path}",
             "https://tmpfiles.org/api/v1/upload",
-            data=body,
-            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            tj = json.loads(resp.read().decode("utf-8"))
+        ])
+        tj  = json.loads(out) if out else {}
         url = tj.get("data", {}).get("url", "")
         if url.startswith("http"):
             url = url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
@@ -453,21 +444,14 @@ def upload_file(file_path: str) -> str:
     except Exception as e:
         print(f"  ⚠️  tmpfiles.org falló: {e}", flush=True)
 
-    # ── 3. uguu.se (URL directa) ──────────────────────────────────────────────
+    # ── 3. uguu.se ────────────────────────────────────────────────────────────
     try:
-        body = (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="files[]"; filename="{filename}"\r\n'
-            f"Content-Type: {mime}\r\n\r\n"
-        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
-        req = urllib.request.Request(
+        out = run_curl([
+            "curl", "-s", "--max-time", "180",
+            "-F", f"files[]=@{file_path}",
             "https://uguu.se/upload",
-            data=body,
-            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            uj = json.loads(resp.read().decode("utf-8"))
+        ])
+        uj  = json.loads(out) if out else {}
         url = uj.get("files", [{}])[0].get("url", "")
         if url.startswith("http"):
             print(f"  ✅ uguu.se: {url}", flush=True)
@@ -475,61 +459,16 @@ def upload_file(file_path: str) -> str:
     except Exception as e:
         print(f"  ⚠️  uguu.se falló: {e}", flush=True)
 
-    # ── 4. Pixeldrain (URL directa — falla connection reset en Railway) ───────
-    try:
-        req = urllib.request.Request(
-            f"https://pixeldrain.com/api/file/{filename}",
-            data=file_data,
-            headers={"Content-Type": mime, "User-Agent": "paperclip-agent/1.0"},
-            method="PUT"
-        )
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            pd = json.loads(resp.read().decode("utf-8"))
-        file_id = pd.get("id", "")
-        if file_id:
-            url = f"https://pixeldrain.com/api/file/{file_id}"
-            print(f"  ✅ Pixeldrain: {url}", flush=True)
-            return url
-    except Exception as e:
-        print(f"  ⚠️  Pixeldrain falló: {e}", flush=True)
-
-    # ── 5. transfer.sh (URL directa — falla network unreachable en Railway) ───
-    try:
-        req = urllib.request.Request(
-            f"https://transfer.sh/{filename}",
-            data=file_data,
-            headers={"Content-Type": mime, "User-Agent": "paperclip-agent/1.0", "Max-Days": "7"},
-            method="PUT"
-        )
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            url = resp.read().decode("utf-8").strip()
-        if url.startswith("http"):
-            print(f"  ✅ transfer.sh: {url}", flush=True)
-            return url
-    except Exception as e:
-        print(f"  ⚠️  transfer.sh falló: {e}", flush=True)
-
-    # ── 6. GoFile (último recurso — URL de página, no directa) ───────────────
+    # ── 4. GoFile ─────────────────────────────────────────────────────────────
     try:
         with urllib.request.urlopen("https://api.gofile.io/servers", timeout=10) as r:
-            servers_data = json.loads(r.read().decode("utf-8"))
-        server = servers_data["data"]["servers"][0]["name"]
-        body = (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-            f"Content-Type: {mime}\r\n\r\n"
-        ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
-        req = urllib.request.Request(
-            f"https://{server}.gofile.io/contents/uploadFile",
-            data=body,
-            headers={
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
-                "User-Agent": "paperclip-agent/1.0",
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            gf = json.loads(resp.read().decode("utf-8"))
+            srv = json.loads(r.read().decode())["data"]["servers"][0]["name"]
+        out = run_curl([
+            "curl", "-s", "--max-time", "180",
+            "-F", f"file=@{file_path}",
+            f"https://{srv}.gofile.io/contents/uploadFile",
+        ])
+        gf  = json.loads(out) if out else {}
         url = gf.get("data", {}).get("downloadPage", "")
         if url.startswith("http"):
             print(f"  ✅ GoFile (página): {url}", flush=True)
