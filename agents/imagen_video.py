@@ -88,30 +88,34 @@ def http_get(url: str, api_key: str) -> dict:
 def submit_video(image_url: str, motion_prompt: str, api_key: str) -> str:
     """
     Envía imagen + motion prompt a Higgsfield DOP. Devuelve request_id.
-    Prueba primero el endpoint lite (mismo patrón que Soul), luego v1.
+    Prueba combinaciones de endpoint + payload hasta que funcione.
     """
-    payload = {
-        "prompt":    motion_prompt,
-        "image_url": image_url,
-        "seed":      42,
-    }
     print(f"  🎬 Motion: {motion_prompt[:80]}", flush=True)
 
-    # Intentar endpoint lite primero
-    for endpoint in [DOP_MODEL_LITE, DOP_MODEL_V1]:
+    # Distintas combinaciones endpoint / formato de payload
+    attempts = [
+        # (endpoint, payload)
+        (DOP_MODEL_LITE, {"prompt": motion_prompt, "image_url": image_url, "seed": 42}),
+        (DOP_MODEL_V1,   {"prompt": motion_prompt, "image_url": image_url, "seed": 42}),
+        (DOP_MODEL_LITE, {"prompt": motion_prompt, "image_urls": [image_url], "seed": 42}),
+        (DOP_MODEL_V1,   {"prompt": motion_prompt, "image_urls": [image_url], "seed": 42}),
+    ]
+
+    for endpoint, payload in attempts:
         url = f"{BASE_URL}/{endpoint}"
-        print(f"  📡 POST {url}", flush=True)
+        print(f"  📡 POST {url}  payload_keys={list(payload.keys())}", flush=True)
         try:
             result = http_post(url, payload, api_key)
             request_id = result.get("request_id")
             if request_id:
-                print(f"  📤 En cola → ID: {request_id} (endpoint: {endpoint})", flush=True)
+                print(f"  📤 En cola → ID: {request_id}  endpoint={endpoint}", flush=True)
                 return request_id
-            print(f"  ⚠️  Sin request_id en: {result} — probando otro endpoint", flush=True)
+            # Loguear la respuesta completa para diagnóstico
+            print(f"  ⚠️  Sin request_id. Respuesta: {json.dumps(result)[:300]}", flush=True)
         except Exception as e:
-            print(f"  ⚠️  {endpoint} falló: {e} — probando otro endpoint", flush=True)
+            print(f"  ⚠️  {endpoint} falló: {e}", flush=True)
 
-    raise Exception("Ambos endpoints DOP fallaron")
+    raise Exception("Todos los intentos DOP fallaron — revisa los logs arriba para el error exacto")
 
 
 def poll_video(request_id: str, api_key: str, max_wait: int = 120) -> str:
