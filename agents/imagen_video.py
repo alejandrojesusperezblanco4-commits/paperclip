@@ -131,11 +131,13 @@ def poll_video(request_id: str, api_key: str, max_wait: int = 120) -> str:
 
         if status in SUCCESS_STATUSES:
             # Intentar extraer video URL de distintos formatos de respuesta
-            videos = data.get("videos") or []
-            if videos and videos[0].get("url"):
-                return videos[0]["url"]
-            # Fallback: campo directo
-            video_url = data.get("video_url") or data.get("output", {}).get("video_url")
+            # Higgsfield DOP devuelve "video": {"url": "..."} (singular)
+            video_url = (
+                (data.get("video") or {}).get("url")           # ← formato real DOP
+                or (data.get("videos") or [{}])[0].get("url")  # plural (legacy)
+                or data.get("video_url")
+                or (data.get("output") or {}).get("video_url")
+            )
             if video_url:
                 return video_url
             raise Exception(f"completed pero sin video URL: {json.dumps(data)[:300]}")
