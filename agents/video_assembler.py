@@ -120,15 +120,31 @@ def assemble_from_clips(clip_paths: list, audio_path: str,
     norm_clips = []
     scale_filter = (
         "scale=720:1280:force_original_aspect_ratio=decrease,"
-        "pad=720:1280:(ow-iw)/2:(oh-ih)/2:black,fps=24"
+        "pad=720:1280:(ow-iw)/2:(oh-ih)/2:black,"
+        "format=yuv420p,fps=24"
     )
     for i, src in enumerate(clip_paths):
+        # Diagnóstico: mostrar codec/resolución/color del clip original
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=codec_name,width,height,pix_fmt,color_space,color_transfer,color_primaries",
+             "-of", "default=nw=1", src],
+            capture_output=True, text=True, timeout=10
+        )
+        if probe.returncode == 0:
+            print(f"  🔍 Clip {i+1} info: {probe.stdout.strip()}", flush=True)
+
         dst = os.path.join(work_dir, f"norm_clip_{i:02d}.mp4")
         cmd = [
             "ffmpeg", "-y", "-i", src,
             "-vf", scale_filter,
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-            "-pix_fmt", "yuv420p", "-an", dst,
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-pix_fmt", "yuv420p",
+            "-colorspace", "bt709",
+            "-color_primaries", "bt709",
+            "-color_trc", "bt709",
+            "-movflags", "+faststart",
+            "-an", dst,
         ]
         print(f"  🔄 Normalizando clip {i+1}/{len(clip_paths)}...", flush=True)
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
