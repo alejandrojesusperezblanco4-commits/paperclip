@@ -115,16 +115,29 @@ def poll_result(request_id: str, api_key: str, max_wait: int = 180) -> str:
     raise Exception(f"Timeout ({max_wait}s) esperando resultado de {request_id}")
 
 
-def generate_image(prompt: str, aspect_ratio: str, label: str, api_key: str) -> dict:
+def generate_image(prompt: str, aspect_ratio: str, label: str, api_key: str,
+                   max_retries: int = 2) -> dict:
+    """Genera imagen con reintentos automáticos ante fallos de API o timeout."""
     print(f"\n🎨 Generando {label} ({aspect_ratio}) con Higgsfield Soul...", flush=True)
-    try:
-        request_id = submit_image(prompt, aspect_ratio, api_key)
-        url = poll_result(request_id, api_key)
-        print(f"  ✅ {label} lista → {url}", flush=True)
-        return {"label": label, "aspect_ratio": aspect_ratio, "prompt": prompt, "url": url, "status": "ok"}
-    except Exception as e:
-        print(f"  ❌ Error generando {label}: {e}", flush=True)
-        return {"label": label, "aspect_ratio": aspect_ratio, "prompt": prompt, "url": None, "status": f"error: {e}"}
+    last_error = None
+    for attempt in range(1, max_retries + 2):  # intentos: 1, 2, 3
+        if attempt > 1:
+            wait = 15 * (attempt - 1)  # 15s, 30s entre reintentos
+            print(f"  🔄 Reintento {attempt}/{max_retries + 1} en {wait}s...", flush=True)
+            time.sleep(wait)
+        try:
+            request_id = submit_image(prompt, aspect_ratio, api_key)
+            url = poll_result(request_id, api_key)
+            print(f"  ✅ {label} lista → {url}", flush=True)
+            return {"label": label, "aspect_ratio": aspect_ratio, "prompt": prompt,
+                    "url": url, "status": "ok"}
+        except Exception as e:
+            last_error = e
+            print(f"  ⚠️  Intento {attempt} fallido: {e}", flush=True)
+
+    print(f"  ❌ {label} falló tras {max_retries + 1} intentos", flush=True)
+    return {"label": label, "aspect_ratio": aspect_ratio, "prompt": prompt,
+            "url": None, "status": f"error: {last_error}"}
 
 
 def extract_prompts(input_text: str) -> list:
@@ -220,7 +233,7 @@ def main():
             api_key=api_key,
         )
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         futures = {executor.submit(run, i, item): i for i, item in enumerate(prompts)}
         for future in as_completed(futures):
             idx, result = future.result()
