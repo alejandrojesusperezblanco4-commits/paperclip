@@ -1,31 +1,28 @@
 """
-Agente: Imagen Video (Higgsfield DOP — Image-to-Video)
-Anima imágenes estáticas generadas por Soul en clips de video de 4-6 segundos.
+Agente: Imagen Video (Higgsfield DoP Turbo — First-Last Frame)
+Genera clips cinematográficos a partir de pares de imágenes consecutivas.
+
+Con N imágenes de Popcorn → N-1 clips encadenados, donde cada clip
+transiciona suavemente de una escena a la siguiente.
 
 Docs: https://docs.higgsfield.ai
 Auth: Authorization: Key {KEY_ID}:{KEY_SECRET}
-Submit:  POST https://platform.higgsfield.ai/higgsfield-ai/dop/turbo
-Poll:    GET  https://platform.higgsfield.ai/requests/{id}/status
-Result:  videos[0].url cuando status == "completed"
+Submit: POST https://platform.higgsfield.ai/higgsfield-ai/dop/turbo/first-last-frame
+Poll:   GET  https://platform.higgsfield.ai/requests/{id}/status
+Result: video.url cuando status == "completed"
 
-Input (JSON del video_prompt_generator):
-{
-  "video_prompts": [
-    { "scene": 1, "image_url": "...", "motion_prompt": "slow push-in..." },
-    ...
-  ]
-}
-
-Output: texto con URLs de los clips MP4 generados.
+Input: JSON con image_urls[] del agente Popcorn (o imagen.py)
+Output: URLs de clips MP4 + lanza Video Assembler con los clips reales.
 """
 import os
 import sys
 import json
 import time
+import re
 import urllib.request
 import urllib.error
-import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from api_client import post_issue_result, post_issue_comment, resolve_issue_context, post_parent_update
 
@@ -33,13 +30,49 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 BASE_URL  = "https://platform.higgsfield.ai"
-# Endpoints DOP disponibles (en orden de preferencia según la API Reference de Higgsfield):
-DOP_MODEL_V1   = "v1/image2video/dop"       # endpoint nuevo recomendado
-DOP_MODEL_LITE = "higgsfield-ai/dop/lite"   # mismo patrón que Soul (legacy)
-DOP_MODEL      = DOP_MODEL_LITE             # usar lite (lo que tiene el usuario)
+ENDPOINT  = "higgsfield-ai/dop/turbo/first-last-frame"
 
-DONE_STATUSES    = {"completed", "failed", "nsfw"}
+DONE_STATUSES    = {"completed", "failed", "nsfw", "canceled"}
 SUCCESS_STATUSES = {"completed"}
+
+# ── Motion presets por posición narrativa ────────────────────────────────────
+# Cada lista representa los motions del clip en esa posición del relato.
+# El campo "motions" acepta array → podemos combinar varios.
+# Mapeado a un arco narrativo clásico: gancho → desarrollo → clímax → resolución.
+NARRATIVE_MOTIONS = [
+    # Clip 0 — GANCHO / apertura: entra al mundo del personaje
+    ["Dolly In"],
+    # Clip 1 — DESARROLLO: la situación se complica, cámara más dinámica
+    ["Arc Right", "Focus Change"],
+    # Clip 2 — TENSIÓN / punto de inflexión: energía máxima
+    ["Crash Zoom In"],
+    # Clip 3 — CLÍMAX o RESOLUCIÓN: perspectiva amplia, revelación final
+    ["Crane Up", "Dolly Out"],
+    # Clip 4+ — fallback cinematográfico genérico
+    ["Dolly In"],
+]
+
+# Prompt de texto complementario (breve, DoP prioriza los motions)
+TRANSITION_PROMPT = "cinematic, photorealistic, dramatic lighting, smooth"
+
+
+def select_motions(clip_index: int, total_clips: int) -> list:
+    """
+    Selecciona motions según la posición narrativa del clip dentro del total.
+    Escala dinámicamente para cualquier número de clips.
+    """
+    if total_clips == 1:
+        return ["Dolly In"]
+    # Mapear posición relativa (0.0–1.0) a categoría narrativa
+    ratio = clip_index / max(total_clips - 1, 1)
+    if ratio < 0.20:
+        return NARRATIVE_MOTIONS[0]   # apertura
+    elif ratio < 0.45:
+        return NARRATIVE_MOTIONS[1]   # desarrollo
+    elif ratio < 0.70:
+        return NARRATIVE_MOTIONS[2]   # tensión
+    else:
+        return NARRATIVE_MOTIONS[3]   # clímax / resolución
 
 BROWSER_HEADERS = {
     "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -50,18 +83,17 @@ BROWSER_HEADERS = {
 }
 
 
-def auth_header(api_key: str) -> str:
-    return f"Key {api_key}"
+def make_headers(api_key: str) -> dict:
+    return {
+        **BROWSER_HEADERS,
+        "Authorization": f"Key {api_key}",
+        "Content-Type":  "application/json",
+    }
 
 
 def http_post(url: str, payload: dict, api_key: str) -> dict:
     data = json.dumps(payload).encode("utf-8")
-    headers = {
-        **BROWSER_HEADERS,
-        "Authorization": auth_header(api_key),
-        "Content-Type": "application/json",
-    }
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    req  = urllib.request.Request(url, data=data, headers=make_headers(api_key), method="POST")
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))
@@ -73,8 +105,7 @@ def http_post(url: str, payload: dict, api_key: str) -> dict:
 
 
 def http_get(url: str, api_key: str) -> dict:
-    headers = {**BROWSER_HEADERS, "Authorization": auth_header(api_key)}
-    req = urllib.request.Request(url, headers=headers, method="GET")
+    req = urllib.request.Request(url, headers=make_headers(api_key), method="GET")
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8"))
@@ -85,48 +116,38 @@ def http_get(url: str, api_key: str) -> dict:
         raise Exception(f"HTTP {e.code} — {body[:500]}")
 
 
-def submit_video(image_url: str, motion_prompt: str, api_key: str) -> str:
+def submit_clip(image_url: str, end_image_url: str, prompt: str,
+                api_key: str, motions: list = None) -> str:
     """
-    Envía imagen + motion prompt a Higgsfield DOP. Devuelve request_id.
-    Prueba combinaciones de endpoint + payload hasta que funcione.
+    Envía un par de imágenes (primer y último frame) a DoP Turbo.
+    motions: lista de nombres de motion (ej. ["Dolly In", "Focus Change"]).
+    Devuelve request_id.
     """
-    print(f"  🎬 Motion: {motion_prompt[:80]}", flush=True)
+    url = f"{BASE_URL}/{ENDPOINT}"
+    payload = {
+        "image_url":      image_url,
+        "end_image_url":  end_image_url,
+        "prompt":         prompt,
+        "enhance_prompt": True,
+        "seed":           None,
+        "motions":        motions or None,
+    }
+    print(f"  📡 POST {url}", flush=True)
+    print(f"  🖼️  {image_url[:55]}… → {end_image_url[:55]}…", flush=True)
+    print(f"  🎬 Motions: {motions}", flush=True)
 
-    # Distintas combinaciones endpoint / formato de payload
-    attempts = [
-        # dop/lite con payload plano (formato confirmado)
-        (DOP_MODEL_LITE, {"prompt": motion_prompt, "image_url": image_url, "seed": 42}),
-        # v1 con wrapper params (formato correcto para v1)
-        (DOP_MODEL_V1,   {"params": {"prompt": motion_prompt, "image_url": image_url, "seed": 42}}),
-    ]
-
-    for attempt_num, (endpoint, payload) in enumerate(attempts):
-        url = f"{BASE_URL}/{endpoint}"
-        print(f"  📡 POST {url}  payload_keys={list(payload.keys())}", flush=True)
-        try:
-            result = http_post(url, payload, api_key)
-            request_id = result.get("request_id")
-            if request_id:
-                print(f"  📤 En cola → ID: {request_id}  endpoint={endpoint}", flush=True)
-                return request_id
-            # Loguear la respuesta completa para diagnóstico
-            print(f"  ⚠️  Sin request_id. Respuesta: {json.dumps(result)[:300]}", flush=True)
-        except Exception as e:
-            err_str = str(e)
-            # Rate limit: esperar antes del siguiente intento
-            if "concurrent" in err_str.lower() or "HTTP 400" in err_str:
-                wait = 20 if attempt_num == 0 else 30
-                print(f"  ⏳ Rate limit detectado — esperando {wait}s antes de reintentar...", flush=True)
-                time.sleep(wait)
-            print(f"  ⚠️  {endpoint} falló: {e}", flush=True)
-
-    raise Exception("Todos los intentos DOP fallaron — revisa los logs arriba para el error exacto")
+    result = http_post(url, payload, api_key)
+    request_id = result.get("request_id")
+    if not request_id:
+        raise Exception(f"Sin request_id en respuesta: {json.dumps(result)[:300]}")
+    print(f"  📤 En cola → ID: {request_id}", flush=True)
+    return request_id
 
 
-def poll_video(request_id: str, api_key: str, max_wait: int = 150) -> str:
-    """Polling hasta obtener la URL del video MP4. Timeout 2.5 min por clip."""
+def poll_clip(request_id: str, api_key: str, max_wait: int = 180) -> str:
+    """Polling hasta obtener la URL del clip MP4. Timeout 3 min por clip."""
     deadline   = time.time() + max_wait
-    interval   = 4          # poll cada 4s para ser más ágil
+    interval   = 5
     status_url = f"{BASE_URL}/requests/{request_id}/status"
 
     while time.time() < deadline:
@@ -135,11 +156,9 @@ def poll_video(request_id: str, api_key: str, max_wait: int = 150) -> str:
         print(f"  ⏳ {request_id[:12]}… → {status}", flush=True)
 
         if status in SUCCESS_STATUSES:
-            # Intentar extraer video URL de distintos formatos de respuesta
-            # Higgsfield DOP devuelve "video": {"url": "..."} (singular)
             video_url = (
-                (data.get("video") or {}).get("url")           # ← formato real DOP
-                or (data.get("videos") or [{}])[0].get("url")  # plural (legacy)
+                (data.get("video") or {}).get("url")
+                or (data.get("videos") or [{}])[0].get("url")
                 or data.get("video_url")
                 or (data.get("output") or {}).get("video_url")
             )
@@ -149,95 +168,137 @@ def poll_video(request_id: str, api_key: str, max_wait: int = 150) -> str:
 
         if status == "nsfw":
             raise Exception("Clip rechazado por moderación (NSFW).")
-        if status == "failed":
-            raise Exception(f"Animación fallida: {data.get('error','')}")
+        if status in ("failed", "canceled"):
+            raise Exception(f"Generación fallida ({status}): {data.get('error', '')}")
 
         time.sleep(interval)
 
-    raise Exception(f"Timeout ({max_wait}s) esperando clip de {request_id}")
+    raise Exception(f"Timeout ({max_wait}s) esperando clip {request_id}")
 
 
-def animate_scene(scene: int, image_url: str, motion_prompt: str, api_key: str,
-                  max_retries: int = 1) -> dict:
-    """Anima una imagen con reintentos automáticos ante timeout o error."""
-    label = f"Escena {scene}"
-    print(f"\n🎞️  Animando {label}...", flush=True)
-    print(f"   🖼️  Imagen: {image_url[:80]}", flush=True)
+def generate_transition_clip(
+    idx: int,
+    image_url: str,
+    end_image_url: str,
+    api_key: str,
+    motions: list = None,
+    max_retries: int = 1,
+) -> dict:
+    """Genera un clip de transición entre dos imágenes con motions y reintentos."""
+    label = f"Clip {idx} (escena {idx}→{idx + 1})"
+    print(f"\n🎞️  {label}…", flush=True)
     last_error = None
+
     for attempt in range(1, max_retries + 2):
         if attempt > 1:
-            print(f"  🔄 Reintento {attempt}/{max_retries + 1} para {label}...", flush=True)
-            time.sleep(10)
+            wait = 20 * (attempt - 1)
+            print(f"  🔄 Reintento {attempt} en {wait}s…", flush=True)
+            time.sleep(wait)
         try:
-            request_id = submit_video(image_url, motion_prompt, api_key)
-            video_url  = poll_video(request_id, api_key)
-            print(f"  ✅ {label} animada → {video_url}", flush=True)
+            request_id = submit_clip(
+                image_url, end_image_url,
+                TRANSITION_PROMPT, api_key,
+                motions=motions,
+            )
+            video_url = poll_clip(request_id, api_key)
+            print(f"  ✅ {label} → {video_url[:80]}", flush=True)
             return {
-                "scene":         scene,
+                "clip":          idx,
                 "image_url":     image_url,
-                "motion_prompt": motion_prompt,
+                "end_image_url": end_image_url,
+                "motions":       motions,
                 "video_url":     video_url,
                 "status":        "ok",
             }
         except Exception as e:
             last_error = e
-            print(f"  ⚠️  Intento {attempt} fallido para {label}: {e}", flush=True)
+            print(f"  ⚠️  Intento {attempt} fallido: {e}", flush=True)
+            if "concurrent" in str(e).lower() or "HTTP 400" in str(e):
+                time.sleep(25)
 
     print(f"  ❌ {label} falló tras {max_retries + 1} intentos", flush=True)
     return {
-        "scene":         scene,
+        "clip":          idx,
         "image_url":     image_url,
-        "motion_prompt": motion_prompt,
+        "end_image_url": end_image_url,
+        "motions":       motions,
         "video_url":     None,
         "status":        f"error: {last_error}",
     }
 
 
-def extract_video_prompts(raw: str) -> list:
+def extract_image_urls(raw: str) -> list:
     """
-    Extrae video_prompts[] del JSON del video_prompt_generator.
-    Si no hay JSON válido, intenta extraer pares imagen/prompt del texto libre.
+    Extrae image_urls[] del JSON de Popcorn/Imagen o del texto libre.
+    Prioridad: JSON con image_urls[] > markdown images > URLs directas.
     """
-    # Buscar JSON explícito
-    json_str = None
-    if "```json" in raw:
-        json_str = raw.split("```json")[1].split("```")[0].strip()
-    elif "```" in raw:
-        json_str = raw.split("```")[1].split("```")[0].strip()
-    elif raw.strip().startswith("{"):
-        json_str = raw.strip()
-    else:
-        m = re.search(r'\{[\s\S]*?"video_prompts"[\s\S]*?\}', raw)
+    # 1. Buscar JSON estructurado (output de Popcorn)
+    for pattern in (r'```json\s*([\s\S]+?)```', r'(\{[\s\S]*?"image_urls"[\s\S]*?\})'):
+        m = re.search(pattern, raw)
         if m:
-            json_str = m.group(0)
+            try:
+                data = json.loads(m.group(1))
+                urls = data.get("image_urls") or data.get("video_clips") or []
+                if urls:
+                    print(f"  ✅ {len(urls)} URLs extraídas del JSON", flush=True)
+                    return urls
+            except Exception:
+                pass
 
-    if json_str:
-        try:
-            data = json.loads(json_str)
-            prompts = data.get("video_prompts", [])
-            if prompts:
-                print(f"  ✅ {len(prompts)} video_prompts extraídos del JSON", flush=True)
-                return prompts
-        except Exception as e:
-            print(f"  ⚠️  JSON parse error: {e}", flush=True)
+    # 2. Fallback: buscar URLs de imagen en el texto
+    seen, result = set(), []
+    for u in re.findall(r'https?://[^\s"\')\]]+\.(?:png|jpg|jpeg|webp)', raw, re.I):
+        if u not in seen:
+            seen.add(u)
+            result.append(u)
+    # también markdown ![](url)
+    for u in re.findall(r'\]\((https?://[^\s)]+)\)', raw):
+        if u not in seen and any(ext in u.lower() for ext in ('.png','.jpg','.jpeg','.webp')):
+            seen.add(u)
+            result.append(u)
 
-    # Fallback: extraer URLs de imágenes y usar prompt genérico
-    print("  ℹ️  Fallback: usando motion prompt genérico para todas las imágenes", flush=True)
-    ext_urls  = re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", raw)
-    bold_urls = re.findall(r"\*\*URL:\*\*\s*(https?://\S+)", raw)
-    md_urls   = re.findall(r"\]\((https?://[^\s)]+)\)", raw)
-    urls = list(dict.fromkeys(ext_urls + bold_urls + md_urls))
-    return [
-        {
-            "scene": i + 1,
-            "image_url": url,
-            "motion_prompt": (
-                "slow cinematic push-in, subtle light shift, "
-                "hair and clothes gently moving, ambient particles floating"
-            ),
-        }
-        for i, url in enumerate(urls)
-    ]
+    if result:
+        print(f"  ℹ️  {len(result)} URLs extraídas del texto libre", flush=True)
+    return result
+
+
+def launch_video_assembler(clip_urls: list, assembler_params: dict) -> None:
+    """
+    Lanza video_assembler.py como proceso detachado con los clips reales.
+    Se ejecuta DESPUÉS de que todos los clips están listos.
+    """
+    import subprocess as _sub
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    script     = os.path.join(script_dir, "video_assembler.py")
+
+    task = json.dumps({
+        "video_clips": clip_urls,
+        "image_urls":  assembler_params.get("image_urls", []),
+        "audio_path":  assembler_params.get("audio_path", ""),
+        "audio_url":   assembler_params.get("audio_url", ""),
+        "tema":        assembler_params.get("tema", ""),
+    }, ensure_ascii=False)
+
+    env = {**os.environ}
+    env.pop("PAPERCLIP_ISSUE_ID",    None)
+    env.pop("PAPERCLIP_ISSUE_TITLE", None)
+    env.pop("PAPERCLIP_ISSUE_BODY",  None)
+
+    mode = f"{len(clip_urls)} clips animados" if clip_urls else "imágenes como fallback"
+    print(f"\n🎬 Lanzando Video Assembler ({mode})…", flush=True)
+    try:
+        proc = _sub.Popen(
+            [sys.executable, script],
+            stdin=_sub.PIPE,
+            start_new_session=True,
+            env=env,
+        )
+        proc.stdin.write(task.encode("utf-8"))
+        proc.stdin.close()
+        print(f"  🚀 Video Assembler lanzado en background (PID {proc.pid})", flush=True)
+    except Exception as e:
+        print(f"  ⚠️  No se pudo lanzar Video Assembler: {e}", flush=True)
 
 
 def main():
@@ -255,99 +316,128 @@ def main():
     if issue_title:
         raw = issue_body if issue_body else raw
 
-    # Extraer PARENT_ISSUE_ID inyectado por el Director en la descripción del sub-issue.
-    # Esto permite que post_parent_update() notifique a Studio aunque el Director
-    # ya haya cerrado su issue (agente corre como proceso Paperclip independiente).
-    _parent_match = re.search(r'<!--PARENT_ISSUE_ID:([^>]+)-->', raw)
+    # ── Extraer PARENT_ISSUE_ID ───────────────────────────────
+    _parent_match = re.search(r'PARENT_ISSUE_ID:([^\n\s>]+)', raw)
     if _parent_match:
         os.environ['PAPERCLIP_PARENT_ISSUE_ID'] = _parent_match.group(1).strip()
         raw = raw.replace(_parent_match.group(0), '').strip()
-        print(f"  🔗 Parent issue ID detectado: {os.environ['PAPERCLIP_PARENT_ISSUE_ID'][:12]}…", flush=True)
+        raw = re.sub(r'<!--[^>]*-->', '', raw).strip()
+        print(f"  🔗 Parent issue ID: {os.environ['PAPERCLIP_PARENT_ISSUE_ID'][:12]}…", flush=True)
+
+    # ── Extraer ASSEMBLER_PARAMS ──────────────────────────────
+    assembler_params = None
+    _asm_match = re.search(r'ASSEMBLER_PARAMS:(\{[^\n]+\})', raw)
+    if _asm_match:
+        try:
+            assembler_params = json.loads(_asm_match.group(1))
+            raw = raw.replace(_asm_match.group(0), '').strip()
+            print(f"  📦 Assembler params: audio={bool(assembler_params.get('audio_url'))}", flush=True)
+        except Exception as e:
+            print(f"  ⚠️  No se pudo parsear ASSEMBLER_PARAMS: {e}", flush=True)
 
     if issue_title:
         post_issue_comment(
-            f"🎞️ Animando imágenes con Higgsfield DOP para: **{issue_title}**\n\n"
-            f"Convierto cada imagen estática en un clip de video de 4-6 segundos "
-            f"con movimiento de cámara cinematográfico. Puede tardar 3-5 min."
+            f"🎞️ Generando clips cinematográficos para: **{issue_title}**\n\n"
+            f"Uso DoP Turbo First-Last Frame para crear transiciones fluidas "
+            f"entre cada par de imágenes consecutivas. Puede tardar 3-6 min."
         )
 
     if not raw:
         print("ERROR: Sin input", file=sys.stderr)
         sys.exit(1)
 
-    print("🎞️  IMAGEN VIDEO — HIGGSFIELD DOP", flush=True)
-    video_prompts = extract_video_prompts(raw)
+    print("🎞️  IMAGEN VIDEO — DOP TURBO FIRST-LAST FRAME", flush=True)
 
-    if not video_prompts:
-        print("ERROR: No hay imágenes para animar", file=sys.stderr)
+    # ── Extraer imágenes de entrada ───────────────────────────
+    image_urls = extract_image_urls(raw)
+
+    if len(image_urls) < 2:
+        msg = f"ERROR: Se necesitan al menos 2 imágenes para First-Last Frame (recibidas: {len(image_urls)})"
+        print(msg, file=sys.stderr)
         sys.exit(1)
 
-    # Limitar a 3 imágenes máximo para no exceder el timeout del Director (300s).
-    # Las 3 primeras escenas son las más importantes para el hook narrativo.
-    MAX_CLIPS = 3
-    if len(video_prompts) > MAX_CLIPS:
-        print(f"  ℹ️  Limitando a {MAX_CLIPS} clips (de {len(video_prompts)}) para respetar el timeout", flush=True)
-        video_prompts = video_prompts[:MAX_CLIPS]
+    # Limitar a 5 imágenes → 4 clips (equilibrio calidad/tiempo)
+    MAX_IMAGES = 5
+    if len(image_urls) > MAX_IMAGES:
+        print(f"  ℹ️  Limitando a {MAX_IMAGES} imágenes ({len(image_urls)} recibidas)", flush=True)
+        image_urls = image_urls[:MAX_IMAGES]
 
-    print(f"\n🚀 Animando {len(video_prompts)} imágenes (paralelo, máx 3 a la vez)...", flush=True)
+    # Construir pares consecutivos: (img0→img1), (img1→img2), ...
+    pairs = [(image_urls[i], image_urls[i + 1]) for i in range(len(image_urls) - 1)]
+    n_clips = len(pairs)
+    print(f"\n🚀 Generando {n_clips} clips de transición (secuencial)…", flush=True)
 
-    results = [None] * len(video_prompts)
+    # Mostrar el plan de motions antes de empezar
+    for i in range(n_clips):
+        m = select_motions(i, n_clips)
+        print(f"  📋 Clip {i+1}: {m}", flush=True)
 
-    def run(idx, item):
-        return idx, animate_scene(
-            scene         = item.get("scene", idx + 1),
-            image_url     = item["image_url"],
-            motion_prompt = item.get("motion_prompt", "slow cinematic push-in"),
+    results = [None] * n_clips
+
+    def run(idx, first_url, last_url):
+        motions = select_motions(idx, n_clips)
+        return idx, generate_transition_clip(
+            idx           = idx + 1,
+            image_url     = first_url,
+            end_image_url = last_url,
             api_key       = api_key,
+            motions       = motions,
         )
 
-    # Secuencial (max_workers=1) para evitar el límite de 4 concurrent requests de Higgsfield
+    # Secuencial para evitar el límite de concurrent requests de Higgsfield
     with ThreadPoolExecutor(max_workers=1) as executor:
-        futures = {executor.submit(run, i, item): i for i, item in enumerate(video_prompts)}
+        futures = {executor.submit(run, i, f, l): i for i, (f, l) in enumerate(pairs)}
         for future in as_completed(futures):
             idx, result = future.result()
             results[idx] = result
             icon = "✅" if result["status"] == "ok" else "❌"
-            print(f"  {icon} Escena {result['scene']} completada", flush=True)
+            print(f"  {icon} Clip {result['clip']} completado", flush=True)
 
-    # Construir output
-    lines = ["# 🎞️ CLIPS DE VIDEO GENERADOS (Higgsfield DOP)\n"]
-    ok_count = sum(1 for r in results if r and r["status"] == "ok")
-    lines.append(f"**{ok_count}/{len(results)} clips animados correctamente**\n")
+    # ── Construir output ──────────────────────────────────────
+    ok_count      = sum(1 for r in results if r and r["status"] == "ok")
+    video_clip_urls = [r["video_url"] for r in results if r and r["video_url"]]
 
-    video_clip_urls = []
+    lines = ["# 🎞️ CLIPS GENERADOS — DoP Turbo First-Last Frame\n"]
+    lines.append(f"**{ok_count}/{len(results)} clips generados correctamente**")
+    lines.append(f"**Imágenes usadas:** {len(image_urls)}  →  **Clips:** {len(pairs)}\n")
+
     for r in results:
         if not r:
             continue
         icon = "✅" if r["status"] == "ok" else "❌"
-        lines.append(f"## {icon} Escena {r['scene']}")
+        motions_str = ", ".join(r.get("motions") or []) or "—"
+        lines.append(f"## {icon} Clip {r['clip']} — {motions_str}")
         if r["video_url"]:
             lines.append(f"**VIDEO_CLIP:** {r['video_url']}")
-            lines.append(f"![Clip escena {r['scene']}]({r['video_url']})")
-            video_clip_urls.append(r["video_url"])
+            lines.append(f"![Clip {r['clip']}]({r['video_url']})")
         else:
             lines.append(f"**Error:** {r['status']}")
-            # Incluir imagen original como fallback
-            if r["image_url"]:
-                lines.append(f"**FALLBACK_IMAGE:** {r['image_url']}")
-        lines.append(f"**Motion:** {r['motion_prompt'][:100]}")
+            lines.append(f"**Fallback frame 1:** {r['image_url']}")
         lines.append("")
 
-    # JSON estructurado al final
     lines.append("```json")
     lines.append(json.dumps({
-        "video_clips": [r["video_url"] for r in results if r and r["video_url"]],
-        "fallback_images": [r["image_url"] for r in results if r and not r["video_url"]],
-        "results": results,
+        "video_clips":     video_clip_urls,
+        "fallback_images": image_urls,
+        "results":         results,
     }, indent=2, ensure_ascii=False))
     lines.append("```")
 
     output = "\n".join(lines)
     print(output, flush=True)
+
     post_issue_result(output)
-    # Notificar al issue padre (Director) para que Studio muestre los clips
-    # aunque el Director ya haya cerrado su issue
     post_parent_update("imagen_video", output)
+
+    # ── Lanzar Video Assembler con clips reales ───────────────
+    if assembler_params is not None:
+        if video_clip_urls:
+            print(f"\n✅ {len(video_clip_urls)} clips listos → lanzando Video Assembler", flush=True)
+        else:
+            print(f"\n⚠️  Sin clips — Video Assembler usará imágenes como fallback", flush=True)
+        launch_video_assembler(video_clip_urls, assembler_params)
+    else:
+        print("\nℹ️  Sin ASSEMBLER_PARAMS — Video Assembler no lanzado desde aquí", flush=True)
 
 
 if __name__ == "__main__":

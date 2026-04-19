@@ -239,8 +239,10 @@ def post_parent_update(agent_name: str, output: str) -> None:
             except Exception:
                 pass
 
-    # Marcador especial que Studio detecta al hacer polling
-    marker = f"<!--PC_AGENT_UPDATE:{agent_name}-->\n{output[:9500]}"
+    # Marcador especial que Studio detecta al hacer polling.
+    # NO usar sintaxis HTML (<!--...-->) porque algunos APIs la sanean al almacenar/devolver.
+    # Formato de texto plano: AGENT_UPDATE_START:{nombre}: seguido del output.
+    marker = f"AGENT_UPDATE_START:{agent_name}:\n{output[:9500]}"
     data = json.dumps({"body": marker}).encode("utf-8")
     req  = urllib.request.Request(
         f"{api_url}/api/issues/{parent_id}/comments",

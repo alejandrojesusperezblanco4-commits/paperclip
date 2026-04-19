@@ -492,10 +492,12 @@ def main():
     # Extraer PARENT_ISSUE_ID inyectado por el Director en la descripción del sub-issue.
     # Esto permite que post_parent_update() notifique a Studio aunque el Director
     # ya haya cerrado su issue (agente corre como proceso Paperclip independiente).
-    _parent_match = re.search(r'<!--PARENT_ISSUE_ID:([^>]+)-->', raw)
+    # Soportar ambos formatos: texto plano (nuevo) y HTML comment (legacy)
+    _parent_match = re.search(r'PARENT_ISSUE_ID:([^\n\s>]+)', raw)
     if _parent_match:
         os.environ['PAPERCLIP_PARENT_ISSUE_ID'] = _parent_match.group(1).strip()
         raw = raw.replace(_parent_match.group(0), '').strip()
+        raw = re.sub(r'<!--[^>]*-->', '', raw).strip()
         print(f"  🔗 Parent issue ID detectado: {os.environ['PAPERCLIP_PARENT_ISSUE_ID'][:12]}…", flush=True)
 
     post_issue_comment("🎬 Ensamblando video MP4 9:16…")

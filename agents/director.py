@@ -430,8 +430,8 @@ def main():
         _body_urls = _re.findall(r"https?://[^\s<>\"'\)\]]+", issue_body) if issue_body else []
         _has_src   = len(_body_urls) > 0
         # Agentes base: DS + CA + Story + Prompt = 4
-        # Con TTS: +1, con Higgsfield: +Imagen +VP Generator +Imagen Video +VA = +4
-        _total_agents = (1 if _has_src else 0) + 4 + (1 if has_tts else 0) + (4 if has_hf else 0)
+        # Con TTS: +1, con Higgsfield: +Popcorn +Imagen Video +VA = +3
+        _total_agents = (1 if _has_src else 0) + 4 + (1 if has_tts else 0) + (3 if has_hf else 0)
 
         # ── Kickoff message ──────────────────────────────────────
         _phase  = 1
@@ -455,9 +455,8 @@ def main():
             _phases += f"{_phase}️⃣ **TTS** — voz en off con ElevenLabs\n"; _phase += 1
         _phases += f"{_phase}️⃣ **Prompt Generator** — prompts de imagen por escena\n"; _phase += 1
         if has_hf:
-            _phases += f"{_phase}️⃣ **Imagen Generator** — imágenes con Higgsfield Soul\n"; _phase += 1
-            _phases += f"{_phase}️⃣ **Video Prompt Generator** — motion prompts por escena\n"; _phase += 1
-            _phases += f"{_phase}️⃣ **Imagen Video** — clips animados con Higgsfield DOP\n"; _phase += 1
+            _phases += f"{_phase}️⃣ **Imagen Generator** — imágenes coherentes con Higgsfield Popcorn Auto\n"; _phase += 1
+            _phases += f"{_phase}️⃣ **Imagen Video** — clips cinematográficos con DoP Turbo First-Last Frame\n"; _phase += 1
         if has_tts and has_hf:
             _phases += f"{_phase}️⃣ **Video Assembler** — MP4 final 9:16 con voz en off\n"; _phase += 1
 
@@ -547,7 +546,8 @@ def main():
             # la descripción como PAPERCLIP_ISSUE_BODY, así el agente puede extraer el
             # ID del issue padre y notificar a Studio cuando termina.
             _async_agents = {"imagen_video", "video_assembler"}
-            _desc = (f"<!--PARENT_ISSUE_ID:{issue_id}-->\n{task}"
+            # Usar texto plano (no HTML <!--...-->) para evitar saneamiento del API
+            _desc = (f"PARENT_ISSUE_ID:{issue_id}\n{task}"
                      if agent_key in _async_agents else task)
             sub_id = create_sub_issue(
                 title=f"🤖 {label}",
@@ -740,10 +740,21 @@ Guión completo:
     imagen_result  = "[Imagen Generator: HIGGSFIELD_API_KEY no configurada — omitido]"
     higgsfield_key = os.environ.get("HIGGSFIELD_API_KEY", "")
     if higgsfield_key:
-        post_issue_comment("🖼️ **Fase 6 — Imagen Generator** en progreso… (puede tardar 2-3 min)")
-        imagen_result = run_tracked("imagen.py", prompt_result,
-                                    "Imagen Generator — Higgsfield Soul", "imagen_generator",
-                                    extra_env={"HIGGSFIELD_API_KEY": higgsfield_key})
+        # Usar Popcorn Auto: genera 5 imágenes visualmente coherentes de una sola llamada.
+        # Ventaja sobre Soul: las escenas tienen estética consistente sin tener que
+        # coordinar prompts individuales. Popcorn toma la narrativa completa como input.
+        post_issue_comment("🍿 **Fase 6 — Imagen Generator (Popcorn Auto)** en progreso… (2-3 min)")
+        _popcorn_task = sanitize(json.dumps({
+            "prompt":       storytelling_result[:1500],
+            "num_images":   5,
+            "aspect_ratio": "9:16",
+            "resolution":   "720p",
+        }, ensure_ascii=False))
+        imagen_result = run_tracked(
+            "popcorn.py", _popcorn_task,
+            "Imagen Generator — Higgsfield Popcorn Auto", "popcorn",
+            extra_env={"HIGGSFIELD_API_KEY": higgsfield_key},
+        )
     else:
         print("⚠️  HIGGSFIELD_API_KEY no encontrada — saltando Imagen Generator", flush=True)
 
@@ -889,63 +900,58 @@ Guión completo:
     # guión + imágenes + audio. El video es un bonus.
     # ═══════════════════════════════════════════════════════════
 
-    # ── Fase 6b: Video Prompt Generator ──────────────────────
-    video_prompt_result = ""
-    if higgsfield_key and _img_urls:
-        _vp_task = sanitize(
-            storytelling_result[:1500] + "\n\n---\n\n" +
-            "\n".join(f"Escena {i+1}: {u}" for i, u in enumerate(_img_urls))
-        )
-        video_prompt_result = run_tracked(
-            "video_prompt_generator.py", _vp_task,
-            "Video Prompt Generator — Motion prompts", "video_prompt_generator",
-        )
-
-    # ── Fase 6c: Imagen Video — Higgsfield DOP ───────────────
+    # ── Fase 6b: Imagen Video — DoP Turbo First-Last Frame ───
+    # Usamos DoP Turbo First-Last Frame: toma pares de imágenes consecutivas
+    # (img0→img1, img1→img2 …) y genera un clip cinematográfico por par.
+    # Con 5 imágenes de Popcorn → 4 clips encadenados.
+    # Ya NO necesitamos Video Prompt Generator — DoP interpreta las transiciones solo.
     imagen_video_result = ""
-    _video_clip_urls    = []
-    if higgsfield_key and video_prompt_result and _img_urls:
-        # paperclip_timeout=0 → fire-and-forget como video_assembler.
-        # Evita la carrera que causa HTTP 409 (dos instancias cerrando el mismo sub-issue).
-        # Studio recibe los clips via post_parent_update cuando el agente termina.
+    if higgsfield_key and _img_urls and len(_img_urls) >= 2:
+        _asm_params = {
+            "image_urls": _img_urls,
+            "audio_path": audio_path,
+            "audio_url":  audio_url_tts,
+            "tema":       objetivo[:100],
+        }
+        # Construir tarea: ASSEMBLER_PARAMS primero + JSON con image_urls para el agente
+        _iv_input = json.dumps({
+            "image_urls": _img_urls,
+            "source":     "popcorn_auto",
+        }, ensure_ascii=False)
+        _iv_task = (
+            f"ASSEMBLER_PARAMS:{json.dumps(_asm_params, ensure_ascii=False)}\n\n"
+            + _iv_input
+        )
+        post_issue_comment(
+            f"🎞️ **Fase 6b — Imagen Video (DoP Turbo)** en proceso…\n"
+            f"Generando {len(_img_urls) - 1} clips de transición entre las {len(_img_urls)} escenas. "
+            f"Puede tardar 4-8 min."
+        )
         imagen_video_result = run_tracked(
-            "imagen_video.py", video_prompt_result,
-            "Imagen Video — Higgsfield DOP", "imagen_video",
+            "imagen_video.py", sanitize(_iv_task),
+            "Imagen Video — Higgsfield DOP Turbo", "imagen_video",
             extra_env={"HIGGSFIELD_API_KEY": higgsfield_key},
             paperclip_timeout=0,
         )
-        _clip_bold = _re.findall(r"\*\*VIDEO_CLIP:\*\*\s*(https?://\S+)", imagen_video_result)
-        _clip_json = []
-        try:
-            _jm = _re.search(r'"video_clips"\s*:\s*(\[[\s\S]*?\])', imagen_video_result)
-            if _jm:
-                _clip_json = [u for u in json.loads(_jm.group(1)) if u]
-        except Exception:
-            pass
-        _video_clip_urls = list(dict.fromkeys(_clip_bold + _clip_json))
-        print(f"  🎞️  Clips animados detectados: {len(_video_clip_urls)}", flush=True)
-        for _u in _video_clip_urls[:6]:
-            print(f"     • {_u[:90]}", flush=True)
+        print(f"  ⏳ Imagen Video ({len(_img_urls)-1} clips) + Video Assembler en proceso", flush=True)
+    elif higgsfield_key and _img_urls:
+        print(f"  ⚠️  Solo {len(_img_urls)} imagen(es) — se necesitan ≥2 para First-Last Frame", flush=True)
 
-    # ── Fase 7: Video Assembler — fire-and-forget ─────────────
-    if elevenlabs_key and higgsfield_key:
-        _use_clips  = bool(_video_clip_urls)
-        _use_images = bool(_img_urls) and not _use_clips
-        if _use_clips or _use_images:
-            video_task = sanitize(json.dumps({
-                "video_clips": _video_clip_urls,
-                "image_urls":  _img_urls,
-                "audio_path":  audio_path,
-                "audio_url":   audio_url_tts,
-                "tema":        objetivo[:100],
-            }, ensure_ascii=False))
-            _mode = "clips animados" if _use_clips else "imágenes estáticas (fallback)"
-            print(f"  🎬 Despachando Video Assembler ({_mode}) — fire-and-forget", flush=True)
-            run_tracked("video_assembler.py", video_task,
-                        "Video Assembler — MP4 final", "video_assembler",
-                        paperclip_timeout=0)
-        else:
-            print("⚠️  Sin imágenes ni clips — saltando Video Assembler", flush=True)
+    # ── Fase 7: Video Assembler ──────────────────────────────
+    # Caso normal: lo lanza Imagen Video internamente con los clips reales.
+    # Caso fallback: sin Higgsfield pero con ElevenLabs → video con fotos fijas.
+    if elevenlabs_key and not higgsfield_key and _img_urls:
+        video_task = sanitize(json.dumps({
+            "video_clips": [],
+            "image_urls":  _img_urls,
+            "audio_path":  audio_path,
+            "audio_url":   audio_url_tts,
+            "tema":        objetivo[:100],
+        }, ensure_ascii=False))
+        print("  🎬 Despachando Video Assembler (fotos+audio, sin Higgsfield)", flush=True)
+        run_tracked("video_assembler.py", video_task,
+                    "Video Assembler — MP4 final", "video_assembler",
+                    paperclip_timeout=0)
 
 
 if __name__ == "__main__":

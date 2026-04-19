@@ -514,6 +514,152 @@
       <div class="input-section">
         <div class="panel-label" id="inputLabel">Historia / tema</div>
         <textarea id="topicInput" class="input-area" placeholder="Ej: Ella descubre que su esposo la engañó con su mejor amiga…"></textarea>
+
+        <!-- Soul Style selector (visible solo para agentes que usan Higgsfield Soul) -->
+        <div id="soulStyleSection" style="display:none;margin-top:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="font-size:10px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">🎨 Estilo Soul</div>
+            <select id="soulStyleSelect" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;outline:none">
+              <option value="">Sin estilo (base)</option>
+              <optgroup label="🖼️ Retratos / Rostro / Makeup">
+                <option value="Creatures" title="Animalistic details fused with human edge, strange, eerie and beautiful">Creatures</option>
+                <option value="Bleached Brows" title="Barely-there brows, futuristic face. Bold energy and alien glam">Bleached Brows</option>
+                <option value="Grillz Selfie" title="Flash-heavy close-up of shiny teeth, bold attitude, underground luxury">Grillz Selfie</option>
+                <option value="PixeletedFace" title="Retro-glitch vibe with a pixelated face — playful, edgy, early-internet dream">PixeletedFace</option>
+                <option value="Paper Face" title="A face collaged from torn paper, textures, and cutouts. Mixed media magic with a surreal twist">Paper Face</option>
+                <option value="Babydoll MakeUp" title="Fluttery lashes, pouty lips, porcelain skin — sweet meets surreal hyper-feminine glow-up">Babydoll MakeUp</option>
+                <option value="Glazed doll skin makeup" title="Glass-like skin with high-shine finish. Dewy, doll-like, and flawlessly unreal">Glazed doll skin makeup</option>
+                <option value="Object Makeup" title="Collage-style layers. An object below, makeup above, colors duplicated for surreal face art">Object Makeup</option>
+                <option value="HairClips" title="Chunky, colorful, or pearl-lined accessories that frame the face with playful precision">HairClips</option>
+                <option value="Nail Check" title="Close-up hands showing off nail art, rings, and textures. Precision beauty with attitude">Nail Check</option>
+                <option value="RingSelfie" title="Manicured hands, glossy lips, and a flash that catches the sparkle. Casual flex, maximal impact">RingSelfie</option>
+                <option value="Shoe Check" title="Focus on footwear, captured from a top-down or ground-level angle">Shoe Check</option>
+              </optgroup>
+              <optgroup label="👗 Moda / Editorial">
+                <option value="Medieval" title="Chainmail chic, velvet drapes, and candlelit intrigue. Courtly vibes with cinematic weight">Medieval</option>
+                <option value="Spotlight" title="Direct light creating high-contrast drama, paparazzi flash, and instant icon energy">Spotlight</option>
+                <option value="Quiet luxury" title="Quiet luxury — understated elegance">Quiet luxury</option>
+                <option value="FashionShow" title="Backstage flashes, bold looks, and runway energy — where chaos meets couture">FashionShow</option>
+                <option value="90's Editorial" title="Retro fashion magazine style with film grain, soft blur, moody colors, and pure nostalgia">90's Editorial</option>
+                <option value="Avant-garde" title="Sculptural beauty, unexpected forms. A look that speaks in bold shapes and silent statements">Avant-garde</option>
+                <option value="Catwalk / Long legs" title="Elongated limbs and stretched proportions. Stylized drama with a runway edge">Catwalk / Long legs</option>
+                <option value="Gorpcore" title="Technical fabrics, bulky sneakers, and colorblocked gear that looks runway-ready">Gorpcore</option>
+                <option value="Indie sleaze" title="Flash-lit chaos, smudged eyeliner, and blurry rebellion. Tumblr-era nightlife energy">Indie sleaze</option>
+                <option value="Bimbocore" title="Hyperfeminine overload: glossed lips, tiny skirts, and confidence cranked to 100">Bimbocore</option>
+                <option value="Coquette core" title="Soft focus and lace daydreams. Bows, blush, and a wink — sweetness laced with irony">Coquette core</option>
+                <option value="Grunge" title="Distressed denim, oversized flannel, and don't-care hair. Moody, messy, iconic">Grunge</option>
+                <option value="Fairycore" title="Glittery woodland fantasy. Soft pastels, magical sparkles, enchanted innocence">Fairycore</option>
+                <option value="Tumblr" title="Grainy gifs, soft blur, and blue-toned melancholy — effortlessly curated">Tumblr</option>
+                <option value="burgundy suit" title="burgundy suit">burgundy suit</option>
+                <option value="blackout fit" title="blackout fit">blackout fit</option>
+                <option value="Bike mafia" title="Bike mafia">Bike mafia</option>
+              </optgroup>
+              <optgroup label="📼 Y2K / Nostalgia / Retro">
+                <option value="DigitalCam" title="Harsh flash, timestamp corner, and raw textures. Feels like 2007 captured forever">DigitalCam</option>
+                <option value="2000s Cam" title="Low-rise everything, rhinestones. Nostalgia wrapped in early paparazzi glam">2000s Cam</option>
+                <option value="2000s Fashion" title="Flashy fits, shiny textures, Y2K icons — low-rise, high-attitude, totally throwback">2000s Fashion</option>
+                <option value="Y2K" title="Gloss, glitter, and baby tees. A shiny reboot of early 2000s maximalism">Y2K</option>
+                <option value="Y2K Posters" title="Chrome text, airbrushed skin, and floating objects. Early internet meets teen bedroom wall">Y2K Posters</option>
+                <option value="90s Grain" title="Warm tones, film texture, and a soft blur — retro mood in every pixel">90s Grain</option>
+                <option value="Vintage PhotoBooth" title="Flash-lit nostalgia in strip form. Grain, glare, and a kiss of chaos">Vintage PhotoBooth</option>
+                <option value="VHS" title="VHS analog look">VHS</option>
+                <option value="afterparty cam" title="afterparty cam">afterparty cam</option>
+              </optgroup>
+              <optgroup label="📷 Cámara / Lente / Efecto visual">
+                <option value="360 cam" title="Wrap-around perspective with immersive distortion. Captures everything — warped, wide, wonderfully weird">360 cam</option>
+                <option value="Glitch" title="Pixel drag, color distortion, and digital noise. Beautiful errors in motion">Glitch</option>
+                <option value="Fisheye" title="Exaggerated depth and playful proportions. Face up close, background stretched to infinity">Fisheye</option>
+                <option value="CCTV" title="Grainy surveillance vibe. Raw, unfiltered and highly realistic">CCTV</option>
+                <option value="0.5 Outfit" title="Shot from the waist down with wide-angle distortion. Casual, candid, effortlessly cool">0.5 Outfit</option>
+                <option value="0.5 Selfie" title="Front cam, half-body, mirror or not. Unfiltered fits and real-life lighting">0.5 Selfie</option>
+                <option value="iPhone" title="Natural light, casual framing, soft HDR glow. Looks real, but a little better">iPhone</option>
+                <option value="Overexposed" title="Washed-out whites and intense brightness. A raw visual effect that feels accidental and emotional">Overexposed</option>
+                <option value="Realistic" title="No filters, just flawless clarity. Light, pores, fabric — everything exactly as it is, but better">Realistic</option>
+                <option value="Invertethereal" title="Negative tones and ghostly hues. Dreamlike, eerie, and light turned inside out">Invertethereal</option>
+                <option value="7&quot;" title="Distorted realism with eerie edits, glitch vibes, cult-classic weirdness">7"</option>
+                <option value="Fish-eye twin" title="Fish-eye twin">Fish-eye twin</option>
+                <option value="static glow" title="static glow">static glow</option>
+                <option value="Nicotine glow" title="Nicotine glow">Nicotine glow</option>
+                <option value="chrome exit" title="chrome exit">chrome exit</option>
+              </optgroup>
+              <optgroup label="🌍 Escenarios / Localizaciones">
+                <option value="Subway" title="Subway">Subway</option>
+                <option value="Library" title="Soft indoor lighting meets cozy academia. Perfect for quiet power and timeless knits">Library</option>
+                <option value="Sitting on the Street" title="Laid-back pose meets city grit. Candid, cool, and consciously unbothered">Sitting on the Street</option>
+                <option value="Crossing the street" title="Boss walk energy. Overhead angles, harsh midday shadows">Crossing the street</option>
+                <option value="Elevator Mirror" title="Elevator Mirror">Elevator Mirror</option>
+                <option value="Sunbathing" title="Clear turquoise water, woven bags, towel texture, and heat-soaked skin">Sunbathing</option>
+                <option value="Amalfi Summer" title="Lemon light, sunkissed skin, linen dresses fluttering on cobblestone">Amalfi Summer</option>
+                <option value="Office beach" title="Corporate meets coastal. Suits and sand, spreadsheets with sunglasses">Office beach</option>
+                <option value="Night Beach" title="Moonlit waves, dark silhouettes, and salt in the air. Intimate and a little unreal">Night Beach</option>
+                <option value="Rainy Day" title="Moody skies, reflections in wet pavement, soft sweaters. A slow, cinematic quiet">Rainy Day</option>
+                <option value="Mt. Fuji" title="Postcard surrealism. Crystal-blue skies, iconic mountain symmetry, and convenience store drama">Mt. Fuji</option>
+                <option value="Street view" title="Street view">Street view</option>
+                <option value="Through The Glass" title="Shot behind fogged-up windows or café panes. A quiet moment seen, not staged">Through The Glass</option>
+                <option value="Gallery" title="Neutral walls, high taste. Frames your subject like a work of art — minimal, polished">Gallery</option>
+                <option value="Swords Hill" title="High fantasy on a mountain slope. Capes, steel, wind-blown drama">Swords Hill</option>
+                <option value="Japandi" title="Minimalism with warmth. Clean lines, natural light, and a serene sense of balance">Japandi</option>
+                <option value="Foggy Morning" title="Muted colors, blurred horizons, and quiet light. Dreamlike stillness in early hours">Foggy Morning</option>
+                <option value="Sunset beach" title="Golden-hour dreams. Sky melts from purple to peach. Glowy skin, backlit outlines">Sunset beach</option>
+                <option value="Flight mode" title="Airports, terminals, modern architecture. Main character leaves town aura">Flight mode</option>
+                <option value="Escalator" title="Gliding style in motion. Mall paparazzi look — structured outfits, steel gradients">Escalator</option>
+                <option value="505room" title="505room">505room</option>
+                <option value="mount view" title="mount view">mount view</option>
+                <option value="hallway noir" title="hallway noir">hallway noir</option>
+                <option value="Sea breeze" title="Sea breeze">Sea breeze</option>
+                <option value="dmv" title="dmv">dmv</option>
+                <option value="It's french" title="It's french">It's french</option>
+              </optgroup>
+              <optgroup label="✨ Surreal / Fantasy / Arte">
+                <option value="Giant People" title="Giant People">Giant People</option>
+                <option value="Angel Wings" title="Soft look with delicate wings giving dreamy and weightless feeling">Angel Wings</option>
+                <option value="Duplicate" title="Echoed figures, mirrored forms, or repeated poses — surreal symmetry that bends perception">Duplicate</option>
+                <option value="Giant Accessory" title="One item exaggerated to surreal scale — bags, bows, or earrings blown up for visual drama">Giant Accessory</option>
+                <option value="Help It's Too Big" title="Help It's Too Big">Help It's Too Big</option>
+                <option value="Artwork" title="Framed moments with painterly depth. A still life of emotion, texture, and light">Artwork</option>
+                <option value="Mixed Media" title="Layers of photo, paint, text, and texture. A visual collage with chaotic elegance">Mixed Media</option>
+                <option value="Geominimal" title="Clean lines, geometric overlays. Sharp, modern, minimalist settings">Geominimal</option>
+                <option value="2049" title="2049">2049</option>
+                <option value="tokyo drift" title="tokyo drift">tokyo drift</option>
+                <option value="Clouded Dream" title="Clouded Dream">Clouded Dream</option>
+                <option value="Night rider" title="Night rider">Night rider</option>
+                <option value="brick shade" title="brick shade">brick shade</option>
+              </optgroup>
+              <optgroup label="🌅 Lifestyle / Mood">
+                <option value="Fireproof" title="Fireproof">Fireproof</option>
+                <option value="Selfcare" title="Candles, skincare, robes. Glowing peace in muted tones and soft light">Selfcare</option>
+                <option value="Rhyme &amp; blues" title="Rhyme &amp; blues">Rhyme &amp; blues</option>
+                <option value="birthday mess" title="birthday mess">birthday mess</option>
+                <option value="Eating Food" title="Eating Food">Eating Food</option>
+                <option value="Double take" title="Double take">Double take</option>
+                <option value="Movie" title="Movie">Movie</option>
+                <option value="Graffiti" title="Spray textures, bold lines, and rebellious color. Raw energy in every frame">Graffiti</option>
+                <option value="Sunburnt" title="Sunburnt">Sunburnt</option>
+                <option value="Tokyo Streetstyle" title="Layered looks, sharp silhouettes, and fearless color. A street-level runway">Tokyo Streetstyle</option>
+                <option value="Sand" title="Sculptural silhouettes in windswept dunes. Neutral tones, survivalist edge">Sand</option>
+                <option value="Paparazzi" title="Paparazzi">Paparazzi</option>
+                <option value="cocktail" title="cocktail">cocktail</option>
+              </optgroup>
+              <optgroup label="⚡ General">
+                <option value="General" title="Clean, balanced, and natural — true-to-life colors and soft lighting. Effortlessly versatile">General</option>
+                <option value="green editorial" title="green editorial">green editorial</option>
+                <option value="Red balloon" title="Red balloon">Red balloon</option>
+              </optgroup>
+              <option value="__custom__">✏️ Personalizado…</option>
+            </select>
+            <div style="display:flex;align-items:center;gap:4px">
+              <div style="font-size:10px;color:var(--sub);white-space:nowrap">Fuerza</div>
+              <input type="range" id="soulStyleStrength" min="0" max="1" step="0.05" value="1"
+                style="width:64px;accent-color:var(--accent)" oninput="document.getElementById('soulStrengthVal').textContent=parseFloat(this.value).toFixed(2)">
+              <div id="soulStrengthVal" style="font-size:10px;color:var(--accent);width:28px;text-align:right">1.00</div>
+            </div>
+          </div>
+          <div id="soulStyleCustomWrap" style="display:none;margin-top:6px">
+            <input type="text" id="soulStyleCustomId" placeholder="Nombre del estilo Soul (ej: Cinematic, Anime…)"
+              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:5px 10px;outline:none">
+          </div>
+        </div>
+
         <div class="progress-bar-wrap" id="progressWrap" style="display:none">
           <div class="progress-bar" id="progressBar" style="width:5%"></div>
         </div>
@@ -740,6 +886,9 @@ function selectAgent(key) {
   document.getElementById('topicInput').value = '';
 
   document.getElementById('pipelineSection').style.display = cfg.showPipeline ? '' : 'none';
+  // Mostrar selector de estilo Soul solo para agentes que usan Higgsfield Soul directamente
+  const showStyle = ['imagen'].includes(key);
+  document.getElementById('soulStyleSection').style.display = showStyle ? '' : 'none';
   document.getElementById('btnRun').innerHTML = `${cfg.icon} Ejecutar ${cfg.name}`;
 
   document.getElementById('rightPanel').innerHTML = `
@@ -793,11 +942,33 @@ function paperclipToState(status) {
 /* ────────────────────────────────────────
    RUN
 ──────────────────────────────────────── */
+/* ── Soul style helpers ── */
+function getSoulStyle() {
+  const sel = document.getElementById('soulStyleSelect');
+  if (!sel) return { id: null, strength: 1 };
+  let id = sel.value === '__custom__'
+    ? (document.getElementById('soulStyleCustomId')?.value.trim() || '')
+    : sel.value;
+  const strength = parseFloat(document.getElementById('soulStyleStrength')?.value || '1');
+  return { id: id || null, strength };
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.getElementById('soulStyleSelect');
+  if (sel) sel.addEventListener('change', () => {
+    const wrap = document.getElementById('soulStyleCustomWrap');
+    if (wrap) wrap.style.display = sel.value === '__custom__' ? '' : 'none';
+  });
+});
+
 async function startRun() {
   const topic = document.getElementById('topicInput').value.trim();
   if (!topic) { flashInput(); return; }
 
   const cfg = AGENTS[currentAgent];
+
+  // Leer estilo Soul si aplica (solo agente imagen)
+  const soulStyle = getSoulStyle();
 
   document.getElementById('btnRun').disabled = true;
   document.getElementById('btnRun').innerHTML = '<span class="spinner"></span> Generando…';
@@ -808,7 +979,17 @@ async function startRun() {
   showRunningPanel(cfg, topic);
 
   try {
-    const body = { title: topic, description: topic, projectId: PROJECT_ID };
+    // Para el agente Imagen con estilo: incluir soul_style en la descripción del issue
+    let description = topic;
+    if (currentAgent === 'imagen' && soulStyle.id) {
+      description = JSON.stringify({
+        soul_style:          soulStyle.id,
+        soul_style_strength: soulStyle.strength,
+        prompt:              topic,
+      });
+    }
+
+    const body = { title: topic, description, projectId: PROJECT_ID };
     if (cfg.agentId) body.assigneeAgentId = cfg.agentId;
 
     const res = await fetch(`${API_BASE}/api/companies/${COMPANY_ID}/issues`, {
@@ -828,13 +1009,15 @@ async function startRun() {
     currentRunIssueId = currentIssueId; // guardar antes de que resetUI lo borre
     addLog(`▸ Issue #${currentIssueId.slice(0,8)}… asignado a ${cfg.name}`, 'accent');
 
+    // El comentario inicial es el input del agente (puede incluir estilo Soul)
+    const commentBody = (currentAgent === 'imagen' && soulStyle.id) ? description : topic;
     await fetch(`${API_BASE}/api/issues/${currentIssueId}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ body: topic }),
+      body: JSON.stringify({ body: commentBody }),
     });
-    addLog(`▸ Agente disparado`, 'accent');
+    addLog(`▸ Agente disparado${soulStyle.id ? ' · estilo Soul activo' : ''}`, 'accent');
 
     pollTimer = setInterval(pollMain, POLL_MS);
     if (cfg.showPipeline) subPollTimer = setInterval(pollSubIssues, POLL_MS);
@@ -1798,14 +1981,21 @@ function startAgentUpdatePolling(issueId) {
   const MAX_MS = 15 * 60 * 1000; // 15 minutos
   const pollStart = Date.now();
 
+  console.log('[Studio] Iniciando polling de agentes async para issue', issueId);
+
+  // Comprobar inmediatamente (sin esperar los primeros 8s)
+  checkAgentUpdates(issueId);
+
   agentUpdateTimer = setInterval(async () => {
     if (Date.now() - pollStart > MAX_MS) {
+      console.log('[Studio] Polling de agentes async — timeout 15min alcanzado');
       clearInterval(agentUpdateTimer);
       return;
     }
     await checkAgentUpdates(issueId);
     // Parar cuando ambos agentes de video hayan reportado
     if (agentUpdatesFound.has('imagen_video') && agentUpdatesFound.has('video_assembler')) {
+      console.log('[Studio] Ambos agentes async recibidos — deteniendo polling');
       clearInterval(agentUpdateTimer);
     }
   }, 8000);
@@ -1813,28 +2003,41 @@ function startAgentUpdatePolling(issueId) {
 
 async function checkAgentUpdates(issueId) {
   // Los agentes imagen_video y video_assembler llaman post_parent_update()
-  // que publica <!--PC_AGENT_UPDATE:NOMBRE--> en el issue del Director.
-  // Paperclip SÍ permite leer (GET) comentarios de issues cerrados.
-  // Los agentes también PUEDEN escribir (POST) en issues cerrados de otros agentes.
+  // que publica AGENT_UPDATE_START:{nombre}: en el issue del Director.
+  // Paperclip permite leer (GET) comentarios de issues cerrados.
+  // Los agentes también pueden escribir (POST) en issues cerrados de otros agentes.
+  // NOTA: No usamos sintaxis HTML <!--...--> porque algunos APIs la sanean.
   try {
-    const res = await fetch(`${API_BASE}/api/issues/${issueId}/comments`, { credentials: 'include' });
-    if (!res.ok) return;
+    const res = await fetch(`${API_BASE}/api/issues/${issueId}/comments?limit=100`, { credentials: 'include' });
+    if (!res.ok) {
+      console.warn('[Studio] checkAgentUpdates — GET comments falló:', res.status);
+      return;
+    }
     const data = await res.json();
     const comments = data.comments || data || [];
-    if (!Array.isArray(comments)) return;
+    if (!Array.isArray(comments)) {
+      console.warn('[Studio] checkAgentUpdates — respuesta no es array:', typeof comments);
+      return;
+    }
+
+    console.log(`[Studio] checkAgentUpdates — ${comments.length} comentarios en issue ${issueId.slice(0,8)}…`);
 
     for (const c of comments) {
       const body = c.body || c.content || c.text || '';
-      const match = body.match(/<!--PC_AGENT_UPDATE:(\w+)-->\n?([\s\S]*)/);
+      // Formato nuevo: AGENT_UPDATE_START:nombre: (texto plano, sin HTML)
+      const match = body.match(/AGENT_UPDATE_START:(\w+):\n?([\s\S]*)/);
       if (!match) continue;
       const agentName = match[1];
       const content   = match[2];
+      console.log(`[Studio] checkAgentUpdates — encontrado update de ${agentName}`);
       if (agentUpdatesFound.has(agentName)) continue; // ya procesado
 
       agentUpdatesFound.add(agentName);
       applyAgentUpdate(agentName, content);
     }
-  } catch(e) { /* silencioso */ }
+  } catch(e) {
+    console.error('[Studio] checkAgentUpdates — error:', e);
+  }
 }
 
 function applyAgentUpdate(agentName, content) {
