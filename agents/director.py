@@ -264,7 +264,7 @@ def run_agent_with_env(script_name: str, task: str, env: dict, label: str,
         return output
 
     except subprocess.TimeoutExpired:
-        print(f"⏱️  {label} timeout (240s)", flush=True)
+        print(f"⏱️  {label} timeout ({timeout}s)", flush=True)
         return f"[{label}: Timeout]"
     except Exception as e:
         print(f"❌ {label} error inesperado: {e}", flush=True)
@@ -573,6 +573,9 @@ def main():
         # TTS necesita ~90s (ElevenLabs + upload).
         if agent_key == "video_assembler":
             _subprocess_timeout = 270
+        elif agent_key == "imagen_video":
+            # 3 clips × ~90s cada uno (2 en paralelo) + margen = 200s
+            _subprocess_timeout = 200
         elif agent_key == "tts":
             _subprocess_timeout = 120
         else:

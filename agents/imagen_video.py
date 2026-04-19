@@ -33,7 +33,10 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 BASE_URL  = "https://platform.higgsfield.ai"
-DOP_MODEL = "higgsfield-ai/dop/turbo"   # imagen-a-video (DOP = Depth Of Presence)
+# Endpoints DOP disponibles (en orden de preferencia según la API Reference de Higgsfield):
+DOP_MODEL_V1   = "v1/image2video/dop"       # endpoint nuevo recomendado
+DOP_MODEL_LITE = "higgsfield-ai/dop/lite"   # mismo patrón que Soul (legacy)
+DOP_MODEL      = DOP_MODEL_LITE             # usar lite (lo que tiene el usuario)
 
 DONE_STATUSES    = {"completed", "failed", "nsfw"}
 SUCCESS_STATUSES = {"completed"}
@@ -83,27 +86,38 @@ def http_get(url: str, api_key: str) -> dict:
 
 
 def submit_video(image_url: str, motion_prompt: str, api_key: str) -> str:
-    """Envía imagen + motion prompt a Higgsfield DOP. Devuelve request_id."""
-    url = f"{BASE_URL}/{DOP_MODEL}"
+    """
+    Envía imagen + motion prompt a Higgsfield DOP. Devuelve request_id.
+    Prueba primero el endpoint lite (mismo patrón que Soul), luego v1.
+    """
     payload = {
         "prompt":    motion_prompt,
         "image_url": image_url,
         "seed":      42,
     }
-    print(f"  📡 POST {url}", flush=True)
     print(f"  🎬 Motion: {motion_prompt[:80]}", flush=True)
-    result = http_post(url, payload, api_key)
-    request_id = result.get("request_id")
-    if not request_id:
-        raise Exception(f"Sin request_id en respuesta: {result}")
-    print(f"  📤 En cola → ID: {request_id}", flush=True)
-    return request_id
+
+    # Intentar endpoint lite primero
+    for endpoint in [DOP_MODEL_LITE, DOP_MODEL_V1]:
+        url = f"{BASE_URL}/{endpoint}"
+        print(f"  📡 POST {url}", flush=True)
+        try:
+            result = http_post(url, payload, api_key)
+            request_id = result.get("request_id")
+            if request_id:
+                print(f"  📤 En cola → ID: {request_id} (endpoint: {endpoint})", flush=True)
+                return request_id
+            print(f"  ⚠️  Sin request_id en: {result} — probando otro endpoint", flush=True)
+        except Exception as e:
+            print(f"  ⚠️  {endpoint} falló: {e} — probando otro endpoint", flush=True)
+
+    raise Exception("Ambos endpoints DOP fallaron")
 
 
-def poll_video(request_id: str, api_key: str, max_wait: int = 240) -> str:
-    """Polling hasta obtener la URL del video MP4. Timeout 4 min por clip."""
-    deadline  = time.time() + max_wait
-    interval  = 8
+def poll_video(request_id: str, api_key: str, max_wait: int = 120) -> str:
+    """Polling hasta obtener la URL del video MP4. Timeout 2 min por clip."""
+    deadline   = time.time() + max_wait
+    interval   = 4          # poll cada 4s para ser más ágil
     status_url = f"{BASE_URL}/requests/{request_id}/status"
 
     while time.time() < deadline:
@@ -237,20 +251,27 @@ def main():
         print("ERROR: No hay imágenes para animar", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\n🚀 Animando {len(video_prompts)} imágenes (paralelo, máx 2 a la vez)...", flush=True)
+    # Limitar a 3 imágenes máximo para no exceder el timeout del Director (300s).
+    # Las 3 primeras escenas son las más importantes para el hook narrativo.
+    MAX_CLIPS = 3
+    if len(video_prompts) > MAX_CLIPS:
+        print(f"  ℹ️  Limitando a {MAX_CLIPS} clips (de {len(video_prompts)}) para respetar el timeout", flush=True)
+        video_prompts = video_prompts[:MAX_CLIPS]
+
+    print(f"\n🚀 Animando {len(video_prompts)} imágenes (paralelo, máx 3 a la vez)...", flush=True)
 
     results = [None] * len(video_prompts)
 
     def run(idx, item):
         return idx, animate_scene(
-            scene        = item.get("scene", idx + 1),
-            image_url    = item["image_url"],
+            scene         = item.get("scene", idx + 1),
+            image_url     = item["image_url"],
             motion_prompt = item.get("motion_prompt", "slow cinematic push-in"),
-            api_key      = api_key,
+            api_key       = api_key,
         )
 
-    # Máx 2 en paralelo para no saturar la API de Higgsfield
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    # Máx 3 en paralelo — DOP Lite aguanta bien la concurrencia baja
+    with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {executor.submit(run, i, item): i for i, item in enumerate(video_prompts)}
         for future in as_completed(futures):
             idx, result = future.result()
