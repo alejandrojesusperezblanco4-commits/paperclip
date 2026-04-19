@@ -478,6 +478,20 @@
             <div class="tab-desc">Genera con Higgsfield Soul</div>
           </div>
         </div>
+        <div class="agent-tab" data-agent="video_prompt" onclick="selectAgent('video_prompt')">
+          <div class="tab-icon">🎞️</div>
+          <div class="tab-info">
+            <div class="tab-name">Video Prompt Gen</div>
+            <div class="tab-desc">Motion prompts por escena</div>
+          </div>
+        </div>
+        <div class="agent-tab" data-agent="imagen_video" onclick="selectAgent('imagen_video')">
+          <div class="tab-icon">🎬</div>
+          <div class="tab-info">
+            <div class="tab-name">Imagen Video</div>
+            <div class="tab-desc">Clips MP4 · Higgsfield DOP</div>
+          </div>
+        </div>
         <div class="agent-tab" data-agent="tts" onclick="selectAgent('tts')">
           <div class="tab-icon">🎙️</div>
           <div class="tab-info">
@@ -540,6 +554,16 @@
           <div class="stage waiting" id="stage-imagen">
             <div class="stage-icon">🖼️</div>
             <div class="stage-name">Imagen AI</div>
+            <div class="stage-badge">En espera</div>
+          </div>
+          <div class="stage waiting" id="stage-video_prompt">
+            <div class="stage-icon">🎞️</div>
+            <div class="stage-name">Video Prompt Gen</div>
+            <div class="stage-badge">En espera</div>
+          </div>
+          <div class="stage waiting" id="stage-imagen_video">
+            <div class="stage-icon">🎬</div>
+            <div class="stage-name">Imagen Video</div>
             <div class="stage-badge">En espera</div>
           </div>
           <div class="stage waiting" id="stage-tts">
@@ -638,6 +662,22 @@ const AGENTS = {
     showPipeline: false,
     resultType: 'images',
   },
+  video_prompt: {
+    icon: '🎞️', name: 'Video Prompt Generator',
+    label: 'Imágenes del Imagen AI',
+    placeholder: 'Pega el JSON o las URLs de imágenes generadas por Imagen AI.\nEl agente generará motion prompts cinematográficos para cada escena.',
+    agentId: '9d4d8bf2-8f0b-48df-a189-da6a12911437',
+    showPipeline: false,
+    resultType: 'video_prompts',
+  },
+  imagen_video: {
+    icon: '🎬', name: 'Imagen Video',
+    label: 'JSON del Video Prompt Generator',
+    placeholder: 'Pega el JSON del Video Prompt Generator con "video_prompts" (image_url + motion_prompt por escena).\nEl agente animará cada imagen con Higgsfield DOP.',
+    agentId: '62e14c73-905b-45ce-b4d9-4cd532ec3dca',
+    showPipeline: false,
+    resultType: 'imagen_video',
+  },
   tts: {
     icon: '🎙️', name: 'TTS — Voz en off',
     label: 'Guión / texto a narrar',
@@ -661,8 +701,10 @@ const SUB_STAGE_MAP = [
   { key: 'channel analyzer', stage: 'analyzer' },
   { key: 'storytelling',     stage: 'story'    },
   { key: 'prompt generator', stage: 'prompt'   },
-  { key: 'imagen generator', stage: 'imagen'   },
-  { key: 'tts',              stage: 'tts'      },
+  { key: 'imagen generator', stage: 'imagen'      },
+  { key: 'video prompt',     stage: 'video_prompt'},
+  { key: 'imagen video',     stage: 'imagen_video'},
+  { key: 'tts',              stage: 'tts'         },
   { key: 'voz en off',       stage: 'tts'      },
   { key: 'video assembler',  stage: 'video'    },
   { key: 'ensamblando',      stage: 'video'    },
@@ -711,8 +753,10 @@ function getAgentDesc(key) {
     analyzer:  'Disecciona canales exitosos: hooks, estructura, thumbnails, ritmo de cortes y fórmula ganadora.',
     story:     'Crea un guión cinematográfico de 4-5 escenas con hook brutal, narración en primera persona y CTA final.',
     prompt:    'Genera 5-6 prompts ultra-detallados para Higgsfield Soul, uno por escena, con coherencia visual total.',
-    imagen:    'Genera imágenes cinemáticas 9:16 con Higgsfield Soul. Puedes pegar el JSON del Prompt Generator.',
-    tts:       'Convierte el guión en narración de voz dramática usando ElevenLabs. Descarga el MP3 resultante.',
+    imagen:       'Genera imágenes cinemáticas 9:16 con Higgsfield Soul. Puedes pegar el JSON del Prompt Generator.',
+    video_prompt: 'Analiza las imágenes generadas y crea motion prompts cinematográficos (push-in, parallax, drift…) para animar cada escena con Higgsfield DOP.',
+    imagen_video: 'Anima cada imagen estática en un clip de video de 4-6 segundos usando Higgsfield DOP. Requiere el JSON del Video Prompt Generator.',
+    tts:          'Convierte el guión en narración de voz dramática usando ElevenLabs. Descarga el MP3 resultante.',
     video:     'Ensambla las imágenes generadas + la narración de voz en un MP4 9:16 listo para TikTok, Reels y Shorts.',
   };
   return descs[key] || '';
@@ -721,7 +765,7 @@ function getAgentDesc(key) {
 /* ────────────────────────────────────────
    STAGES
 ──────────────────────────────────────── */
-const STAGE_IDS = ['director','search','analyzer','story','prompt','imagen','tts','video'];
+const STAGE_IDS = ['director','search','analyzer','story','prompt','imagen','video_prompt','imagen_video','tts','video'];
 
 function setStage(id, state) {
   const el = document.getElementById(`stage-${id}`);
@@ -940,13 +984,15 @@ function showResults(raw, data) {
     <div style="font-size:11.5px;color:var(--sub);margin-bottom:16px;">Issue #${(currentIssueId||'').slice(0,8)}…</div>`;
 
   switch (cfg.resultType) {
-    case 'director':  right.innerHTML = header + buildDirectorResult(raw); break;
-    case 'images':    right.innerHTML = header + buildImagesResult(raw);   break;
-    case 'script':    right.innerHTML = header + buildScriptResult(raw);   break;
-    case 'prompts':   right.innerHTML = header + buildPromptsResult(raw);  break;
-    case 'audio':     right.innerHTML = header + buildAudioResult(raw);    break;
-    case 'video':     right.innerHTML = header + buildVideoResult(raw);    break;
-    default:          right.innerHTML = header + buildMarkdownResult(raw); break;
+    case 'director':     right.innerHTML = header + buildDirectorResult(raw);     break;
+    case 'images':       right.innerHTML = header + buildImagesResult(raw);       break;
+    case 'script':       right.innerHTML = header + buildScriptResult(raw);       break;
+    case 'prompts':      right.innerHTML = header + buildPromptsResult(raw);      break;
+    case 'audio':        right.innerHTML = header + buildAudioResult(raw);        break;
+    case 'video':        right.innerHTML = header + buildVideoResult(raw);        break;
+    case 'video_prompts':right.innerHTML = header + buildVideoPromptsResult(raw); break;
+    case 'imagen_video': right.innerHTML = header + buildImagenVideoResult(raw);  break;
+    default:             right.innerHTML = header + buildMarkdownResult(raw);     break;
   }
 }
 
@@ -1146,13 +1192,15 @@ function buildDirectorResult(raw) {
     const m = raw.match(re); return m ? m[1].trim() : '';
   }
   const sections = {
-    search:   extractDetail('Deep Search'),
-    analyzer: extractDetail('Channel Analyzer'),
-    story:    extractDetail('Storytelling'),
-    prompts:  extractDetail('Prompt Generator'),
-    images:   extractDetail('Imagen Generator'),
-    tts:      extractDetail('TTS'),
-    video:    extractDetail('Video'),
+    search:      extractDetail('Deep Search'),
+    analyzer:    extractDetail('Channel Analyzer'),
+    story:       extractDetail('Storytelling'),
+    prompts:     extractDetail('Prompt Generator'),
+    images:      extractDetail('Imagen Generator'),
+    video_prompt:extractDetail('Video Prompt'),
+    imagen_video:extractDetail('Imagen Video'),
+    tts:         extractDetail('TTS'),
+    video:       extractDetail('Video'),
   };
 
   let richImages = [];
@@ -1221,12 +1269,27 @@ function buildDirectorResult(raw) {
       </div>
     </div>` : `<div style="color:var(--sub);font-size:12.5px;padding:20px 0;text-align:center">⚠️ El video no fue generado todavía o no se encontró URL</div>`;
 
+  // Extract video clips from Imagen Video section
+  let directorClips = [];
+  try {
+    const ivSection = sections.imagen_video || '';
+    const jm = ivSection.match(/```json\s*([\s\S]+?)```/);
+    if (jm) directorClips = (JSON.parse(jm[1]).video_clips || []).filter(Boolean);
+    if (!directorClips.length) {
+      for (const m of ivSection.matchAll(/\*\*VIDEO_CLIP:\*\*\s*(https?:\/\/[^\s\n]+)/g)) directorClips.push(m[1]);
+    }
+    if (!directorClips.length) {
+      for (const m of raw.matchAll(/\*\*VIDEO_CLIP:\*\*\s*(https?:\/\/[^\s\n]+)/g)) directorClips.push(m[1]);
+    }
+  } catch(e) {}
+
   const nImages = richImages.filter(i=>i.url).length || imageUrls.length;
 
   return `
     <div class="art-tabs" id="artTabs">
       <button class="art-tab active" data-art="summary" onclick="switchArtTab('summary',this)">🎬 Resumen</button>
       ${videoUrl ? `<button class="art-tab" data-art="videoTab" onclick="switchArtTab('videoTab',this)">📱 Video</button>` : ''}
+      ${directorClips.length ? `<button class="art-tab" data-art="clipsTab" onclick="switchArtTab('clipsTab',this)">🎬 Clips · ${directorClips.length}</button>` : ''}
       <button class="art-tab" data-art="images" onclick="switchArtTab('images',this)">🖼️ Imágenes${nImages ? ' · '+nImages : ''}</button>
       <button class="art-tab" data-art="story" onclick="switchArtTab('story',this)">✍️ Guión</button>
       <button class="art-tab" data-art="search" onclick="switchArtTab('search',this)">🔍 Deep Search</button>
@@ -1240,6 +1303,30 @@ function buildDirectorResult(raw) {
 
     <div id="art-panel-videoTab" class="art-panel">
       <div class="card">${videoTabHtml}</div>
+    </div>
+
+    <div id="art-panel-clipsTab" class="art-panel">
+      <div class="card">
+        <div class="card-header"><span class="card-icon">🎬</span><span class="card-title">Clips animados · ${directorClips.length}</span></div>
+        ${directorClips.length
+          ? directorClips.map((url,i) => {
+              const direct = isDirectMedia(url);
+              return `<div style="margin-bottom:20px">
+                <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px">Clip Escena ${i+1}</div>
+                <div class="video-wrap" style="max-width:220px;margin:0 0 8px">
+                  ${direct
+                    ? `<video controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain"><source src="${escHtml(url)}" type="video/mp4"></video>`
+                    : `<div class="video-placeholder"><div class="big-icon">🎬</div><div style="font-size:11px">Abre el link</div></div>`
+                  }
+                </div>
+                <a href="${escHtml(url)}" target="_blank" rel="noopener" class="btn-download" style="font-size:11px;padding:6px 12px">
+                  ${direct ? '⬇️ Descargar' : '▶️ Abrir'}
+                </a>
+              </div>`;
+            }).join('')
+          : `<div style="color:var(--sub);font-size:12px;padding:12px 0">Sin clips en este pipeline</div>`
+        }
+      </div>
     </div>
 
     <div id="art-panel-images" class="art-panel">
@@ -1355,6 +1442,132 @@ function buildMarkdownResult(raw) {
     <div class="card" style="grid-column:1/-1">
       <div class="card-header"><span class="card-icon">${AGENTS[currentAgent].icon}</span><span class="card-title">Análisis</span></div>
       <div class="md-render" style="max-height:600px;overflow-y:auto">${mdToHtml(raw)}</div>
+    </div>`;
+}
+
+/* ── Video Prompt Generator result ── */
+function buildVideoPromptsResult(raw) {
+  let videoPrompts = [];
+  // Try JSON block first
+  try {
+    const jsonMatch = raw.match(/```json\s*([\s\S]+?)```/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[1]);
+      videoPrompts = parsed.video_prompts || [];
+    }
+  } catch(e) {}
+  // Fallback: inline JSON
+  if (!videoPrompts.length) {
+    try {
+      const m = raw.match(/\{[\s\S]*?"video_prompts"[\s\S]*?\}/);
+      if (m) videoPrompts = (JSON.parse(m[0]).video_prompts) || [];
+    } catch(e) {}
+  }
+
+  const scenesHtml = videoPrompts.length
+    ? videoPrompts.map(s => `
+        <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px">🎞️ Escena ${escHtml(String(s.scene||''))}</div>
+          ${s.image_url ? `
+            <div style="margin-bottom:10px">
+              <a href="${escHtml(s.image_url)}" target="_blank" rel="noopener">
+                <img src="${escHtml(s.image_url)}" alt="Escena ${escHtml(String(s.scene||''))}"
+                  style="max-height:180px;border-radius:7px;cursor:pointer;object-fit:cover;display:block"
+                  loading="lazy" onerror="this.style.display='none'">
+              </a>
+            </div>` : ''}
+          <div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Motion Prompt</div>
+          <div style="font-size:12.5px;line-height:1.65;color:var(--text);font-style:italic">"${escHtml(s.motion_prompt||'')}"</div>
+        </div>`).join('')
+    : `<div class="md-render">${mdToHtml(raw)}</div>`;
+
+  return `
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header"><span class="card-icon">🎞️</span><span class="card-title">Motion Prompts · ${videoPrompts.length} escenas</span></div>
+      <div style="max-height:620px;overflow-y:auto">${scenesHtml}</div>
+    </div>
+    <div class="card card-raw" style="margin-top:0">
+      <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver JSON completo</div>
+      <div class="raw-body">${escHtml(raw)}</div>
+    </div>`;
+}
+
+/* ── Imagen Video (Higgsfield DOP clips) result ── */
+function buildImagenVideoResult(raw) {
+  let clips = [];
+  let fallbacks = [];
+  // Try JSON block
+  try {
+    const jsonMatch = raw.match(/```json\s*([\s\S]+?)```/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[1]);
+      clips     = (parsed.video_clips    || []).filter(Boolean);
+      fallbacks = (parsed.fallback_images|| []).filter(Boolean);
+    }
+  } catch(e) {}
+  // Fallback: **VIDEO_CLIP:** markers
+  if (!clips.length) {
+    for (const m of raw.matchAll(/\*\*VIDEO_CLIP:\*\*\s*(https?:\/\/[^\s\n]+)/g)) clips.push(m[1]);
+  }
+  // Fallback: raw MP4 urls
+  if (!clips.length) {
+    for (const m of raw.matchAll(/https?:\/\/[^\s"')\]]+\.mp4/gi)) clips.push(m[0]);
+  }
+  // Fallback images from FALLBACK_IMAGE markers
+  if (!fallbacks.length) {
+    for (const m of raw.matchAll(/\*\*FALLBACK_IMAGE:\*\*\s*(https?:\/\/[^\s\n]+)/g)) fallbacks.push(m[1]);
+  }
+
+  const clipsHtml = clips.length
+    ? clips.map((url, i) => {
+        const direct = isDirectMedia(url);
+        return `
+          <div style="margin-bottom:22px">
+            <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:10px">🎬 Clip Escena ${i+1}</div>
+            <div class="video-wrap" style="max-width:240px;margin:0 0 10px">
+              ${direct
+                ? `<video controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain"><source src="${escHtml(url)}" type="video/mp4"></video>`
+                : `<div class="video-placeholder"><div class="big-icon">🎬</div><div style="font-size:11px">Abre el link para ver</div></div>`
+              }
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <a href="${escHtml(url)}" target="_blank" rel="noopener" class="btn-download" style="font-size:11.5px;padding:7px 14px">
+                ${direct ? '⬇️ Descargar clip' : '▶️ Abrir clip'}
+              </a>
+              ${direct ? `<a href="${escHtml(url)}" target="_blank" rel="noopener" class="btn-download secondary" style="font-size:11.5px;padding:7px 14px">🔗 Nueva pestaña</a>` : ''}
+            </div>
+          </div>`;
+      }).join('')
+    : `<div style="color:var(--sub);font-size:12px;padding:12px 0">No se encontraron clips de video en la respuesta.</div>`;
+
+  const fallbackHtml = fallbacks.length ? `
+    <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📷 Imágenes originales (fallback)</div>
+      <div class="image-gallery">
+        ${fallbacks.map((url,i) => `
+          <div>
+            <div class="gallery-item">
+              <img src="${escHtml(url)}" alt="Fallback ${i+1}"
+                onclick="window.open('${escHtml(url)}','_blank')"
+                onerror="this.parentElement.innerHTML='<div class=\\'gallery-error\\'>❌</div>'" loading="lazy">
+            </div>
+            <div class="gallery-caption">Fallback ${i+1}</div>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header">
+        <span class="card-icon">🎬</span>
+        <span class="card-title">Clips animados · ${clips.length} generados${fallbacks.length ? ' · ' + fallbacks.length + ' fallback' : ''}</span>
+      </div>
+      ${clipsHtml}
+      ${fallbackHtml}
+    </div>
+    <div class="card card-raw" style="margin-top:0">
+      <div class="raw-toggle" onclick="toggleRaw(this)"><span>▸</span> Ver salida completa</div>
+      <div class="raw-body">${escHtml(raw)}</div>
     </div>`;
 }
 
@@ -1485,7 +1698,7 @@ function switchArtTab(tabId, btn) {
     if (found) found.classList.add('active');
   }
 
-  const TAB_TO_STAGE = { summary:'director', videoTab:'video', images:'imagen', story:'story', search:'search', analyzer:'analyzer', prompts:'prompt' };
+  const TAB_TO_STAGE = { summary:'director', videoTab:'video', clipsTab:'imagen_video', images:'imagen', story:'story', search:'search', analyzer:'analyzer', prompts:'prompt' };
   document.querySelectorAll('.stage').forEach(s => s.classList.remove('nav-active'));
   const stageId = TAB_TO_STAGE[tabId];
   if (stageId) {
@@ -1496,7 +1709,7 @@ function switchArtTab(tabId, btn) {
 
 /* Wire pipeline stages as tab navigation */
 function activatePipelineNav() {
-  const STAGE_TO_TAB = { director:'summary', search:'search', analyzer:'analyzer', story:'story', prompt:'prompts', imagen:'images', video:'videoTab' };
+  const STAGE_TO_TAB = { director:'summary', search:'search', analyzer:'analyzer', story:'story', prompt:'prompts', imagen:'images', video_prompt:'prompts', imagen_video:'clipsTab', video:'videoTab' };
   STAGE_IDS.forEach(id => {
     const el = document.getElementById('stage-' + id);
     if (!el) return;
