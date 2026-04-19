@@ -118,8 +118,8 @@ def submit_video(image_url: str, motion_prompt: str, api_key: str) -> str:
     raise Exception("Todos los intentos DOP fallaron — revisa los logs arriba para el error exacto")
 
 
-def poll_video(request_id: str, api_key: str, max_wait: int = 120) -> str:
-    """Polling hasta obtener la URL del video MP4. Timeout 2 min por clip."""
+def poll_video(request_id: str, api_key: str, max_wait: int = 180) -> str:
+    """Polling hasta obtener la URL del video MP4. Timeout 3 min por clip."""
     deadline   = time.time() + max_wait
     interval   = 4          # poll cada 4s para ser más ágil
     status_url = f"{BASE_URL}/requests/{request_id}/status"
@@ -152,31 +152,40 @@ def poll_video(request_id: str, api_key: str, max_wait: int = 120) -> str:
     raise Exception(f"Timeout ({max_wait}s) esperando clip de {request_id}")
 
 
-def animate_scene(scene: int, image_url: str, motion_prompt: str, api_key: str) -> dict:
-    """Anima una imagen y devuelve el resultado estructurado."""
+def animate_scene(scene: int, image_url: str, motion_prompt: str, api_key: str,
+                  max_retries: int = 1) -> dict:
+    """Anima una imagen con reintentos automáticos ante timeout o error."""
     label = f"Escena {scene}"
     print(f"\n🎞️  Animando {label}...", flush=True)
     print(f"   🖼️  Imagen: {image_url[:80]}", flush=True)
-    try:
-        request_id = submit_video(image_url, motion_prompt, api_key)
-        video_url  = poll_video(request_id, api_key)
-        print(f"  ✅ {label} animada → {video_url}", flush=True)
-        return {
-            "scene":        scene,
-            "image_url":    image_url,
-            "motion_prompt": motion_prompt,
-            "video_url":    video_url,
-            "status":       "ok",
-        }
-    except Exception as e:
-        print(f"  ❌ Error animando {label}: {e}", flush=True)
-        return {
-            "scene":        scene,
-            "image_url":    image_url,
-            "motion_prompt": motion_prompt,
-            "video_url":    None,
-            "status":       f"error: {e}",
-        }
+    last_error = None
+    for attempt in range(1, max_retries + 2):
+        if attempt > 1:
+            print(f"  🔄 Reintento {attempt}/{max_retries + 1} para {label}...", flush=True)
+            time.sleep(10)
+        try:
+            request_id = submit_video(image_url, motion_prompt, api_key)
+            video_url  = poll_video(request_id, api_key)
+            print(f"  ✅ {label} animada → {video_url}", flush=True)
+            return {
+                "scene":         scene,
+                "image_url":     image_url,
+                "motion_prompt": motion_prompt,
+                "video_url":     video_url,
+                "status":        "ok",
+            }
+        except Exception as e:
+            last_error = e
+            print(f"  ⚠️  Intento {attempt} fallido para {label}: {e}", flush=True)
+
+    print(f"  ❌ {label} falló tras {max_retries + 1} intentos", flush=True)
+    return {
+        "scene":         scene,
+        "image_url":     image_url,
+        "motion_prompt": motion_prompt,
+        "video_url":     None,
+        "status":        f"error: {last_error}",
+    }
 
 
 def extract_video_prompts(raw: str) -> list:
