@@ -538,10 +538,17 @@ def main():
         sub_id = None
 
         if issue_id and "Authorization" in auth_headers:
+            # Inyectar PARENT_ISSUE_ID en la descripción para los agentes que corren
+            # de forma asíncrona (imagen_video, video_assembler). Paperclip les inyecta
+            # la descripción como PAPERCLIP_ISSUE_BODY, así el agente puede extraer el
+            # ID del issue padre y notificar a Studio cuando termina.
+            _async_agents = {"imagen_video", "video_assembler"}
+            _desc = (f"<!--PARENT_ISSUE_ID:{issue_id}-->\n{task}"
+                     if agent_key in _async_agents else task)
             sub_id = create_sub_issue(
                 title=f"🤖 {label}",
                 agent_key=agent_key,
-                description=task,
+                description=_desc,
                 assignee_agent_id=assignee_id,
                 parent_issue_id=issue_id,
                 api_url=api_url,
@@ -563,12 +570,18 @@ def main():
                 print(f"  ✅ {label} completado vía Paperclip ({len(result)} caracteres)", flush=True)
                 return result
 
-            # video_assembler es un proceso Railway pesado (~90s) — no hacer subprocess
-            # fallback o el Director supera los 300s de Railway y muere.
-            # Dejarlo correr en su propio proceso; el Director publica sin video_url.
+            # video_assembler e imagen_video son procesos pesados y asíncronos.
+            # No hacer subprocess fallback: causaría que DOS instancias intentaran
+            # cerrar el mismo sub-issue → HTTP 409 Conflict.
+            # Dejarlos correr en su propio proceso Paperclip; Studio actualiza
+            # la UI cuando llega el comentario PC_AGENT_UPDATE al issue padre.
             if agent_key == "video_assembler":
                 print(f"  ⏳ Video Assembler en proceso — Director continúa sin esperar", flush=True)
                 return f"[video_assembler:en_proceso:sub_id={sub_id}]"
+
+            if agent_key == "imagen_video":
+                print(f"  ⏳ Imagen Video en proceso — Director continúa sin esperar", flush=True)
+                return f"[imagen_video:en_proceso:sub_id={sub_id}]"
 
             print(f"  ⚠️  Timeout esperando {label} — usando subprocess como fallback...", flush=True)
             _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "in_progress"}, auth_headers)
@@ -888,12 +901,14 @@ Guión completo:
     imagen_video_result = ""
     _video_clip_urls    = []
     if higgsfield_key and video_prompt_result and _img_urls:
-        _iv_paperclip_timeout = 180 if SUB_AGENT_IDS.get("imagen_video") else 60
+        # paperclip_timeout=0 → fire-and-forget como video_assembler.
+        # Evita la carrera que causa HTTP 409 (dos instancias cerrando el mismo sub-issue).
+        # Studio recibe los clips via post_parent_update cuando el agente termina.
         imagen_video_result = run_tracked(
             "imagen_video.py", video_prompt_result,
             "Imagen Video — Higgsfield DOP", "imagen_video",
             extra_env={"HIGGSFIELD_API_KEY": higgsfield_key},
-            paperclip_timeout=_iv_paperclip_timeout,
+            paperclip_timeout=0,
         )
         _clip_bold = _re.findall(r"\*\*VIDEO_CLIP:\*\*\s*(https?://\S+)", imagen_video_result)
         _clip_json = []
