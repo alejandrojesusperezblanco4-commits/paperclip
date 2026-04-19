@@ -717,9 +717,11 @@ let currentAgent   = 'director';
 let currentIssueId = null;
 let pollTimer        = null;
 let subPollTimer     = null;
-let agentUpdateTimer = null;    // sondea comentarios del issue padre tras cierre del Director
-let agentUpdatesFound = new Set(); // qué agentes ya notificaron
+let agentUpdateTimer = null;    // sondea sub-issues de imagen_video / video_assembler
+let agentUpdatesFound = new Set(); // qué agentes ya actualizaron Studio
 let startTime      = null;
+let currentRunTopic   = '';    // tema capturado al iniciar el run (para localStorage)
+let currentRunIssueId = '';    // issue del Director (capturado antes de que resetUI lo borre)
 let runHistory     = JSON.parse(localStorage.getItem('hs_history') || '[]');
 
 /* ────────────────────────────────────────
@@ -822,6 +824,8 @@ async function startRun() {
     const data = await res.json();
     currentIssueId = data.id || data.issueId || data.issue?.id;
     if (!currentIssueId) throw new Error('No se obtuvo ID del issue');
+    currentRunTopic   = topic;       // guardar para acumulación en localStorage
+    currentRunIssueId = currentIssueId; // guardar antes de que resetUI lo borre
     addLog(`▸ Issue #${currentIssueId.slice(0,8)}… asignado a ${cfg.name}`, 'accent');
 
     await fetch(`${API_BASE}/api/issues/${currentIssueId}/comments`, {
@@ -1191,7 +1195,7 @@ function buildDirectorResult(raw) {
   const imageUrls = extractImageUrls(raw);
   const videoUrl  = extractVideoUrl(raw);
   const audioUrl  = extractAudioUrl(raw);
-  const topic     = (document.getElementById('topicInput')?.value || '').trim();
+  const topic     = currentRunTopic || (document.getElementById('topicInput')?.value || '').trim();
 
   const detailsIdx = raw.indexOf('<details>');
   const synthesis  = detailsIdx > 0 ? raw.slice(0, detailsIdx).trim() : raw;
@@ -1665,12 +1669,19 @@ function renderHistory() {
 function loadHistory(idx) {
   const h = runHistory[idx];
   if (!h) return;
-  currentIssueId = h.id;
-  currentAgent   = h.agent || 'director';
+  currentIssueId  = h.id;
+  currentRunIssueId = h.id;
+  currentRunTopic   = h.topic || '';
+  currentAgent    = h.agent || 'director';
   selectAgent(currentAgent);
   document.getElementById('topicInput').value = h.topic || '';
   setAllDone();
   showResults(h.raw, {});
+  // Si hay clips/videos acumulados para este topic, activar polling
+  // por si los agentes de video aún no han terminado
+  if (h.agent === 'director' && h.id) {
+    startAgentUpdatePolling(h.id);
+  }
 }
 
 /* ────────────────────────────────────────
@@ -1801,29 +1812,43 @@ function startAgentUpdatePolling(issueId) {
 }
 
 async function checkAgentUpdates(issueId) {
+  // Estrategia: sondear sub-issues por parentId.
+  // Paperclip no permite comentarios ni cambios en issues cerrados (409),
+  // así que no podemos leer comentarios del issue del Director.
+  // En cambio, leemos los sub-issues que Paperclip sí mantiene accesibles.
   try {
-    const res = await fetch(`${API_BASE}/api/issues/${issueId}/comments`, { credentials: 'include' });
+    const res = await fetch(
+      `${API_BASE}/api/companies/${COMPANY_ID}/issues?parentId=${issueId}&limit=30`,
+      { credentials: 'include' }
+    );
     if (!res.ok) return;
     const data = await res.json();
-    const comments = data.comments || data || [];
-    if (!Array.isArray(comments)) return;
+    const issues = data.issues || data || [];
+    if (!Array.isArray(issues)) return;
 
-    for (const c of comments) {
-      const body = c.body || c.content || c.text || '';
-      const match = body.match(/<!--PC_AGENT_UPDATE:(\w+)-->\n?([\s\S]*)/);
-      if (!match) continue;
-      const agentName = match[1];
-      const content   = match[2];
-      if (agentUpdatesFound.has(agentName)) continue; // ya procesado
+    for (const iss of issues) {
+      const title  = (iss.title || '').toLowerCase();
+      const status = (iss.status || '').toLowerCase();
+      if (status !== 'done') continue;
 
-      agentUpdatesFound.add(agentName);
-      applyAgentUpdate(agentName, content);
+      if (title.includes('imagen video') && !agentUpdatesFound.has('imagen_video')) {
+        agentUpdatesFound.add('imagen_video');
+        const result = await fetchLastComment(iss.id);
+        if (result) applyAgentUpdate('imagen_video', result);
+      }
+
+      if ((title.includes('video assembler') || title.includes('assembler')) && !agentUpdatesFound.has('video_assembler')) {
+        agentUpdatesFound.add('video_assembler');
+        const result = await fetchLastComment(iss.id);
+        if (result) applyAgentUpdate('video_assembler', result);
+      }
     }
   } catch(e) { /* silencioso */ }
 }
 
 function applyAgentUpdate(agentName, content) {
-  const topic = (document.getElementById('topicInput')?.value || '').trim();
+  // Usar el topic capturado al iniciar el run, no el actual (puede haber cambiado)
+  const topic = currentRunTopic || (document.getElementById('topicInput')?.value || '').trim();
 
   if (agentName === 'imagen_video') {
     // Extraer clips del contenido del agente
