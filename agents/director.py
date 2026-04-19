@@ -36,8 +36,10 @@ SUB_AGENT_IDS = {
     "storytelling":         "061ed6b8-27b1-4a31-8758-19af856b45d3",
     "prompt_generator":     "64e2cb07-75e1-4ca2-8b6c-05a78b66613f",
     "imagen_generator":     "2492962a-b9f0-4611-90e2-c7ccca5aa281",
-    "video_prompt_generator": os.environ.get("VIDEO_PROMPT_GENERATOR_AGENT_ID", ""),
-    "imagen_video":         os.environ.get("IMAGEN_VIDEO_AGENT_ID", ""),
+    "video_prompt_generator": os.environ.get("VIDEO_PROMPT_GENERATOR_AGENT_ID",
+                                             "9d4d8bf2-8f0b-48df-a189-da6a12911437"),
+    "imagen_video":         os.environ.get("IMAGEN_VIDEO_AGENT_ID",
+                                           "62e14c73-905b-45ce-b4d9-4cd532ec3dca"),
     "tts":                  "0d43b313-77b5-481b-83cc-a41485823f8e",
     "video_assembler":      "28f0a4aa-a230-4d82-aedf-4c327ab4a506",
 }
@@ -253,8 +255,11 @@ def run_agent_with_env(script_name: str, task: str, env: dict, label: str,
             env=env
         )
         if result.returncode != 0:
-            error_msg = result.stderr.strip()
+            error_msg  = result.stderr.strip()
+            stdout_tail = result.stdout.strip()[-600:]  # últimas líneas para debug ffmpeg
             print(f"⚠️  {label} falló (exit {result.returncode}): {error_msg[:300]}", flush=True)
+            if stdout_tail:
+                print(f"  📋 stdout (tail):\n{stdout_tail}", flush=True)
             return f"[{label}: Error - {error_msg[:200]}]"
 
         output = sanitize(result.stdout.strip())
