@@ -94,14 +94,13 @@ def submit_video(image_url: str, motion_prompt: str, api_key: str) -> str:
 
     # Distintas combinaciones endpoint / formato de payload
     attempts = [
-        # (endpoint, payload)
+        # dop/lite con payload plano (formato confirmado)
         (DOP_MODEL_LITE, {"prompt": motion_prompt, "image_url": image_url, "seed": 42}),
-        (DOP_MODEL_V1,   {"prompt": motion_prompt, "image_url": image_url, "seed": 42}),
-        (DOP_MODEL_LITE, {"prompt": motion_prompt, "image_urls": [image_url], "seed": 42}),
-        (DOP_MODEL_V1,   {"prompt": motion_prompt, "image_urls": [image_url], "seed": 42}),
+        # v1 con wrapper params (formato correcto para v1)
+        (DOP_MODEL_V1,   {"params": {"prompt": motion_prompt, "image_url": image_url, "seed": 42}}),
     ]
 
-    for endpoint, payload in attempts:
+    for attempt_num, (endpoint, payload) in enumerate(attempts):
         url = f"{BASE_URL}/{endpoint}"
         print(f"  📡 POST {url}  payload_keys={list(payload.keys())}", flush=True)
         try:
@@ -113,13 +112,19 @@ def submit_video(image_url: str, motion_prompt: str, api_key: str) -> str:
             # Loguear la respuesta completa para diagnóstico
             print(f"  ⚠️  Sin request_id. Respuesta: {json.dumps(result)[:300]}", flush=True)
         except Exception as e:
+            err_str = str(e)
+            # Rate limit: esperar antes del siguiente intento
+            if "concurrent" in err_str.lower() or "HTTP 400" in err_str:
+                wait = 20 if attempt_num == 0 else 30
+                print(f"  ⏳ Rate limit detectado — esperando {wait}s antes de reintentar...", flush=True)
+                time.sleep(wait)
             print(f"  ⚠️  {endpoint} falló: {e}", flush=True)
 
     raise Exception("Todos los intentos DOP fallaron — revisa los logs arriba para el error exacto")
 
 
-def poll_video(request_id: str, api_key: str, max_wait: int = 180) -> str:
-    """Polling hasta obtener la URL del video MP4. Timeout 3 min por clip."""
+def poll_video(request_id: str, api_key: str, max_wait: int = 150) -> str:
+    """Polling hasta obtener la URL del video MP4. Timeout 2.5 min por clip."""
     deadline   = time.time() + max_wait
     interval   = 4          # poll cada 4s para ser más ágil
     status_url = f"{BASE_URL}/requests/{request_id}/status"
@@ -285,8 +290,8 @@ def main():
             api_key       = api_key,
         )
 
-    # Máx 3 en paralelo — DOP Lite aguanta bien la concurrencia baja
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # Secuencial (max_workers=1) para evitar el límite de 4 concurrent requests de Higgsfield
+    with ThreadPoolExecutor(max_workers=1) as executor:
         futures = {executor.submit(run, i, item): i for i, item in enumerate(video_prompts)}
         for future in as_completed(futures):
             idx, result = future.result()
