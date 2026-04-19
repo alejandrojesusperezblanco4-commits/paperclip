@@ -516,8 +516,10 @@ def main():
     # Estos agentes se crean como sub-issue (visibilidad en inbox) pero se ejecutan localmente.
     # video_prompt_generator e imagen_video salen de SUBPROCESS_ONLY cuando
     # tienen un ID real de Paperclip → corren en su propio proceso Railway.
-    _subprocess_base = {"tts", "video_assembler", "source_reader"}
-    _maybe_delegated = {"video_prompt_generator", "imagen_video"}
+    # video_assembler pasa a delegado (propio proceso Railway) para no bloquear
+    # al Director los ~90s que tarda FFmpeg + upload.
+    _subprocess_base = {"tts", "source_reader"}
+    _maybe_delegated = {"video_prompt_generator", "imagen_video", "video_assembler"}
     SUBPROCESS_ONLY = _subprocess_base | {
         k for k in _maybe_delegated if not SUB_AGENT_IDS.get(k)
     }
@@ -560,6 +562,13 @@ def main():
             if result is not None:
                 print(f"  ✅ {label} completado vía Paperclip ({len(result)} caracteres)", flush=True)
                 return result
+
+            # video_assembler es un proceso Railway pesado (~90s) — no hacer subprocess
+            # fallback o el Director supera los 300s de Railway y muere.
+            # Dejarlo correr en su propio proceso; el Director publica sin video_url.
+            if agent_key == "video_assembler":
+                print(f"  ⏳ Video Assembler en proceso — Director continúa sin esperar", flush=True)
+                return f"[video_assembler:en_proceso:sub_id={sub_id}]"
 
             print(f"  ⚠️  Timeout esperando {label} — usando subprocess como fallback...", flush=True)
             _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "in_progress"}, auth_headers)
@@ -789,7 +798,7 @@ Guión completo:
             post_issue_comment(f"🎬 **Fase 7 — Video Assembler** en progreso… ensamblando con {_mode}…")
             video_result = run_tracked("video_assembler.py", video_task,
                                        "Video Assembler — MP4 final", "video_assembler",
-                                       paperclip_timeout=60)
+                                       paperclip_timeout=90)
             try:
                 _vid_match = _re.search(r'\{[\s\S]*?"video_url"[\s\S]*?\}', video_result)
                 if _vid_match:
@@ -848,6 +857,13 @@ Guión completo:
     video_section = ""
     if video_url:
         video_section = f"\n## 🎬 VIDEO GENERADO\n📥 [Descargar MP4]({video_url})\n\n"
+    elif video_result and "en_proceso" in video_result:
+        video_section = (
+            "\n## 🎬 VIDEO EN PROCESO\n"
+            "⏳ El Video Assembler está ensamblando el MP4 en su propio proceso. "
+            "El link de descarga aparecerá en el sub-issue **Video Assembler — MP4 final** "
+            "dentro de ~2 minutos.\n\n"
+        )
 
     tts_section = ""
     if tts_result:
