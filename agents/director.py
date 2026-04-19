@@ -736,80 +736,13 @@ Guión completo:
     for _u in _img_urls[:6]:
         print(f"     • {_u[:90]}", flush=True)
 
-    # ── Fase 6b: Video Prompt Generator (motion prompts) ─────
-    video_prompt_result = ""
-    if higgsfield_key and _img_urls:
-        post_issue_comment("🎬 **Fase 6b — Video Prompt Generator** en progreso… diseñando movimientos de cámara…")
-        _vp_task = sanitize(
-            storytelling_result[:1500] + "\n\n---\n\n" +
-            "\n".join(f"Escena {i+1}: {u}" for i, u in enumerate(_img_urls))
-        )
-        video_prompt_result = run_tracked(
-            "video_prompt_generator.py", _vp_task,
-            "Video Prompt Generator — Motion prompts", "video_prompt_generator",
-        )
+    # ═══════════════════════════════════════════════════════════
+    # FASE GARANTIZADA — Síntesis + publicar resultado
+    # Se ejecuta ANTES de la cadena de video para asegurar que
+    # el usuario SIEMPRE recibe el contenido aunque Railway
+    # mate el proceso durante la animación/ensamblado.
+    # ═══════════════════════════════════════════════════════════
 
-    # ── Fase 6c: Imagen Video — Higgsfield DOP (animar imágenes) ─
-    imagen_video_result = ""
-    _video_clip_urls    = []
-    if higgsfield_key and video_prompt_result and _img_urls:
-        post_issue_comment("🎞️ **Fase 6c — Imagen Video (DOP)** en progreso… animando cada imagen (3-5 min)…")
-        # Cuando imagen_video es un agente Paperclip real (ID != ""),
-        # corre en su propio proceso Railway → le damos 240s de polling.
-        # Cuando es subprocess directo, el timeout del OS ya aplica.
-        _iv_paperclip_timeout = 240 if SUB_AGENT_IDS.get("imagen_video") else 60
-        imagen_video_result = run_tracked(
-            "imagen_video.py", video_prompt_result,
-            "Imagen Video — Higgsfield DOP", "imagen_video",
-            extra_env={"HIGGSFIELD_API_KEY": higgsfield_key},
-            paperclip_timeout=_iv_paperclip_timeout,
-        )
-        # Extraer URLs de clips animados del output
-        _clip_bold = _re.findall(r"\*\*VIDEO_CLIP:\*\*\s*(https?://\S+)", imagen_video_result)
-        _clip_json = []
-        try:
-            _jm = _re.search(r'"video_clips"\s*:\s*(\[[\s\S]*?\])', imagen_video_result)
-            if _jm:
-                _clip_json = [u for u in json.loads(_jm.group(1)) if u]
-        except Exception:
-            pass
-        _video_clip_urls = list(dict.fromkeys(_clip_bold + _clip_json))
-        print(f"  🎞️  Clips animados detectados: {len(_video_clip_urls)}", flush=True)
-        for _u in _video_clip_urls[:6]:
-            print(f"     • {_u[:90]}", flush=True)
-
-    # ── Fase 7: Video Assembler (clips o imágenes + voz) ─────
-    video_result = ""
-    video_url    = ""
-    if elevenlabs_key and higgsfield_key:
-        # Preferir clips animados; si falló DOP, usar imágenes estáticas como fallback
-        _use_clips  = bool(_video_clip_urls)
-        _use_images = bool(_img_urls) and not _use_clips
-
-        if _use_clips or _use_images:
-            video_task = sanitize(json.dumps({
-                "video_clips":  _video_clip_urls,   # clips animados (vacío → usa imágenes)
-                "image_urls":   _img_urls,          # fallback si no hay clips
-                "audio_path":   audio_path,
-                "audio_url":    audio_url_tts,
-                "tema":         objetivo[:100],
-            }, ensure_ascii=False))
-            _mode = "clips animados" if _use_clips else "imágenes estáticas (fallback)"
-            post_issue_comment(f"🎬 **Fase 7 — Video Assembler** en progreso… ensamblando con {_mode}…")
-            video_result = run_tracked("video_assembler.py", video_task,
-                                       "Video Assembler — MP4 final", "video_assembler",
-                                       paperclip_timeout=90)
-            try:
-                _vid_match = _re.search(r'\{[\s\S]*?"video_url"[\s\S]*?\}', video_result)
-                if _vid_match:
-                    _vid_data = json.loads(_vid_match.group(0))
-                    video_url = _vid_data.get("video_url", "")
-            except Exception:
-                pass
-        else:
-            print("⚠️  Sin imágenes ni clips — saltando Video Assembler", flush=True)
-
-    # ── Síntesis ejecutiva ────────────────────────────────────
     print(f"\n{'='*60}", flush=True)
     print("🧠 Sintetizando paquete ejecutivo...", flush=True)
     print(f"{'='*60}", flush=True)
@@ -821,19 +754,17 @@ Guión completo:
         "prompt_generator": prompt_result,
         "imagen":           imagen_result,
     }
-
     try:
         synthesis = synthesize(objetivo, reports, api_key)
     except Exception as e:
         synthesis = f"[Error en síntesis: {e}]"
 
-    # ── Extraer URLs de imágenes para galería ────────────────
+    # ── Construir secciones del output ───────────────────────
     _raw_ext   = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", imagen_result)
     _raw_bold  = _re.findall(r"\*\*URL:\*\*\s*(https?://\S+)", imagen_result)
     _raw_md    = _re.findall(r"\]\((https?://[^\s)]+)\)", imagen_result)
     imagen_urls = list(dict.fromkeys(_raw_ext + _raw_bold + _raw_md))
 
-    # ── Construir output final ────────────────────────────────
     imagen_gallery = ""
     if imagen_urls:
         imagen_gallery = "\n## 🖼️ IMÁGENES GENERADAS\n"
@@ -854,21 +785,9 @@ Guión completo:
         except Exception:
             pass
 
-    video_section = ""
-    if video_url:
-        video_section = f"\n## 🎬 VIDEO GENERADO\n📥 [Descargar MP4]({video_url})\n\n"
-    elif video_result and "en_proceso" in video_result:
-        video_section = (
-            "\n## 🎬 VIDEO EN PROCESO\n"
-            "⏳ El Video Assembler está ensamblando el MP4 en su propio proceso. "
-            "El link de descarga aparecerá en el sub-issue **Video Assembler — MP4 final** "
-            "dentro de ~2 minutos.\n\n"
-        )
-
     tts_section = ""
     if tts_result:
         try:
-            # tts_result es stdout mixto (logs + JSON al final) — extraer el bloque JSON
             _tts_match = _re.search(r'\{[\s\S]*?"audio_url"[\s\S]*?\}', tts_result)
             if _tts_match:
                 _tts = json.loads(_tts_match.group(0))
@@ -876,6 +795,17 @@ Guión completo:
                     tts_section = f"\n## 🎙️ VOZ EN OFF\n📥 [Descargar MP3]({_tts['audio_url']}) — {_tts.get('duration_estimate','')}\n\n"
         except Exception:
             pass
+
+    # Video en proceso — la cadena de video corre después de publicar
+    video_section = ""
+    if higgsfield_key and elevenlabs_key and _img_urls:
+        video_section = (
+            "\n## 🎬 VIDEO EN PROCESO\n"
+            "⏳ Los agentes **Video Prompt Generator → Imagen Video → Video Assembler** "
+            "están animando y ensamblando el MP4 ahora mismo. "
+            "El link de descarga aparecerá en el sub-issue **Video Assembler — MP4 final** "
+            "en ~3-5 minutos.\n\n"
+        )
 
     output = f"""# 🎬 PAQUETE COMPLETO DE CONTENIDO
 **Tema:** {objetivo}
@@ -917,24 +847,83 @@ Guión completo:
 {imagen_result[:3000]}
 </details>
 {("<details><summary>🎙️ TTS - Audio narración</summary>" + chr(10) + tts_result[-2000:] + chr(10) + "</details>") if tts_result else ""}
-{("<details><summary>🎬 Video Assembler - Video final</summary>" + chr(10) + video_result[-2000:] + chr(10) + "</details>") if video_result else ""}
 {("<details><summary>📚 Source Reader - Fuentes procesadas</summary>" + chr(10) + source_result[-2000:] + chr(10) + "</details>") if source_result else ""}
 """
     print(output, flush=True)
 
-    # ── Publicar resultado en el issue principal ───────────────
+    # ── Publicar resultado y cerrar issue ANTES de la cadena de video ──
     if issue_id and "Authorization" in auth_headers:
-        # 1. Postear el resultado PRIMERO como comentario
         _api_request("POST", f"{api_url}/api/issues/{issue_id}/comments",
                      {"body": output}, auth_headers)
         print("✅ Resultado publicado en el inbox", flush=True)
-
-        # 2. Cerrar el issue DESPUÉS (el frontend detecta 'done' y ya hay comentario)
         _api_request("PATCH", f"{api_url}/api/issues/{issue_id}",
                      {"status": "done"}, auth_headers)
-        print("✅ Issue principal cerrado", flush=True)
+        print("✅ Issue principal cerrado — iniciando cadena de video best-effort", flush=True)
     elif issue_id:
         print("⚠️  Sin auth — issue no se pudo cerrar", flush=True)
+
+    # ═══════════════════════════════════════════════════════════
+    # CADENA DE VIDEO — Best-effort
+    # El issue ya está cerrado y el resultado publicado.
+    # Si Railway mata el proceso aquí, el usuario ya tiene
+    # guión + imágenes + audio. El video es un bonus.
+    # ═══════════════════════════════════════════════════════════
+
+    # ── Fase 6b: Video Prompt Generator ──────────────────────
+    video_prompt_result = ""
+    if higgsfield_key and _img_urls:
+        _vp_task = sanitize(
+            storytelling_result[:1500] + "\n\n---\n\n" +
+            "\n".join(f"Escena {i+1}: {u}" for i, u in enumerate(_img_urls))
+        )
+        video_prompt_result = run_tracked(
+            "video_prompt_generator.py", _vp_task,
+            "Video Prompt Generator — Motion prompts", "video_prompt_generator",
+        )
+
+    # ── Fase 6c: Imagen Video — Higgsfield DOP ───────────────
+    imagen_video_result = ""
+    _video_clip_urls    = []
+    if higgsfield_key and video_prompt_result and _img_urls:
+        _iv_paperclip_timeout = 180 if SUB_AGENT_IDS.get("imagen_video") else 60
+        imagen_video_result = run_tracked(
+            "imagen_video.py", video_prompt_result,
+            "Imagen Video — Higgsfield DOP", "imagen_video",
+            extra_env={"HIGGSFIELD_API_KEY": higgsfield_key},
+            paperclip_timeout=_iv_paperclip_timeout,
+        )
+        _clip_bold = _re.findall(r"\*\*VIDEO_CLIP:\*\*\s*(https?://\S+)", imagen_video_result)
+        _clip_json = []
+        try:
+            _jm = _re.search(r'"video_clips"\s*:\s*(\[[\s\S]*?\])', imagen_video_result)
+            if _jm:
+                _clip_json = [u for u in json.loads(_jm.group(1)) if u]
+        except Exception:
+            pass
+        _video_clip_urls = list(dict.fromkeys(_clip_bold + _clip_json))
+        print(f"  🎞️  Clips animados detectados: {len(_video_clip_urls)}", flush=True)
+        for _u in _video_clip_urls[:6]:
+            print(f"     • {_u[:90]}", flush=True)
+
+    # ── Fase 7: Video Assembler — fire-and-forget ─────────────
+    if elevenlabs_key and higgsfield_key:
+        _use_clips  = bool(_video_clip_urls)
+        _use_images = bool(_img_urls) and not _use_clips
+        if _use_clips or _use_images:
+            video_task = sanitize(json.dumps({
+                "video_clips": _video_clip_urls,
+                "image_urls":  _img_urls,
+                "audio_path":  audio_path,
+                "audio_url":   audio_url_tts,
+                "tema":        objetivo[:100],
+            }, ensure_ascii=False))
+            _mode = "clips animados" if _use_clips else "imágenes estáticas (fallback)"
+            print(f"  🎬 Despachando Video Assembler ({_mode}) — fire-and-forget", flush=True)
+            run_tracked("video_assembler.py", video_task,
+                        "Video Assembler — MP4 final", "video_assembler",
+                        paperclip_timeout=0)
+        else:
+            print("⚠️  Sin imágenes ni clips — saltando Video Assembler", flush=True)
 
 
 if __name__ == "__main__":
