@@ -3,4 +3,5 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
+preDeployCommand = "pnpm exec tsx packages/db/src/create_video_agents.ts"
 restartPolicyType = "never"
