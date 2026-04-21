@@ -150,6 +150,45 @@ def _api_request(method: str, url: str, payload, headers: dict):
         return None
 
 
+def ensure_agent_registered(agent_name: str, script: str, title: str,
+                            api_url: str, auth_headers: dict, company_id: str,
+                            reports_to_id: str = "") -> str:
+    """Busca el agente por nombre en Paperclip. Si no existe, lo crea con adapterType='process'.
+    Devuelve el UUID del agente (existente o recién creado), o "" si falla."""
+    if not api_url or not company_id or "Authorization" not in auth_headers:
+        return ""
+    try:
+        # 1. Listar agentes existentes
+        data = _api_request("GET", f"{api_url}/api/companies/{company_id}/agents", None, auth_headers)
+        existing_agents = data if isinstance(data, list) else (data or {}).get("agents", [])
+        for ag in existing_agents:
+            if isinstance(ag, dict) and ag.get("name", "").lower() == agent_name.lower():
+                found_id = ag.get("id", "")
+                print(f"  ✅ Agente '{agent_name}' ya existe → {found_id}", flush=True)
+                return found_id
+        # 2. Crear agente
+        payload = {
+            "name":               agent_name,
+            "title":              title,
+            "role":               "engineer",
+            "adapterType":        "process",
+            "adapterConfig":      {"command": "python", "args": [f"agents/{script}"], "cwd": "/app"},
+            "budgetMonthlyCents": 6000,
+        }
+        if reports_to_id:
+            payload["reportsTo"] = reports_to_id
+        result = _api_request("POST", f"{api_url}/api/companies/{company_id}/agents",
+                              payload, auth_headers)
+        new_id = (result or {}).get("id", "")
+        if new_id:
+            print(f"  ✅ Agente '{agent_name}' creado → {new_id}", flush=True)
+            print(f"  💡 Añade POPCORN_AGENT_ID={new_id} en Railway para persistirlo", flush=True)
+        return new_id
+    except Exception as e:
+        print(f"⚠️  No se pudo registrar agente '{agent_name}': {e}", flush=True)
+        return ""
+
+
 def create_sub_issue(title: str, agent_key: str, parent_issue_id: str,
                      api_url: str, auth_headers: dict, company_id: str = "",
                      description: str = "", assignee_agent_id: str = ""):
@@ -406,6 +445,21 @@ def main():
             print(f"⚠️  No se pudo generar JWT: {e}", flush=True)
     else:
         print("⚠️  Sin token de autenticación disponible — sub-issues no se crearán", flush=True)
+
+    # ── Auto-registrar agentes de proceso si no tienen UUID ───────
+    if not SUB_AGENT_IDS.get("popcorn") and "Authorization" in auth_headers:
+        print("🔧 POPCORN_AGENT_ID no configurado — intentando auto-registrar...", flush=True)
+        _popcorn_id = ensure_agent_registered(
+            agent_name="Popcorn Auto",
+            script="popcorn.py",
+            title="Higgsfield Coherent Image Generator",
+            api_url=api_url,
+            auth_headers=auth_headers,
+            company_id=company_id,
+            reports_to_id=agent_id,
+        )
+        if _popcorn_id:
+            SUB_AGENT_IDS["popcorn"] = _popcorn_id
 
     # ── Obtener título del issue desde la API si no llegó por env ─
     # El wakeup de Paperclip solo pasa issueId en el payload, no el título.
