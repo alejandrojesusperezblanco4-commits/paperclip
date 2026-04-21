@@ -21,6 +21,7 @@ import hashlib
 import base64
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from api_client import call_llm, post_issue_comment
@@ -503,12 +504,12 @@ def main():
             _src_label = ", ".join(dict.fromkeys(_src_types)) or "web"
             _phases += f"{_phase}️⃣ **Source Reader** — extraigo contenido real de {len(_body_urls)} fuente(s) ({_src_label})\n"
             _phase += 1
-        _phases += f"{_phase}️⃣ **Deep Search** — tendencias virales del nicho\n"; _phase += 1
-        _phases += f"{_phase}️⃣ **Channel Analyzer** — análisis de la competencia\n"; _phase += 1
+        _phases += f"{_phase}️⃣ **Deep Search + Channel Analyzer** — tendencias y competencia (en paralelo)\n"; _phase += 2
         _phases += f"{_phase}️⃣ **Storytelling** — guión {'basado en tus fuentes' if _has_src else 'adaptado al nicho'}\n"; _phase += 1
         if has_tts:
-            _phases += f"{_phase}️⃣ **TTS** — voz en off con ElevenLabs\n"; _phase += 1
-        _phases += f"{_phase}️⃣ **Prompt Generator** — prompts de imagen por escena\n"; _phase += 1
+            _phases += f"{_phase}️⃣ **TTS + Prompt Generator** — voz en off y prompts de imagen (en paralelo)\n"; _phase += 2
+        else:
+            _phases += f"{_phase}️⃣ **Prompt Generator** — prompts de imagen por escena\n"; _phase += 1
         if has_hf:
             _phases += f"{_phase}️⃣ **Imagen Generator** — imágenes coherentes con Higgsfield Popcorn Auto\n"; _phase += 1
             _phases += f"{_phase}️⃣ **Imagen Video** — clips cinematográficos con DoP Turbo First-Last Frame\n"; _phase += 1
@@ -728,13 +729,18 @@ def main():
     search_task   = f"Busca tendencias virales y keywords de oportunidad para el tema: {objetivo}{_source_hint}"
     analyzer_task = f"Analiza los canales más exitosos de YouTube y TikTok sobre: {objetivo}. Encuentra sus debilidades.{_source_hint}"
 
-    post_issue_comment(f"🔍 **Fase {'2' if has_sources else '1'} — Deep Search** en progreso…")
-    deep_search_result = run_tracked("deep_search.py", search_task,
-                                     "Deep Search — Tendencias", "deep_search")
-
-    post_issue_comment(f"📊 **Fase {'3' if has_sources else '2'} — Channel Analyzer** en progreso…")
-    channel_result     = run_tracked("channel_analyzer.py", analyzer_task,
-                                     "Channel Analyzer — Competencia", "channel_analyzer")
+    _fase_inv = 2 if has_sources else 1
+    post_issue_comment(
+        f"🔍📊 **Fases {_fase_inv} y {_fase_inv + 1} — Deep Search + Channel Analyzer** "
+        f"corriendo en paralelo…"
+    )
+    with ThreadPoolExecutor(max_workers=2) as _ex:
+        _f_ds = _ex.submit(run_tracked, "deep_search.py", search_task,
+                           "Deep Search — Tendencias", "deep_search")
+        _f_ca = _ex.submit(run_tracked, "channel_analyzer.py", analyzer_task,
+                           "Channel Analyzer — Competencia", "channel_analyzer")
+        deep_search_result = _f_ds.result()
+        channel_result     = _f_ca.result()
 
     # ── Fase 2: Guión ─────────────────────────────────────────
     _source_block = ""
@@ -754,36 +760,25 @@ Diferenciacion vs competencia:
     storytelling_result = run_tracked("storytelling.py", storytelling_task,
                                       "Storytelling — Guión 4-5 escenas", "storytelling")
 
-    # ── Fase 3: TTS (voz en off) ──────────────────────────────
-    tts_result      = ""
-    audio_path      = ""
-    audio_url_tts   = ""
-    elevenlabs_key  = os.environ.get("ELEVENLABS_API_KEY", "")
+    # ── TTS en background — corre en paralelo con Style Decision + PG ──
+    # TTS solo necesita el guión → puede arrancar ahora mismo.
+    # Esperamos su resultado después de que PG termine.
+    tts_result     = ""
+    audio_path     = ""
+    audio_url_tts  = ""
+    elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY", "")
+    _tts_executor  = None
+    _tts_future    = None
     if elevenlabs_key:
-        post_issue_comment("🎙️ **Fase 4 — TTS (voz en off)** en progreso…")
-        tts_result = run_tracked(
-            "tts.py", storytelling_result,
-            "TTS — Voz en off", "tts",
-            extra_env={"ELEVENLABS_API_KEY": elevenlabs_key},
-            paperclip_timeout=90,  # falla rápido → subprocess directo
+        post_issue_comment(
+            "🎙️ **TTS** arrancado en background (corre en paralelo con Prompt Generator)…"
         )
-        # Extraer audio_path y audio_url del JSON que devuelve tts.py.
-        # tts_result mezcla logs + JSON en stdout → buscar el JSON con regex.
-        try:
-            _m = _re.search(r'\{[\s\S]*?"audio_(?:path|url)"[\s\S]*?\}', tts_result)
-            if _m:
-                _tts_data = json.loads(_m.group(0))
-                audio_path    = _tts_data.get("audio_path", "")
-                audio_url_tts = _tts_data.get("audio_url", "")
-        except Exception:
-            pass
-        # Fallback: buscar el MP3 más reciente en /tmp si el parsing falló
-        if not audio_path or not os.path.exists(audio_path):
-            import glob as _glob
-            _mp3s = sorted(_glob.glob("/tmp/narration_*.mp3"), key=os.path.getmtime, reverse=True)
-            audio_path = _mp3s[0] if _mp3s else ""
-        print(f"🎙️ Audio path: {audio_path or 'no disponible'}", flush=True)
-        print(f"🔗 Audio URL TTS: {audio_url_tts[:80] if audio_url_tts else 'no disponible'}", flush=True)
+        _tts_executor = ThreadPoolExecutor(max_workers=1)
+        _tts_future   = _tts_executor.submit(
+            run_tracked, "tts.py", storytelling_result,
+            "TTS — Voz en off", "tts",
+            {"ELEVENLABS_API_KEY": elevenlabs_key}, 90,
+        )
     else:
         print("⚠️  ELEVENLABS_API_KEY no encontrada — saltando TTS", flush=True)
 
@@ -863,6 +858,30 @@ Guión completo:
     post_issue_comment("🎨 **Fase 5 — Prompt Generator** en progreso…")
     prompt_result = run_tracked("prompt_generator.py", prompt_task,
                                 "Prompt Generator — 5-6 imágenes", "prompt_generator")
+
+    # ── Esperar TTS (que corrió en paralelo con Style + PG) ──
+    if _tts_future is not None:
+        try:
+            tts_result = _tts_future.result(timeout=130)
+        except Exception as _tts_e:
+            print(f"⚠️  TTS error en background: {_tts_e}", flush=True)
+        finally:
+            if _tts_executor:
+                _tts_executor.shutdown(wait=False)
+        try:
+            _m = _re.search(r'\{[\s\S]*?"audio_(?:path|url)"[\s\S]*?\}', tts_result)
+            if _m:
+                _tts_data     = json.loads(_m.group(0))
+                audio_path    = _tts_data.get("audio_path", "")
+                audio_url_tts = _tts_data.get("audio_url", "")
+        except Exception:
+            pass
+        if not audio_path or not os.path.exists(audio_path):
+            import glob as _glob
+            _mp3s = sorted(_glob.glob("/tmp/narration_*.mp3"), key=os.path.getmtime, reverse=True)
+            audio_path = _mp3s[0] if _mp3s else ""
+        print(f"🎙️ Audio path: {audio_path or 'no disponible'}", flush=True)
+        print(f"🔗 Audio URL TTS: {audio_url_tts[:80] if audio_url_tts else 'no disponible'}", flush=True)
 
     imagen_result  = "[Imagen Generator: HIGGSFIELD_API_KEY no configurada — omitido]"
     higgsfield_key = os.environ.get("HIGGSFIELD_API_KEY", "")
