@@ -596,6 +596,13 @@ def main():
         4. Cierra el sub-issue con el resultado
         """
         assignee_id = SUB_AGENT_IDS.get(agent_key, "")
+
+        # Calcular ANTES de crear el sub-issue: los agentes en SUBPROCESS_ONLY
+        # NO deben tener assigneeAgentId, porque Paperclip intentaría dispatcharlos
+        # por su cuenta (conflicto con el subprocess local que ya lanzamos).
+        use_subprocess_directly = agent_key in SUBPROCESS_ONLY or not assignee_id
+        _assignee_for_issue = "" if use_subprocess_directly else assignee_id
+
         sub_id = None
 
         if issue_id and "Authorization" in auth_headers:
@@ -611,15 +618,12 @@ def main():
                 title=f"🤖 {label}",
                 agent_key=agent_key,
                 description=_desc,
-                assignee_agent_id=assignee_id,
+                assignee_agent_id=_assignee_for_issue,
                 parent_issue_id=issue_id,
                 api_url=api_url,
                 auth_headers=auth_headers,
                 company_id=company_id,
             )
-
-        # Agentes que van directo a subprocess (sin esperar dispatch de Paperclip)
-        use_subprocess_directly = agent_key in SUBPROCESS_ONLY or not assignee_id
 
         if sub_id and assignee_id and not use_subprocess_directly:
             # PATCH a 'todo' → statusChangedFromBacklog → Paperclip despacha el sub-agente
