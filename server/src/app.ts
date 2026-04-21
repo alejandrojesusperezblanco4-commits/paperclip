@@ -162,21 +162,34 @@ export async function createApp(
       return;
     }
     try {
-      const [company] = await (db as any)
+      // Buscar la compañía correcta: la que tiene el Director, no necesariamente la primera.
+      const allAgentsGlobal: { id: string; name: string; companyId: string }[] = await (db as any)
+        .select({ id: agentsTable.id, name: agentsTable.name, companyId: agentsTable.companyId })
+        .from(agentsTable)
+        .limit(300);
+
+      const director = allAgentsGlobal.find((a) => a.name.toLowerCase().includes("director"));
+      const targetCompanyId = director?.companyId;
+
+      // Fallback: primera compañía en la tabla
+      const [firstCompany] = await (db as any)
         .select({ id: companiesTable.id, name: companiesTable.name })
         .from(companiesTable)
         .limit(1);
+
+      const [company] = targetCompanyId
+        ? await (db as any)
+            .select({ id: companiesTable.id, name: companiesTable.name })
+            .from(companiesTable)
+            .where(eq(companiesTable.id, targetCompanyId))
+        : [firstCompany];
+
       if (!company) {
         res.status(500).json({ error: "No company found in DB" });
         return;
       }
 
-      const allAgents: { id: string; name: string }[] = await (db as any)
-        .select({ id: agentsTable.id, name: agentsTable.name })
-        .from(agentsTable)
-        .where(eq(agentsTable.companyId, company.id));
-
-      const director = allAgents.find((a) => a.name.toLowerCase().includes("director"));
+      const allAgents = allAgentsGlobal.filter((a) => a.companyId === company.id);
 
       const AGENTS_TO_CREATE = [
         {
