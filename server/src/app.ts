@@ -196,7 +196,7 @@ export async function createApp(
           name: "Popcorn Auto",
           envVar: "POPCORN_AGENT_ID",
           title: "Higgsfield Coherent Image Generator",
-          adapterConfig: { command: "python", args: ["agents/popcorn.py"], cwd: "/app" },
+          adapterConfig: { command: "python3", args: ["agents/popcorn.py"], cwd: "/app" },
           budgetMonthlyCents: 6000,
         },
       ];
@@ -208,6 +208,11 @@ export async function createApp(
           (a) => a.name.toLowerCase() === spec.name.toLowerCase(),
         );
         if (existing) {
+          // Actualizar adapterConfig para aplicar correcciones (ej. python → python3)
+          await (db as any)
+            .update(agentsTable)
+            .set({ adapterConfig: spec.adapterConfig })
+            .where(eq(agentsTable.id, existing.id));
           results[spec.envVar] = { id: existing.id, created: false };
           continue;
         }
