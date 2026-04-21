@@ -871,21 +871,38 @@ Guión completo:
         # cinematográficas limpias), o fallback al guión resumido.
         _visual_brief = ""
         try:
-            _pr_json = _re.search(r'```json\s*([\s\S]*?)```', prompt_result)
-            if _pr_json:
-                _pr_data = json.loads(_pr_json.group(1))
-                _scenes  = _pr_data.get("scene_prompts") or _pr_data.get("scenes") or []
-                if _scenes:
-                    # Tomar los prompts visuales de las primeras 5 escenas
-                    _parts = [s.get("prompt", "") for s in _scenes[:5] if s.get("prompt")]
+            # Intentar varias formas de extraer el JSON del Prompt Generator
+            _pr_data = None
+            # 1. Bloque ```json ... ```
+            _m = _re.search(r'```json\s*([\s\S]*?)```', prompt_result)
+            if _m:
+                _pr_data = json.loads(_m.group(1).strip())
+            # 2. Bloque ``` ... ``` sin lenguaje
+            if not _pr_data:
+                _m = _re.search(r'```\s*(\{[\s\S]*?\})\s*```', prompt_result)
+                if _m:
+                    _pr_data = json.loads(_m.group(1).strip())
+            # 3. JSON inline (empieza con { directamente)
+            if not _pr_data:
+                _m = _re.search(r'(\{[\s\S]*?"scene_prompts"[\s\S]*?\})\s*$', prompt_result)
+                if _m:
+                    _pr_data = json.loads(_m.group(1).strip())
+
+            if _pr_data:
+                _scenes = _pr_data.get("scene_prompts") or _pr_data.get("scenes") or []
+                _parts  = [s.get("prompt", "") for s in _scenes[:5] if s.get("prompt")]
+                if _parts:
                     _visual_brief = " | ".join(_parts)[:2000]
-        except Exception:
-            pass
+                    print(f"  🎨 Visual brief extraído: {len(_parts)} escenas ({len(_visual_brief)} chars)", flush=True)
+        except Exception as _e:
+            print(f"  ⚠️  No se pudo extraer visual brief del Prompt Generator: {_e}", flush=True)
+
         if not _visual_brief:
-            # Fallback: extraer párrafos de VISUAL del guión, evitando el texto del LLM
-            _visual_lines = [l for l in storytelling_result.splitlines()
-                             if "VISUAL" in l.upper() or "🎬" in l]
-            _visual_brief = " ".join(_visual_lines)[:1500] if _visual_lines else objetivo[:500]
+            # Fallback: extraer líneas de VISUAL del guión
+            _visual_lines = [l.strip() for l in storytelling_result.splitlines()
+                             if ("VISUAL" in l.upper() or "🎬" in l) and len(l.strip()) > 20]
+            _visual_brief = " | ".join(_visual_lines)[:1500] if _visual_lines else objetivo[:500]
+            print(f"  ⚠️  Usando fallback para visual brief ({len(_visual_brief)} chars)", flush=True)
 
         _popcorn_task = sanitize(json.dumps({
             "prompt":       _visual_brief,
