@@ -919,7 +919,15 @@ Guión completo:
             _guion = storytelling_result[:800]
             print(f"  🎨 Guión Popcorn: fallback a storytelling completo", flush=True)
 
-        _visual_brief = f"Ambiente: {_ambiente}\n\nGuión:\n{_guion}"[:2000]
+        # Instrucción preventiva anti-copyright: personajes y escenarios 100% originales
+        _copyright_safe = (
+            "REGLA ABSOLUTA: Usa SOLO elementos visuales originales. "
+            "PROHIBIDO: marcas registradas, logos, personajes de ficción con copyright, "
+            "celebridades reales, franquicias (Marvel, Disney, Netflix…), atletas, "
+            "políticos, o cualquier persona/entidad reconocible. "
+            "Crea personajes anónimos y escenarios genéricos originales.\n\n"
+        )
+        _visual_brief = (_copyright_safe + f"Ambiente: {_ambiente}\n\nGuión:\n{_guion}")[:2000]
         print(f"  📝 Prompt Popcorn ({len(_visual_brief)} chars): {_visual_brief[:80]}…", flush=True)
 
         # Lote 1: 8 imágenes (máximo por llamada Popcorn)
@@ -943,6 +951,44 @@ Guión completo:
         # Extraer primera URL del lote 1 como referencia visual para el lote 2
         _b1_ext  = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", _pop_result_1)
         _b1_bold = _re.findall(r"\*\*URL:\*\*\s*(https?://\S+)", _pop_result_1)
+
+        # ── Retry reactivo anti-copyright ────────────────────────
+        # Si Popcorn no devolvió imágenes, probablemente el prompt contiene
+        # referencias con copyright. Reescribir con LLM y reintentar una vez.
+        if not _b1_ext and not _b1_bold:
+            print("  ⚠️  Lote 1 sin imágenes — posible bloqueo por copyright. Reescribiendo prompt…", flush=True)
+            post_issue_comment("⚠️ Popcorn bloqueado (posible copyright) — reescribiendo prompt y reintentando…")
+            try:
+                _safe_prompt = call_llm(
+                    api_key,
+                    f"""Reescribe este prompt para un generador de imágenes eliminando CUALQUIER referencia
+con copyright: marcas, celebridades, personajes de ficción, franquicias, logos, personas reales.
+Sustituye por equivalentes genéricos originales manteniendo la misma atmósfera y narrativa.
+Devuelve SOLO el prompt reescrito, sin explicaciones.
+
+PROMPT ORIGINAL:
+{_visual_brief}""",
+                    model="anthropic/claude-haiku-4-5",
+                    max_tokens=1000,
+                )
+                _visual_brief = _safe_prompt.strip()[:2000]
+                print(f"  🔄 Prompt reescrito ({len(_visual_brief)} chars) — reintentando Popcorn…", flush=True)
+                _retry_task = sanitize(json.dumps({
+                    "prompt":       _visual_brief,
+                    "num_images":   8,
+                    "aspect_ratio": "9:16",
+                    "resolution":   "720p",
+                }, ensure_ascii=False))
+                _pop_result_1 = run_tracked(
+                    "popcorn.py", _retry_task,
+                    "Imagen Lote 1 — Popcorn Auto (retry safe)", "popcorn",
+                    paperclip_timeout=300,
+                )
+                _b1_ext  = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", _pop_result_1)
+                _b1_bold = _re.findall(r"\*\*URL:\*\*\s*(https?://\S+)", _pop_result_1)
+            except Exception as _retry_err:
+                print(f"  ❌ Retry fallido: {_retry_err}", flush=True)
+
         _b1_ref  = (_b1_bold or _b1_ext or [None])[0]
 
         # Lote 2: 8 imágenes más, usando la primera del lote 1 como referencia
