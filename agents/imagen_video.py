@@ -35,6 +35,29 @@ ENDPOINT  = "higgsfield-ai/dop/turbo/first-last-frame"
 DONE_STATUSES    = {"completed", "failed", "nsfw", "canceled"}
 SUCCESS_STATUSES = {"completed"}
 
+_motions_cache: list | None = None
+
+def _fetch_motions_catalog(api_key: str) -> list:
+    global _motions_cache
+    if _motions_cache is not None:
+        return _motions_cache
+    try:
+        data = http_get(f"{BASE_URL}/v1/motions", api_key)
+        _motions_cache = data if isinstance(data, list) else data.get("motions", [])
+        print(f"  📚 Catálogo de motions cargado: {len(_motions_cache)} entradas", flush=True)
+    except Exception as e:
+        print(f"  ⚠️  No se pudo cargar catálogo de motions: {e}", flush=True)
+        _motions_cache = []
+    return _motions_cache
+
+def _resolve_motion(motion_name: str, api_key: str) -> dict:
+    catalog = _fetch_motions_catalog(api_key)
+    for m in catalog:
+        if m.get("name", "").lower() == motion_name.lower():
+            return {"id": m["id"], "name": m["name"], "strength": 1.0}
+    # Fallback: si no está en el catálogo, intentar con slug como id
+    return {"id": motion_name.lower().replace(" ", "_"), "name": motion_name, "strength": 1.0}
+
 # ── Motion presets por posición narrativa ────────────────────────────────────
 # Cada lista representa los motions del clip en esa posición del relato.
 # El campo "motions" acepta array → podemos combinar varios.
@@ -124,8 +147,8 @@ def submit_clip(image_url: str, end_image_url: str, prompt: str,
     Devuelve request_id.
     """
     url = f"{BASE_URL}/{ENDPOINT}"
-    # La API de DoP espera motions como array de objetos {name: "..."}
-    motions_payload = [{"name": m} for m in motions] if motions else []
+    # La API ahora requiere {id, name, strength} por motion
+    motions_payload = [_resolve_motion(m, api_key) for m in motions] if motions else []
     payload = {
         "image_url":      image_url,
         "end_image_url":  end_image_url,

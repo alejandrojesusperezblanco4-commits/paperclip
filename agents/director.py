@@ -579,7 +579,7 @@ def main():
     # al Director los ~90s que tarda FFmpeg + upload.
     # popcorn corre siempre como subprocess: es más fiable y Paperclip dispatch
     # no añade valor (el proceso tarda 2-4 min y el timeout de 180s no es suficiente).
-    _subprocess_base = {"tts", "source_reader", "popcorn"}
+    _subprocess_base = {"tts", "source_reader"}
     _maybe_delegated = {"video_prompt_generator", "imagen_video", "video_assembler"}
     SUBPROCESS_ONLY = _subprocess_base | {
         k for k in _maybe_delegated if not SUB_AGENT_IDS.get(k)
@@ -932,7 +932,7 @@ Guión completo:
         imagen_result = run_tracked(
             "popcorn.py", _popcorn_task,
             "Imagen Generator — Higgsfield Popcorn Auto", "popcorn",
-            extra_env={"HIGGSFIELD_API_KEY": higgsfield_key},
+            paperclip_timeout=240,
         )
     else:
         print("⚠️  HIGGSFIELD_API_KEY no encontrada — saltando Imagen Generator", flush=True)
