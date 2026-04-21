@@ -836,29 +836,24 @@
             <div class="stage-name">Storytelling</div>
             <div class="stage-badge">En espera</div>
           </div>
+          <div class="stage waiting" id="stage-tts">
+            <div class="stage-icon">🎙️</div>
+            <div class="stage-name">TTS — Voz en off</div>
+            <div class="stage-badge">En espera</div>
+          </div>
           <div class="stage waiting" id="stage-prompt">
             <div class="stage-icon">🎨</div>
             <div class="stage-name">Prompt Generator</div>
             <div class="stage-badge">En espera</div>
           </div>
           <div class="stage waiting" id="stage-imagen">
-            <div class="stage-icon">🖼️</div>
-            <div class="stage-name">Imagen AI</div>
-            <div class="stage-badge">En espera</div>
-          </div>
-          <div class="stage waiting" id="stage-video_prompt">
-            <div class="stage-icon">🎞️</div>
-            <div class="stage-name">Video Prompt Gen</div>
+            <div class="stage-icon">🍿</div>
+            <div class="stage-name">Popcorn Auto</div>
             <div class="stage-badge">En espera</div>
           </div>
           <div class="stage waiting" id="stage-imagen_video">
             <div class="stage-icon">🎬</div>
             <div class="stage-name">Imagen Video</div>
-            <div class="stage-badge">En espera</div>
-          </div>
-          <div class="stage waiting" id="stage-tts">
-            <div class="stage-icon">🎙️</div>
-            <div class="stage-name">TTS — Voz en off</div>
             <div class="stage-badge">En espera</div>
           </div>
           <div class="stage waiting" id="stage-video">
@@ -987,17 +982,17 @@ const AGENTS = {
 };
 
 const SUB_STAGE_MAP = [
-  { key: 'deep search',      stage: 'search'   },
-  { key: 'channel analyzer', stage: 'analyzer' },
-  { key: 'storytelling',     stage: 'story'    },
-  { key: 'prompt generator', stage: 'prompt'   },
+  { key: 'deep search',      stage: 'search'      },
+  { key: 'channel analyzer', stage: 'analyzer'    },
+  { key: 'storytelling',     stage: 'story'       },
+  { key: 'prompt generator', stage: 'prompt'      },
   { key: 'imagen generator', stage: 'imagen'      },
-  { key: 'video prompt',     stage: 'video_prompt'},
+  { key: 'popcorn',          stage: 'imagen'      },
   { key: 'imagen video',     stage: 'imagen_video'},
   { key: 'tts',              stage: 'tts'         },
-  { key: 'voz en off',       stage: 'tts'      },
-  { key: 'video assembler',  stage: 'video'    },
-  { key: 'ensamblando',      stage: 'video'    },
+  { key: 'voz en off',       stage: 'tts'         },
+  { key: 'video assembler',  stage: 'video'       },
+  { key: 'ensamblando',      stage: 'video'       },
 ];
 
 /* ────────────────────────────────────────
@@ -1065,7 +1060,7 @@ function getAgentDesc(key) {
 /* ────────────────────────────────────────
    STAGES
 ──────────────────────────────────────── */
-const STAGE_IDS = ['director','search','analyzer','story','prompt','imagen','video_prompt','imagen_video','tts','video'];
+const STAGE_IDS = ['director','search','analyzer','story','tts','prompt','imagen','imagen_video','video'];
 
 function setStage(id, state) {
   const el = document.getElementById(`stage-${id}`);
@@ -2183,6 +2178,21 @@ async function checkAgentUpdates(issueId) {
 
     for (const c of comments) {
       const body = c.body || c.content || c.text || '';
+
+      // PIPELINE_ACTIVE:key — subprocess agent started (no Paperclip in_progress)
+      const activeMatch = body.match(/^PIPELINE_ACTIVE:(\w+)$/m);
+      if (activeMatch) {
+        const key = activeMatch[1]; // 'tts' | 'popcorn'
+        const stageId = key === 'popcorn' ? 'imagen' : key;
+        const alreadyActive = agentUpdatesFound.has(`active:${key}`);
+        if (!alreadyActive) {
+          agentUpdatesFound.add(`active:${key}`);
+          // Only set active if stage is still waiting
+          const el = document.getElementById(`stage-${stageId}`);
+          if (el && el.classList.contains('waiting')) setStage(stageId, 'active');
+        }
+      }
+
       // Formato nuevo: AGENT_UPDATE_START:nombre: (texto plano, sin HTML)
       const match = body.match(/AGENT_UPDATE_START:(\w+):\n?([\s\S]*)/);
       if (!match) continue;

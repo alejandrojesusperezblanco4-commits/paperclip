@@ -785,6 +785,7 @@ Diferenciacion vs competencia:
             "TTS — Voz en off", "tts",
             {"ELEVENLABS_API_KEY": elevenlabs_key}, 90,
         )
+        post_issue_comment("PIPELINE_ACTIVE:tts")
     else:
         print("⚠️  ELEVENLABS_API_KEY no encontrada — saltando TTS", flush=True)
 
@@ -927,6 +928,7 @@ Guión completo:
             "aspect_ratio": "9:16",
             "resolution":   "720p",
         }, ensure_ascii=False))
+        post_issue_comment("PIPELINE_ACTIVE:popcorn")
         imagen_result = run_tracked(
             "popcorn.py", _popcorn_task,
             "Imagen Generator — Higgsfield Popcorn Auto", "popcorn",
