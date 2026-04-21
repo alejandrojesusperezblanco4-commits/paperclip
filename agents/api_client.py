@@ -62,7 +62,7 @@ def call_llm(
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                     "HTTP-Referer": "http://127.0.0.1:7777",
-                    "X-Title": title,
+                    "X-Title": title.encode("ascii", errors="replace").decode("ascii"),
                 },
                 method="POST",
             )

@@ -832,7 +832,7 @@ TONO DEL GUIÓN (primeras líneas):
             api_key=api_key,
             max_tokens=150,
             temperature=0.3,
-            title="Director — Decisión de estilo visual",
+            title="Director - Decision de estilo visual",
             model="anthropic/claude-3-5-haiku",
             timeout=20,
             retries=1,
