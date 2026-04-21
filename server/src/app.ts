@@ -3,6 +3,8 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Db } from "@paperclipai/db";
+import { companies as companiesTable, agents as agentsTable } from "@paperclipai/db";
+import { eq } from "drizzle-orm";
 import type { DeploymentExposure, DeploymentMode } from "@paperclipai/shared";
 import type { StorageService } from "./storage/types.js";
 import { httpLogger, errorHandler } from "./middleware/index.js";
@@ -147,6 +149,87 @@ export async function createApp(
     app.all("/api/auth/{*authPath}", opts.betterAuthHandler);
   }
   app.use(llmRoutes(db));
+
+  // ── Internal one-time seed endpoint ─────────────────────────────────────────
+  // Creates process agents that can't be created via the UI.
+  // Protected by the first 16 chars of BETTER_AUTH_SECRET.
+  // Usage: GET /api/internal/seed-agents?secret=<first-16-chars>
+  app.get("/api/internal/seed-agents", async (req, res) => {
+    const secret = (req.query.secret as string) ?? "";
+    const expectedSecret = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!secret || !expectedSecret || secret !== expectedSecret) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    try {
+      const [company] = await (db as any)
+        .select({ id: companiesTable.id, name: companiesTable.name })
+        .from(companiesTable)
+        .limit(1);
+      if (!company) {
+        res.status(500).json({ error: "No company found in DB" });
+        return;
+      }
+
+      const allAgents: { id: string; name: string }[] = await (db as any)
+        .select({ id: agentsTable.id, name: agentsTable.name })
+        .from(agentsTable)
+        .where(eq(agentsTable.companyId, company.id));
+
+      const director = allAgents.find((a) => a.name.toLowerCase().includes("director"));
+
+      const AGENTS_TO_CREATE = [
+        {
+          name: "Popcorn Auto",
+          envVar: "POPCORN_AGENT_ID",
+          title: "Higgsfield Coherent Image Generator",
+          adapterConfig: { command: "python", args: ["agents/popcorn.py"], cwd: "/app" },
+          budgetMonthlyCents: 6000,
+        },
+      ];
+
+      const results: Record<string, { id: string; created: boolean }> = {};
+
+      for (const spec of AGENTS_TO_CREATE) {
+        const existing = allAgents.find(
+          (a) => a.name.toLowerCase() === spec.name.toLowerCase(),
+        );
+        if (existing) {
+          results[spec.envVar] = { id: existing.id, created: false };
+          continue;
+        }
+        const [created] = await (db as any)
+          .insert(agentsTable)
+          .values({
+            companyId: company.id,
+            name: spec.name,
+            role: "engineer",
+            title: spec.title,
+            status: "idle",
+            adapterType: "process",
+            adapterConfig: spec.adapterConfig,
+            budgetMonthlyCents: spec.budgetMonthlyCents,
+            reportsTo: director?.id ?? null,
+          })
+          .returning({ id: agentsTable.id });
+        results[spec.envVar] = { id: created.id, created: true };
+      }
+
+      const envLines = Object.entries(results)
+        .map(([k, v]) => `${k}=${v.id}`)
+        .join("\n");
+
+      res.json({
+        ok: true,
+        company: company.name,
+        results,
+        envVars: envLines,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: msg });
+    }
+  });
 
   // Mount API routes
   const api = Router();
