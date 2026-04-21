@@ -922,18 +922,37 @@ Guión completo:
         _visual_brief = f"Ambiente: {_ambiente}\n\nGuión:\n{_guion}"[:2000]
         print(f"  📝 Prompt Popcorn ({len(_visual_brief)} chars): {_visual_brief[:80]}…", flush=True)
 
-        _popcorn_task = sanitize(json.dumps({
+        # 2 lotes de 8 imágenes en PARALELO → 16 imágenes → 15 clips × 5s ≈ 75s
+        _popcorn_base = {
             "prompt":       _visual_brief,
-            "num_images":   5,
+            "num_images":   8,
             "aspect_ratio": "9:16",
             "resolution":   "720p",
-        }, ensure_ascii=False))
-        post_issue_comment("PIPELINE_ACTIVE:popcorn")
-        imagen_result = run_tracked(
-            "popcorn.py", _popcorn_task,
-            "Imagen Generator — Higgsfield Popcorn Auto", "popcorn",
-            paperclip_timeout=240,
+        }
+        _task_1 = sanitize(json.dumps(_popcorn_base, ensure_ascii=False))
+        _task_2 = sanitize(json.dumps(_popcorn_base, ensure_ascii=False))
+
+        post_issue_comment(
+            "🍿 **Fase 5b — Popcorn Auto** generando 2 lotes de 8 imágenes en paralelo…\n"
+            "Total esperado: 16 imágenes → 15 clips → ~75 segundos de video"
         )
+        post_issue_comment("PIPELINE_ACTIVE:popcorn")
+        with ThreadPoolExecutor(max_workers=2) as _pop_ex:
+            _f_pop1 = _pop_ex.submit(
+                run_tracked, "popcorn.py", _task_1,
+                "Imagen Lote 1 — Higgsfield Popcorn Auto", "popcorn",
+                None, 240,
+            )
+            _f_pop2 = _pop_ex.submit(
+                run_tracked, "popcorn.py", _task_2,
+                "Imagen Lote 2 — Higgsfield Popcorn Auto", "popcorn",
+                None, 240,
+            )
+            _pop_result_1 = _f_pop1.result()
+            _pop_result_2 = _f_pop2.result()
+
+        imagen_result = _pop_result_1 + "\n" + _pop_result_2
+        print(f"  🍿 Popcorn — lote 1: {'OK' if _pop_result_1 else 'vacío'}, lote 2: {'OK' if _pop_result_2 else 'vacío'}", flush=True)
     else:
         print("⚠️  HIGGSFIELD_API_KEY no encontrada — saltando Imagen Generator", flush=True)
 
@@ -1082,7 +1101,7 @@ Guión completo:
     # ── Fase 6b: Imagen Video — DoP Turbo First-Last Frame ───
     # Usamos DoP Turbo First-Last Frame: toma pares de imágenes consecutivas
     # (img0→img1, img1→img2 …) y genera un clip cinematográfico por par.
-    # Con 5 imágenes de Popcorn → 4 clips encadenados.
+    # Con 2 lotes Popcorn × 8 imágenes → hasta 16 imágenes → 15 clips → ~75s.
     # Ya NO necesitamos Video Prompt Generator — DoP interpreta las transiciones solo.
     imagen_video_result = ""
     if higgsfield_key and _img_urls and len(_img_urls) >= 2:
