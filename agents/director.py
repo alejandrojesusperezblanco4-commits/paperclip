@@ -36,6 +36,7 @@ SUB_AGENT_IDS = {
     "storytelling":         "061ed6b8-27b1-4a31-8758-19af856b45d3",
     "prompt_generator":     "64e2cb07-75e1-4ca2-8b6c-05a78b66613f",
     "imagen_generator":     "2492962a-b9f0-4611-90e2-c7ccca5aa281",
+    "popcorn":              os.environ.get("POPCORN_AGENT_ID", ""),
     "video_prompt_generator": os.environ.get("VIDEO_PROMPT_GENERATOR_AGENT_ID",
                                              "9d4d8bf2-8f0b-48df-a189-da6a12911437"),
     "imagen_video":         os.environ.get("IMAGEN_VIDEO_AGENT_ID",
@@ -522,7 +523,7 @@ def main():
     # video_assembler pasa a delegado (propio proceso Railway) para no bloquear
     # al Director los ~90s que tarda FFmpeg + upload.
     _subprocess_base = {"tts", "source_reader"}
-    _maybe_delegated = {"video_prompt_generator", "imagen_video", "video_assembler"}
+    _maybe_delegated = {"popcorn", "video_prompt_generator", "imagen_video", "video_assembler"}
     SUBPROCESS_ONLY = _subprocess_base | {
         k for k in _maybe_delegated if not SUB_AGENT_IDS.get(k)
     }
