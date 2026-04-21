@@ -576,8 +576,10 @@ def main():
     # tienen un ID real de Paperclip → corren en su propio proceso Railway.
     # video_assembler pasa a delegado (propio proceso Railway) para no bloquear
     # al Director los ~90s que tarda FFmpeg + upload.
-    _subprocess_base = {"tts", "source_reader"}
-    _maybe_delegated = {"popcorn", "video_prompt_generator", "imagen_video", "video_assembler"}
+    # popcorn corre siempre como subprocess: es más fiable y Paperclip dispatch
+    # no añade valor (el proceso tarda 2-4 min y el timeout de 180s no es suficiente).
+    _subprocess_base = {"tts", "source_reader", "popcorn"}
+    _maybe_delegated = {"video_prompt_generator", "imagen_video", "video_assembler"}
     SUBPROCESS_ONLY = _subprocess_base | {
         k for k in _maybe_delegated if not SUB_AGENT_IDS.get(k)
     }
@@ -670,6 +672,9 @@ def main():
         elif agent_key == "imagen_video":
             # 3 clips × ~90s cada uno (2 en paralelo) + margen = 200s
             _subprocess_timeout = 200
+        elif agent_key == "popcorn":
+            # Popcorn puede tardar 2-4 min dependiendo del num_images
+            _subprocess_timeout = 240
         elif agent_key == "tts":
             _subprocess_timeout = 120
         else:
