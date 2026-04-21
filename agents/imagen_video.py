@@ -390,8 +390,8 @@ def main():
         print(msg, file=sys.stderr)
         sys.exit(1)
 
-    # Limitar a 5 imágenes → 4 clips (equilibrio calidad/tiempo)
-    MAX_IMAGES = 5
+    # Máximo 16 imágenes → 15 clips → ~75s de video
+    MAX_IMAGES = 16
     if len(image_urls) > MAX_IMAGES:
         print(f"  ℹ️  Limitando a {MAX_IMAGES} imágenes ({len(image_urls)} recibidas)", flush=True)
         image_urls = image_urls[:MAX_IMAGES]
@@ -399,7 +399,7 @@ def main():
     # Construir pares consecutivos: (img0→img1), (img1→img2), ...
     pairs = [(image_urls[i], image_urls[i + 1]) for i in range(len(image_urls) - 1)]
     n_clips = len(pairs)
-    print(f"\n🚀 Generando {n_clips} clips de transición (secuencial)…", flush=True)
+    print(f"\n🚀 Generando {n_clips} clips de transición (3 en paralelo)…", flush=True)
 
     # Mostrar el plan de motions antes de empezar
     for i in range(n_clips):
@@ -418,8 +418,8 @@ def main():
             motions       = motions,
         )
 
-    # Secuencial para evitar el límite de concurrent requests de Higgsfield
-    with ThreadPoolExecutor(max_workers=1) as executor:
+    # 3 clips en paralelo — equilibrio entre velocidad y rate limit de Higgsfield
+    with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {executor.submit(run, i, f, l): i for i, (f, l) in enumerate(pairs)}
         for future in as_completed(futures):
             idx, result = future.result()
