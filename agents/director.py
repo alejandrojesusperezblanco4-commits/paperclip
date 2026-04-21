@@ -922,37 +922,52 @@ Guión completo:
         _visual_brief = f"Ambiente: {_ambiente}\n\nGuión:\n{_guion}"[:2000]
         print(f"  📝 Prompt Popcorn ({len(_visual_brief)} chars): {_visual_brief[:80]}…", flush=True)
 
-        # 2 lotes de 8 imágenes en PARALELO → 16 imágenes → 15 clips × 5s ≈ 75s
-        _popcorn_base = {
+        # Lote 1: 8 imágenes (máximo por llamada Popcorn)
+        _popcorn_task_1 = sanitize(json.dumps({
+            "prompt":       _visual_brief,
+            "num_images":   8,
+            "aspect_ratio": "9:16",
+            "resolution":   "720p",
+        }, ensure_ascii=False))
+
+        post_issue_comment(
+            "🍿 **Fase 5b — Popcorn Auto** lote 1/2 (8 imágenes)…"
+        )
+        post_issue_comment("PIPELINE_ACTIVE:popcorn")
+        _pop_result_1 = run_tracked(
+            "popcorn.py", _popcorn_task_1,
+            "Imagen Lote 1 — Higgsfield Popcorn Auto", "popcorn",
+            paperclip_timeout=300,
+        )
+
+        # Extraer primera URL del lote 1 como referencia visual para el lote 2
+        _b1_ext  = _re.findall(r"https?://[^\s\"')]+\.(?:png|jpg|jpeg|webp)", _pop_result_1)
+        _b1_bold = _re.findall(r"\*\*URL:\*\*\s*(https?://\S+)", _pop_result_1)
+        _b1_ref  = (_b1_bold or _b1_ext or [None])[0]
+
+        # Lote 2: 8 imágenes más, usando la primera del lote 1 como referencia
+        _pop_result_2 = ""
+        _task_2_data = {
             "prompt":       _visual_brief,
             "num_images":   8,
             "aspect_ratio": "9:16",
             "resolution":   "720p",
         }
-        _task_1 = sanitize(json.dumps(_popcorn_base, ensure_ascii=False))
-        _task_2 = sanitize(json.dumps(_popcorn_base, ensure_ascii=False))
+        if _b1_ref:
+            _task_2_data["image_urls"] = [_b1_ref]
 
-        post_issue_comment(
-            "🍿 **Fase 5b — Popcorn Auto** generando 2 lotes de 8 imágenes en paralelo…\n"
-            "Total esperado: 16 imágenes → 15 clips → ~75 segundos de video"
-        )
-        post_issue_comment("PIPELINE_ACTIVE:popcorn")
-        with ThreadPoolExecutor(max_workers=2) as _pop_ex:
-            _f_pop1 = _pop_ex.submit(
-                run_tracked, "popcorn.py", _task_1,
-                "Imagen Lote 1 — Higgsfield Popcorn Auto", "popcorn",
-                None, 240,
-            )
-            _f_pop2 = _pop_ex.submit(
-                run_tracked, "popcorn.py", _task_2,
+        try:
+            post_issue_comment("🍿 **Fase 5b — Popcorn Auto** lote 2/2 (8 imágenes más)…")
+            _pop_result_2 = run_tracked(
+                "popcorn.py", sanitize(json.dumps(_task_2_data, ensure_ascii=False)),
                 "Imagen Lote 2 — Higgsfield Popcorn Auto", "popcorn",
-                None, 240,
+                paperclip_timeout=300,
             )
-            _pop_result_1 = _f_pop1.result()
-            _pop_result_2 = _f_pop2.result()
+        except Exception as _e2:
+            print(f"  ⚠️  Lote 2 Popcorn falló ({_e2}) — continuando con lote 1 solo", flush=True)
 
-        imagen_result = _pop_result_1 + "\n" + _pop_result_2
-        print(f"  🍿 Popcorn — lote 1: {'OK' if _pop_result_1 else 'vacío'}, lote 2: {'OK' if _pop_result_2 else 'vacío'}", flush=True)
+        imagen_result = _pop_result_1 + ("\n" + _pop_result_2 if _pop_result_2 else "")
+        print(f"  🍿 Popcorn completado — lote 1: {'OK' if _pop_result_1 else '✗'}, lote 2: {'OK' if _pop_result_2 else 'omitido'}", flush=True)
     else:
         print("⚠️  HIGGSFIELD_API_KEY no encontrada — saltando Imagen Generator", flush=True)
 
