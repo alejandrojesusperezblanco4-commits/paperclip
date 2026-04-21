@@ -169,8 +169,8 @@ def submit_clip(image_url: str, end_image_url: str, prompt: str,
     return request_id
 
 
-def poll_clip(request_id: str, api_key: str, max_wait: int = 180) -> str:
-    """Polling hasta obtener la URL del clip MP4. Timeout 3 min por clip."""
+def poll_clip(request_id: str, api_key: str, max_wait: int = 300) -> str:
+    """Polling hasta obtener la URL del clip MP4. Timeout 5 min por clip."""
     deadline   = time.time() + max_wait
     interval   = 5
     status_url = f"{BASE_URL}/requests/{request_id}/status"
@@ -418,8 +418,9 @@ def main():
             motions       = motions,
         )
 
-    # 3 clips en paralelo — equilibrio entre velocidad y rate limit de Higgsfield
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # 2 clips en paralelo — Higgsfield permite máx 4 concurrent; con reintentos
+    # 3 ya lo superaba. Con 2 tenemos margen para 1 reintento sin bloqueos.
+    with ThreadPoolExecutor(max_workers=2) as executor:
         futures = {executor.submit(run, i, f, l): i for i, (f, l) in enumerate(pairs)}
         for future in as_completed(futures):
             idx, result = future.result()
