@@ -653,8 +653,10 @@ def main():
             _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "in_progress"}, auth_headers)
 
         elif sub_id:
-            # Sub-issue visible pero ejecución local inmediata
-            _api_request("PATCH", f"{api_url}/api/issues/{sub_id}", {"status": "in_progress"}, auth_headers)
+            # Sub-issue visible pero ejecución local inmediata.
+            # No parchear a in_progress: sin assignee → HTTP 422.
+            # close_sub_issue marcará como done cuando termine.
+            pass
 
         # ── Subprocess (directo o fallback) ──────────────────
         sub_env = {**os.environ}
@@ -894,53 +896,30 @@ Guión completo:
         # Ventaja sobre Soul: las escenas tienen estética consistente sin tener que
         # coordinar prompts individuales. Popcorn toma la narrativa completa como input.
         post_issue_comment("🍿 **Fase 6 — Imagen Generator (Popcorn Auto)** en progreso… (2-3 min)")
-        # Extraer prompts visuales del Prompt Generator para construir un brief visual
-        # coherente para Popcorn. Usar scene_prompts si existen (descripciones visuales
-        # cinematográficas limpias), o fallback al guión resumido.
-        _visual_brief = ""
-        try:
-            # Intentar varias formas de extraer el JSON del Prompt Generator
-            _pr_data = None
-            # 1. Bloque ```json ... ```
-            _m = _re.search(r'```json\s*([\s\S]*?)```', prompt_result)
-            if _m:
-                _pr_data = json.loads(_m.group(1).strip())
-            # 2. Bloque ``` ... ``` sin lenguaje
-            if not _pr_data:
-                _m = _re.search(r'```\s*(\{[\s\S]*?\})\s*```', prompt_result)
-                if _m:
-                    _pr_data = json.loads(_m.group(1).strip())
-            # 3. JSON inline (empieza con { directamente)
-            if not _pr_data:
-                _m = _re.search(r'(\{[\s\S]*?"scene_prompts"[\s\S]*?\})\s*$', prompt_result)
-                if _m:
-                    _pr_data = json.loads(_m.group(1).strip())
 
-            if _pr_data:
-                _scenes = _pr_data.get("scene_prompts") or _pr_data.get("scenes") or []
-                _parts = []
-                for _sc in _scenes[:5]:
-                    _raw = _sc.get("prompt", "")
-                    # Popcorn necesita prompt narrativo, NO specs técnicas de cámara.
-                    # Cortar antes de "Shot on ARRI...", "Filmed on...", etc.
-                    _clean = _re.split(
-                        r'(?:\.\s+|\,\s+)(?:Shot on|Filmed on|Camera:|ARRI|anamorphic)\b',
-                        _raw, flags=_re.IGNORECASE
-                    )[0].strip()
-                    if _clean and len(_clean) > 20:
-                        _parts.append(_clean[:400])
-                if _parts:
-                    _visual_brief = " | ".join(_parts)[:2000]
-                    print(f"  🎨 Visual brief extraído: {len(_parts)} escenas ({len(_visual_brief)} chars)", flush=True)
-        except Exception as _e:
-            print(f"  ⚠️  No se pudo extraer visual brief del Prompt Generator: {_e}", flush=True)
+        # Popcorn necesita: AMBIENTE (atmósfera/setting) + GUIÓN (narración).
+        # NO usar prompts técnicos de Soul/cámara — Popcorn genera las escenas
+        # internamente a partir de la narrativa.
+        _ambiente = objetivo[:200]
+        if soul_style_choice:
+            _ambiente += f". Estilo visual: {soul_style_choice}."
+        if dop_motion_choice and dop_motion_choice.lower() != "auto":
+            _ambiente += f" Movimiento de cámara: {dop_motion_choice}."
 
-        if not _visual_brief:
-            # Fallback: narrativa del guión (primera opción) o título del video
-            _visual_lines = [l.strip() for l in storytelling_result.splitlines()
-                             if ("VISUAL" in l.upper() or "🎬" in l) and len(l.strip()) > 20]
-            _visual_brief = " ".join(_visual_lines)[:1500] if _visual_lines else objetivo[:500]
-            print(f"  ⚠️  Usando fallback para visual brief ({len(_visual_brief)} chars)", flush=True)
+        # Extraer narración del storytelling (texto spoken, no instrucciones de cámara)
+        _narr_matches = _re.findall(
+            r'(?:NARRACIÓN|voz en off)[^:]*:\s*(.*?)(?=🎬|⚡|━━|ESCENA\s+\d)',
+            storytelling_result, _re.DOTALL | _re.IGNORECASE
+        )
+        if _narr_matches:
+            _guion = " | ".join(m.strip()[:300] for m in _narr_matches[:5] if m.strip())
+            print(f"  🎨 Guión Popcorn: {len(_narr_matches)} narraciones extraídas", flush=True)
+        else:
+            _guion = storytelling_result[:800]
+            print(f"  🎨 Guión Popcorn: fallback a storytelling completo", flush=True)
+
+        _visual_brief = f"Ambiente: {_ambiente}\n\nGuión:\n{_guion}"[:2000]
+        print(f"  📝 Prompt Popcorn ({len(_visual_brief)} chars): {_visual_brief[:80]}…", flush=True)
 
         _popcorn_task = sanitize(json.dumps({
             "prompt":       _visual_brief,
