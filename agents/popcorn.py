@@ -92,9 +92,9 @@ def submit_popcorn(prompt: str, num_images: int, aspect_ratio: str,
         "aspect_ratio": aspect_ratio,
         "num_images":   num_images,
         "resolution":   resolution,
-        "image_urls":   image_urls or [],
-        "seed":         None,
     }
+    if image_urls:
+        payload["image_urls"] = image_urls
     print(f"  📡 POST {url}", flush=True)
     print(f"  📝 num_images={num_images}  ratio={aspect_ratio}  res={resolution}", flush=True)
     result = http_post(url, payload, api_key)

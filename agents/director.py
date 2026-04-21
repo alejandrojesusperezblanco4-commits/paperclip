@@ -866,8 +866,29 @@ Guión completo:
         # Ventaja sobre Soul: las escenas tienen estética consistente sin tener que
         # coordinar prompts individuales. Popcorn toma la narrativa completa como input.
         post_issue_comment("🍿 **Fase 6 — Imagen Generator (Popcorn Auto)** en progreso… (2-3 min)")
+        # Extraer prompts visuales del Prompt Generator para construir un brief visual
+        # coherente para Popcorn. Usar scene_prompts si existen (descripciones visuales
+        # cinematográficas limpias), o fallback al guión resumido.
+        _visual_brief = ""
+        try:
+            _pr_json = _re.search(r'```json\s*([\s\S]*?)```', prompt_result)
+            if _pr_json:
+                _pr_data = json.loads(_pr_json.group(1))
+                _scenes  = _pr_data.get("scene_prompts") or _pr_data.get("scenes") or []
+                if _scenes:
+                    # Tomar los prompts visuales de las primeras 5 escenas
+                    _parts = [s.get("prompt", "") for s in _scenes[:5] if s.get("prompt")]
+                    _visual_brief = " | ".join(_parts)[:2000]
+        except Exception:
+            pass
+        if not _visual_brief:
+            # Fallback: extraer párrafos de VISUAL del guión, evitando el texto del LLM
+            _visual_lines = [l for l in storytelling_result.splitlines()
+                             if "VISUAL" in l.upper() or "🎬" in l]
+            _visual_brief = " ".join(_visual_lines)[:1500] if _visual_lines else objetivo[:500]
+
         _popcorn_task = sanitize(json.dumps({
-            "prompt":       storytelling_result[:1500],
+            "prompt":       _visual_brief,
             "num_images":   5,
             "aspect_ratio": "9:16",
             "resolution":   "720p",
