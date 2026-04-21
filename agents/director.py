@@ -914,7 +914,17 @@ Guión completo:
 
             if _pr_data:
                 _scenes = _pr_data.get("scene_prompts") or _pr_data.get("scenes") or []
-                _parts  = [s.get("prompt", "") for s in _scenes[:5] if s.get("prompt")]
+                _parts = []
+                for _sc in _scenes[:5]:
+                    _raw = _sc.get("prompt", "")
+                    # Popcorn necesita prompt narrativo, NO specs técnicas de cámara.
+                    # Cortar antes de "Shot on ARRI...", "Filmed on...", etc.
+                    _clean = _re.split(
+                        r'(?:\.\s+|\,\s+)(?:Shot on|Filmed on|Camera:|ARRI|anamorphic)\b',
+                        _raw, flags=_re.IGNORECASE
+                    )[0].strip()
+                    if _clean and len(_clean) > 20:
+                        _parts.append(_clean[:400])
                 if _parts:
                     _visual_brief = " | ".join(_parts)[:2000]
                     print(f"  🎨 Visual brief extraído: {len(_parts)} escenas ({len(_visual_brief)} chars)", flush=True)
@@ -922,10 +932,10 @@ Guión completo:
             print(f"  ⚠️  No se pudo extraer visual brief del Prompt Generator: {_e}", flush=True)
 
         if not _visual_brief:
-            # Fallback: extraer líneas de VISUAL del guión
+            # Fallback: narrativa del guión (primera opción) o título del video
             _visual_lines = [l.strip() for l in storytelling_result.splitlines()
                              if ("VISUAL" in l.upper() or "🎬" in l) and len(l.strip()) > 20]
-            _visual_brief = " | ".join(_visual_lines)[:1500] if _visual_lines else objetivo[:500]
+            _visual_brief = " ".join(_visual_lines)[:1500] if _visual_lines else objetivo[:500]
             print(f"  ⚠️  Usando fallback para visual brief ({len(_visual_brief)} chars)", flush=True)
 
         _popcorn_task = sanitize(json.dumps({
