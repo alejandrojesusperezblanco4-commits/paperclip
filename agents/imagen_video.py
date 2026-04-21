@@ -124,14 +124,16 @@ def submit_clip(image_url: str, end_image_url: str, prompt: str,
     Devuelve request_id.
     """
     url = f"{BASE_URL}/{ENDPOINT}"
+    # La API de DoP espera motions como array de objetos {name: "..."}
+    motions_payload = [{"name": m} for m in motions] if motions else []
     payload = {
         "image_url":      image_url,
         "end_image_url":  end_image_url,
         "prompt":         prompt,
         "enhance_prompt": True,
-        "seed":           None,
-        "motions":        motions or None,
     }
+    if motions_payload:
+        payload["motions"] = motions_payload
     print(f"  📡 POST {url}", flush=True)
     print(f"  🖼️  {image_url[:55]}… → {end_image_url[:55]}…", flush=True)
     print(f"  🎬 Motions: {motions}", flush=True)
