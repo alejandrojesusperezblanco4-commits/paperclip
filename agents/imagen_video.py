@@ -30,8 +30,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 BASE_URL  = "https://platform.higgsfield.ai"
-ENDPOINT_TURBO = "higgsfield-ai/dop/turbo/first-last-frame"
-ENDPOINT_LITE  = "higgsfield-ai/dop/lite/first-last-frame"
+ENDPOINT_LITE     = "higgsfield-ai/dop/lite/first-last-frame"     # 2 cr  — básico
+ENDPOINT_TURBO    = "higgsfield-ai/dop/turbo/first-last-frame"    # 6.5 cr — rápido
+ENDPOINT_STANDARD = "higgsfield-ai/dop/standard/first-last-frame" # 9 cr  — mejor calidad
 
 DONE_STATUSES    = {"completed", "failed", "nsfw", "canceled"}
 SUCCESS_STATUSES = {"completed"}
@@ -380,8 +381,15 @@ def main():
     if _model_match:
         dop_model_override = _model_match.group(1).strip().lower()
         raw = re.sub(r',?\s*"dop_model"\s*:\s*"[^"]+"', '', raw)
-    dop_endpoint = ENDPOINT_TURBO if dop_model_override == "turbo" else ENDPOINT_LITE
-    model_label  = "Turbo (6.5 cr/clip)" if dop_model_override == "turbo" else "Lite (2 cr/clip)"
+    if dop_model_override == "turbo":
+        dop_endpoint = ENDPOINT_TURBO
+        model_label  = "Turbo (6.5 cr/clip)"
+    elif dop_model_override == "standard":
+        dop_endpoint = ENDPOINT_STANDARD
+        model_label  = "Standard (9 cr/clip)"
+    else:
+        dop_endpoint = ENDPOINT_LITE
+        model_label  = "Lite (2 cr/clip)"
     print(f"🎞️  IMAGEN VIDEO — DoP {model_label.upper()}", flush=True)
 
     # ── Extraer dop_motion override (si viene de Studio) ──────
