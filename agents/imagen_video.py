@@ -30,7 +30,8 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 BASE_URL  = "https://platform.higgsfield.ai"
-ENDPOINT  = "higgsfield-ai/dop/turbo/first-last-frame"
+ENDPOINT_TURBO = "higgsfield-ai/dop/turbo/first-last-frame"
+ENDPOINT_LITE  = "higgsfield-ai/dop/lite/first-last-frame"
 
 DONE_STATUSES    = {"completed", "failed", "nsfw", "canceled"}
 SUCCESS_STATUSES = {"completed"}
@@ -140,13 +141,13 @@ def http_get(url: str, api_key: str) -> dict:
 
 
 def submit_clip(image_url: str, end_image_url: str, prompt: str,
-                api_key: str, motions: list = None) -> str:
+                api_key: str, motions: list = None, endpoint: str = None) -> str:
     """
-    Envía un par de imágenes (primer y último frame) a DoP Turbo.
+    Envía un par de imágenes (primer y último frame) a DoP (Turbo o Lite).
     motions: lista de nombres de motion (ej. ["Dolly In", "Focus Change"]).
     Devuelve request_id.
     """
-    url = f"{BASE_URL}/{ENDPOINT}"
+    url = f"{BASE_URL}/{endpoint or ENDPOINT_TURBO}"
     # La API ahora requiere {id, name, strength} por motion
     motions_payload = [_resolve_motion(m, api_key) for m in motions] if motions else []
     payload = {
@@ -208,6 +209,7 @@ def generate_transition_clip(
     api_key: str,
     motions: list = None,
     max_retries: int = 1,
+    endpoint: str = None,
 ) -> dict:
     """Genera un clip de transición entre dos imágenes con motions y reintentos."""
     label = f"Clip {idx} (escena {idx}→{idx + 1})"
@@ -224,6 +226,7 @@ def generate_transition_clip(
                 image_url, end_image_url,
                 TRANSITION_PROMPT, api_key,
                 motions=motions,
+                endpoint=endpoint,
             )
             video_url = poll_clip(request_id, api_key)
             print(f"  ✅ {label} → {video_url[:80]}", flush=True)
@@ -363,15 +366,23 @@ def main():
     if issue_title:
         post_issue_comment(
             f"🎞️ Generando clips cinematográficos para: **{issue_title}**\n\n"
-            f"Uso DoP Turbo First-Last Frame para crear transiciones fluidas "
-            f"entre cada par de imágenes consecutivas. Puede tardar 3-6 min."
+            f"Modelo: **DoP {model_label}** — transiciones fluidas entre pares de imágenes. "
+            f"Puede tardar 3-6 min."
         )
 
     if not raw:
         print("ERROR: Sin input", file=sys.stderr)
         sys.exit(1)
 
-    print("🎞️  IMAGEN VIDEO — DOP TURBO FIRST-LAST FRAME", flush=True)
+    # ── Elegir modelo DoP (turbo | lite) ─────────────────────
+    dop_model_override = None
+    _model_match = re.search(r'"dop_model"\s*:\s*"([^"]+)"', raw)
+    if _model_match:
+        dop_model_override = _model_match.group(1).strip().lower()
+        raw = re.sub(r',?\s*"dop_model"\s*:\s*"[^"]+"', '', raw)
+    dop_endpoint = ENDPOINT_LITE if dop_model_override == "lite" else ENDPOINT_TURBO
+    model_label  = "Lite (2 cr/clip)" if dop_model_override == "lite" else "Turbo (6.5 cr/clip)"
+    print(f"🎞️  IMAGEN VIDEO — DoP {model_label.upper()}", flush=True)
 
     # ── Extraer dop_motion override (si viene de Studio) ──────
     dop_motion_override = None
@@ -416,6 +427,7 @@ def main():
             end_image_url = last_url,
             api_key       = api_key,
             motions       = motions,
+            endpoint      = dop_endpoint,
         )
 
     # Lotes de 3 clips: esperar que termine cada lote antes del siguiente.
@@ -442,7 +454,7 @@ def main():
     ok_count      = sum(1 for r in results if r and r["status"] == "ok")
     video_clip_urls = [r["video_url"] for r in results if r and r["video_url"]]
 
-    lines = ["# 🎞️ CLIPS GENERADOS — DoP Turbo First-Last Frame\n"]
+    lines = [f"# 🎞️ CLIPS GENERADOS — DoP {model_label} First-Last Frame\n"]
     lines.append(f"**{ok_count}/{len(results)} clips generados correctamente**")
     lines.append(f"**Imágenes usadas:** {len(image_urls)}  →  **Clips:** {len(pairs)}\n")
 

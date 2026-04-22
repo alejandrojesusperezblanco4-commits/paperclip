@@ -662,6 +662,13 @@
 
         <!-- DoP Motion selector (visible solo para Imagen Video) -->
         <div id="dopMotionSection" style="display:none;margin-top:8px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div style="font-size:10px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">⚡ Modelo</div>
+            <select id="dopModelSelect" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;outline:none">
+              <option value="turbo">Turbo — calidad (6.5 cr/clip)</option>
+              <option value="lite">Lite — 3× más barato (2 cr/clip)</option>
+            </select>
+          </div>
           <div style="display:flex;align-items:center;gap:8px">
             <div style="font-size:10px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">🎬 Motion</div>
             <select id="dopMotionSelect" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;outline:none">
@@ -1124,6 +1131,7 @@ async function startRun() {
     // Para el agente Imagen con estilo: incluir soul_style en la descripción del issue
     // Para Imagen Video con motion: incluir dop_motion en la descripción
     const dopMotion = document.getElementById('dopMotionSelect')?.value || '';
+    const dopModel  = document.getElementById('dopModelSelect')?.value || 'turbo';
     let description = topic;
     if (currentAgent === 'imagen' && soulStyle.id) {
       description = JSON.stringify({
@@ -1131,15 +1139,17 @@ async function startRun() {
         soul_style_strength: soulStyle.strength,
         prompt:              topic,
       });
-    } else if (currentAgent === 'imagen_video' && dopMotion) {
-      // Intentar parsear el topic como JSON y añadir dop_motion
+    } else if (currentAgent === 'imagen_video') {
+      // Intentar parsear el topic como JSON y añadir dop_motion + dop_model
       try {
         const parsed = JSON.parse(topic);
-        parsed.dop_motion = dopMotion;
+        if (dopMotion) parsed.dop_motion = dopMotion;
+        parsed.dop_model = dopModel;
         description = JSON.stringify(parsed);
       } catch {
-        // Si no es JSON, crear wrapper
-        description = JSON.stringify({ dop_motion: dopMotion, input: topic });
+        const wrapper = { dop_model: dopModel, input: topic };
+        if (dopMotion) wrapper.dop_motion = dopMotion;
+        description = JSON.stringify(wrapper);
       }
     }
 
