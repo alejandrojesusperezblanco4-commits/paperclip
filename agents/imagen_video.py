@@ -380,8 +380,8 @@ def main():
     if _model_match:
         dop_model_override = _model_match.group(1).strip().lower()
         raw = re.sub(r',?\s*"dop_model"\s*:\s*"[^"]+"', '', raw)
-    dop_endpoint = ENDPOINT_LITE if dop_model_override == "lite" else ENDPOINT_TURBO
-    model_label  = "Lite (2 cr/clip)" if dop_model_override == "lite" else "Turbo (6.5 cr/clip)"
+    dop_endpoint = ENDPOINT_TURBO if dop_model_override == "turbo" else ENDPOINT_LITE
+    model_label  = "Turbo (6.5 cr/clip)" if dop_model_override == "turbo" else "Lite (2 cr/clip)"
     print(f"🎞️  IMAGEN VIDEO — DoP {model_label.upper()}", flush=True)
 
     # ── Extraer dop_motion override (si viene de Studio) ──────
