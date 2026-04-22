@@ -418,15 +418,25 @@ def main():
             motions       = motions,
         )
 
-    # 2 clips en paralelo — Higgsfield permite máx 4 concurrent; con reintentos
-    # 3 ya lo superaba. Con 2 tenemos margen para 1 reintento sin bloqueos.
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = {executor.submit(run, i, f, l): i for i, (f, l) in enumerate(pairs)}
-        for future in as_completed(futures):
-            idx, result = future.result()
-            results[idx] = result
-            icon = "✅" if result["status"] == "ok" else "❌"
-            print(f"  {icon} Clip {result['clip']} completado", flush=True)
+    # Lotes de 3 clips: esperar que termine cada lote antes del siguiente.
+    # Higgsfield limita a 4 concurrent → con lotes de 3 nunca se supera
+    # aunque haya 1 reintento activo del lote anterior.
+    BATCH_SIZE = 3
+    for _batch_start in range(0, n_clips, BATCH_SIZE):
+        _batch = pairs[_batch_start:_batch_start + BATCH_SIZE]
+        _batch_num = _batch_start // BATCH_SIZE + 1
+        _total_batches = (n_clips + BATCH_SIZE - 1) // BATCH_SIZE
+        print(f"\n  📦 Lote {_batch_num}/{_total_batches} ({len(_batch)} clips)…", flush=True)
+        with ThreadPoolExecutor(max_workers=BATCH_SIZE) as executor:
+            futures = {
+                executor.submit(run, _batch_start + i, f, l): _batch_start + i
+                for i, (f, l) in enumerate(_batch)
+            }
+            for future in as_completed(futures):
+                idx, result = future.result()
+                results[idx] = result
+                icon = "✅" if result["status"] == "ok" else "❌"
+                print(f"  {icon} Clip {result['clip']} completado", flush=True)
 
     # ── Construir output ──────────────────────────────────────
     ok_count      = sum(1 for r in results if r and r["status"] == "ok")
