@@ -112,8 +112,11 @@ def poll_images(request_id: str, api_key: str, max_wait: int = 240) -> list:
     Timeout 4 min.
     """
     deadline   = time.time() + max_wait
-    interval   = 5
+    interval   = 8
     status_url = f"{BASE_URL}/requests/{request_id}/status"
+
+    # Dar tiempo a Higgsfield para encolar el job antes del primer check
+    time.sleep(10)
 
     while time.time() < deadline:
         data   = http_get(status_url, api_key)
