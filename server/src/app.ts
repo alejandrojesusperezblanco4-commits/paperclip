@@ -203,6 +203,25 @@ export async function createApp(
 
       const results: Record<string, { id: string; created: boolean }> = {};
 
+      // Actualizar agentes existentes por ID conocido (timeout extendido, etc.)
+      const AGENTS_TO_PATCH_BY_ID: Array<{ id: string; label: string; adapterConfig: Record<string, unknown> }> = [
+        {
+          id: "62e14c73-905b-45ce-b4d9-4cd532ec3dca", // Imagen Video
+          label: "Imagen Video",
+          adapterConfig: { command: "python3", args: ["agents/imagen_video.py"], cwd: "/app", timeoutSec: 1800 },
+        },
+      ];
+      for (const patch of AGENTS_TO_PATCH_BY_ID) {
+        const target = allAgentsGlobal.find((a) => a.id === patch.id);
+        if (target) {
+          await (db as any).update(agentsTable).set({ adapterConfig: patch.adapterConfig }).where(eq(agentsTable.id, patch.id));
+          results[`patch_${patch.label}`] = { id: patch.id, created: false };
+          console.log(`  ✅ Patched ${patch.label} (${patch.id}) → timeoutSec=${patch.adapterConfig.timeoutSec}`);
+        } else {
+          console.log(`  ⚠️  Agent ${patch.label} (${patch.id}) not found in DB — skip patch`);
+        }
+      }
+
       for (const spec of AGENTS_TO_CREATE) {
         const existing = allAgents.find(
           (a) => a.name.toLowerCase() === spec.name.toLowerCase(),
