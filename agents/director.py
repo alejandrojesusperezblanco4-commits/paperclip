@@ -1159,8 +1159,8 @@ PROMPT ORIGINAL:
     # guión + imágenes + audio. El video es un bonus.
     # ═══════════════════════════════════════════════════════════
 
-    # ── Fase 6b: Imagen Video — DoP Turbo First-Last Frame ───
-    # Usamos DoP Turbo First-Last Frame: toma pares de imágenes consecutivas
+    # ── Fase 6b: Imagen Video — DoP Lite First-Last Frame ────
+    # DoP Lite (2 cr/clip): toma pares de imágenes consecutivas
     # (img0→img1, img1→img2 …) y genera un clip cinematográfico por par.
     # Con 2 lotes Popcorn × 8 imágenes → hasta 16 imágenes → 15 clips → ~75s.
     # Ya NO necesitamos Video Prompt Generator — DoP interpreta las transiciones solo.
@@ -1187,13 +1187,14 @@ PROMPT ORIGINAL:
         )
         _motion_label = f" · motion: **{dop_motion_choice}**" if dop_motion_choice and dop_motion_choice.lower() != "auto" else " · arco narrativo automático"
         post_issue_comment(
-            f"🎞️ **Fase 6b — Imagen Video (DoP Turbo)** en proceso…\n"
+            f"🎞️ **Fase 6b — Imagen Video (DoP Lite)** en proceso…\n"
             f"Generando {len(_img_urls) - 1} clips de transición entre las {len(_img_urls)} escenas"
-            f"{_motion_label}. Puede tardar 4-8 min."
+            f"{_motion_label}. Puede tardar 5-15 min."
         )
+        post_issue_comment("PIPELINE_ACTIVE:imagen_video")
         imagen_video_result = run_tracked(
             "imagen_video.py", sanitize(_iv_task),
-            "Imagen Video — Higgsfield DOP Turbo", "imagen_video",
+            "Imagen Video — Higgsfield DoP Lite", "imagen_video",
             extra_env={"HIGGSFIELD_API_KEY": higgsfield_key},
             paperclip_timeout=0,
         )

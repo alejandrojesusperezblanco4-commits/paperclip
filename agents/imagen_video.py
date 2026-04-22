@@ -364,18 +364,11 @@ def main():
         except Exception as e:
             print(f"  ⚠️  No se pudo parsear ASSEMBLER_PARAMS: {e}", flush=True)
 
-    if issue_title:
-        post_issue_comment(
-            f"🎞️ Generando clips cinematográficos para: **{issue_title}**\n\n"
-            f"Modelo: **DoP {model_label}** — transiciones fluidas entre pares de imágenes. "
-            f"Puede tardar 3-6 min."
-        )
-
     if not raw:
         print("ERROR: Sin input", file=sys.stderr)
         sys.exit(1)
 
-    # ── Elegir modelo DoP (turbo | lite) ─────────────────────
+    # ── Elegir modelo DoP (turbo | lite | standard) ───────────
     dop_model_override = None
     _model_match = re.search(r'"dop_model"\s*:\s*"([^"]+)"', raw)
     if _model_match:
@@ -391,6 +384,13 @@ def main():
         dop_endpoint = ENDPOINT_LITE
         model_label  = "Lite (2 cr/clip)"
     print(f"🎞️  IMAGEN VIDEO — DoP {model_label.upper()}", flush=True)
+
+    if issue_title:
+        post_issue_comment(
+            f"🎞️ Generando clips cinematográficos para: **{issue_title}**\n\n"
+            f"Modelo: **DoP {model_label}** — transiciones fluidas entre pares de imágenes. "
+            f"Puede tardar 3-6 min."
+        )
 
     # ── Extraer dop_motion override (si viene de Studio) ──────
     dop_motion_override = None
