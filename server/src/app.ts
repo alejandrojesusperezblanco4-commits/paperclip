@@ -268,6 +268,40 @@ export async function createApp(
     }
   });
 
+  // ── Quick fix: set timeoutSec on process agents by ID ───────────────────────
+  // Auth: Bearer <PAPERCLIP_API_KEY>
+  // Usage: GET /api/internal/fix-agent-timeout?id=<agent-id>&timeoutSec=1800
+  app.get("/api/internal/fix-agent-timeout", async (req, res) => {
+    const apiKey = process.env.PAPERCLIP_API_KEY ?? "";
+    const authHeader = req.headers.authorization ?? "";
+    if (!apiKey || authHeader !== `Bearer ${apiKey}`) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    const agentId = (req.query.id as string) ?? "";
+    const timeoutSec = Number(req.query.timeoutSec ?? 1800);
+    if (!agentId) {
+      res.status(400).json({ error: "id required" });
+      return;
+    }
+    try {
+      const rows: { id: string; name: string; adapterConfig: unknown }[] = await (db as any)
+        .select({ id: agentsTable.id, name: agentsTable.name, adapterConfig: agentsTable.adapterConfig })
+        .from(agentsTable)
+        .where(eq(agentsTable.id, agentId));
+      if (!rows.length) {
+        res.status(404).json({ error: "agent not found" });
+        return;
+      }
+      const current = rows[0].adapterConfig as Record<string, unknown> ?? {};
+      const updated = { ...current, timeoutSec };
+      await (db as any).update(agentsTable).set({ adapterConfig: updated }).where(eq(agentsTable.id, agentId));
+      res.json({ ok: true, agent: rows[0].name, id: agentId, timeoutSec, adapterConfig: updated });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
   // Mount API routes
   const api = Router();
   api.use(boardMutationGuard());
