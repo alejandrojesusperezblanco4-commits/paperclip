@@ -113,6 +113,45 @@ def download_video_clip(url: str, path: str) -> bool:
         return False
 
 
+def stretch_to_audio(silent_video: str, audio_path: str, work_dir: str) -> str:
+    """
+    Si el video es más corto que el audio, lo estira con setpts para que encaje.
+    Devuelve la ruta del video estirado, o el original si no hace falta.
+    """
+    video_dur = get_audio_duration(silent_video)
+    audio_dur = get_audio_duration(audio_path)
+
+    if audio_dur <= 0 or video_dur <= 0:
+        return silent_video
+
+    # Solo estirar si el audio supera al video en más de un 5%
+    if audio_dur <= video_dur * 1.05:
+        print(f"  ⏱️  Video {video_dur:.1f}s ≈ audio {audio_dur:.1f}s — no hace falta estirar", flush=True)
+        return silent_video
+
+    factor = audio_dur / video_dur
+    print(f"  ⏱️  Estirando video: {video_dur:.1f}s → {audio_dur:.1f}s (×{factor:.2f})", flush=True)
+
+    stretched = os.path.join(work_dir, "silent_stretched.mp4")
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", silent_video,
+        "-vf", f"setpts={factor:.6f}*PTS",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-an",
+        stretched,
+    ]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    if r.returncode == 0 and os.path.exists(stretched) and os.path.getsize(stretched) > 1000:
+        new_dur = get_audio_duration(stretched)
+        print(f"  ✅ Video estirado a {new_dur:.1f}s", flush=True)
+        return stretched
+    else:
+        print(f"  ⚠️  Stretch falló — usando original:\n{r.stderr[-300:]}", flush=True)
+        return silent_video
+
+
 def assemble_from_clips(clip_paths: list, audio_path: str,
                         output_path: str) -> tuple:
     """
@@ -187,8 +226,13 @@ def assemble_from_clips(clip_paths: list, audio_path: str,
 
     total_dur = get_audio_duration(silent_video)
 
-    # Añadir audio
+    # Estirar video si el audio es más largo que los clips concatenados
     has_audio = bool(audio_path and os.path.exists(audio_path))
+    if has_audio:
+        silent_video = stretch_to_audio(silent_video, audio_path, work_dir)
+        total_dur    = get_audio_duration(silent_video)
+
+    # Añadir audio
     if has_audio:
         cmd = [
             "ffmpeg", "-y",
@@ -689,16 +733,6 @@ def main():
     if not os.path.exists(output_path):
         print("ERROR: output_path no existe tras ensamblado", file=sys.stderr)
         sys.exit(1)
-
-    # ── Subtítulos automáticos ────────────────────────────────
-    if narration_text and total_dur > 1:
-        srt_path    = f"{tmp_dir}/subtitulos.srt"
-        sub_output  = f"{tmp_dir}/video_subtitulado.mp4"
-        if generate_srt(narration_text, total_dur, srt_path):
-            if burn_subtitles(output_path, srt_path, sub_output):
-                output_path = sub_output   # usar el video con subtítulos
-    else:
-        print("ℹ️  Sin narración — video sin subtítulos", flush=True)
 
     file_size = os.path.getsize(output_path)
     print(f"📦 Tamaño del video: {file_size/1024/1024:.1f} MB", flush=True)

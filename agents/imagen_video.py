@@ -467,8 +467,7 @@ def main():
         )
 
     # Lotes de 3 clips: esperar que termine cada lote antes del siguiente.
-    # Higgsfield limita a 4 concurrent → con lotes de 3 nunca se supera
-    # aunque haya 1 reintento activo del lote anterior.
+    # Higgsfield limita a 4 concurrent → con lotes de 3 nunca se supera.
     BATCH_SIZE = 3
     for _batch_start in range(0, n_clips, BATCH_SIZE):
         _batch = pairs[_batch_start:_batch_start + BATCH_SIZE]
@@ -486,8 +485,26 @@ def main():
                 icon = "✅" if result["status"] == "ok" else "❌"
                 print(f"  {icon} Clip {result['clip']} completado", flush=True)
 
+    # ── Pase de recuperación: reintentar clips fallidos ───────
+    # Si Higgsfield estaba sobrecargado durante el run principal,
+    # algunos clips pudieron fallar los 2 intentos. Los reintentamos
+    # de uno en uno con más espera (no en paralelo para no saturar).
+    failed_indices = [i for i, r in enumerate(results) if not r or r["status"] != "ok"]
+    if failed_indices:
+        print(f"\n  🔁 Pase de recuperación: {len(failed_indices)} clip(s) fallido(s)…", flush=True)
+        time.sleep(15)  # dar respiro a Higgsfield antes de reintentar
+        for i in failed_indices:
+            first_url, last_url = pairs[i]
+            print(f"  🔄 Reintentando clip {i+1}…", flush=True)
+            _, result = run(i, first_url, last_url)
+            results[i] = result
+            icon = "✅" if result["status"] == "ok" else "❌"
+            print(f"  {icon} Recuperación clip {i+1}: {result['status']}", flush=True)
+            if result["status"] != "ok":
+                time.sleep(10)  # esperar entre fallos en el pase de recuperación
+
     # ── Construir output ──────────────────────────────────────
-    ok_count      = sum(1 for r in results if r and r["status"] == "ok")
+    ok_count        = sum(1 for r in results if r and r["status"] == "ok")
     video_clip_urls = [r["video_url"] for r in results if r and r["video_url"]]
 
     lines = [f"# 🎞️ CLIPS GENERADOS — DoP {model_label} First-Last Frame\n"]
