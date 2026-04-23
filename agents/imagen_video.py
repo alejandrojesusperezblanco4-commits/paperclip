@@ -466,14 +466,16 @@ def main():
             duration      = clip_duration,
         )
 
-    # Lotes de 3 clips: esperar que termine cada lote antes del siguiente.
-    # Higgsfield limita a 4 concurrent → con lotes de 3 nunca se supera.
-    BATCH_SIZE = 3
+    # Lotes de 2 clips: menos presión sobre el límite de concurrencia de Higgsfield.
+    # Con 3 se acumulaban rechazos si un clip del lote anterior tardaba más.
+    BATCH_SIZE = 2
     for _batch_start in range(0, n_clips, BATCH_SIZE):
         _batch = pairs[_batch_start:_batch_start + BATCH_SIZE]
         _batch_num = _batch_start // BATCH_SIZE + 1
         _total_batches = (n_clips + BATCH_SIZE - 1) // BATCH_SIZE
         print(f"\n  📦 Lote {_batch_num}/{_total_batches} ({len(_batch)} clips)…", flush=True)
+        if _batch_start > 0:
+            time.sleep(5)  # pausa entre lotes para no saturar concurrencia
         with ThreadPoolExecutor(max_workers=BATCH_SIZE) as executor:
             futures = {
                 executor.submit(run, _batch_start + i, f, l): _batch_start + i
