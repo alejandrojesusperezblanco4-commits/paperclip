@@ -142,10 +142,12 @@ def http_get(url: str, api_key: str) -> dict:
 
 
 def submit_clip(image_url: str, end_image_url: str, prompt: str,
-                api_key: str, motions: list = None, endpoint: str = None) -> str:
+                api_key: str, motions: list = None, endpoint: str = None,
+                duration: int = 5) -> str:
     """
     Envía un par de imágenes (primer y último frame) a DoP (Turbo o Lite).
     motions: lista de nombres de motion (ej. ["Dolly In", "Focus Change"]).
+    duration: duración del clip en segundos (3-8). Default 5s.
     Devuelve request_id.
     """
     url = f"{BASE_URL}/{endpoint or ENDPOINT_TURBO}"
@@ -156,12 +158,13 @@ def submit_clip(image_url: str, end_image_url: str, prompt: str,
         "end_image_url":  end_image_url,
         "prompt":         prompt,
         "enhance_prompt": True,
+        "duration":       duration,
     }
     if motions_payload:
         payload["motions"] = motions_payload
     print(f"  📡 POST {url}", flush=True)
     print(f"  🖼️  {image_url[:55]}… → {end_image_url[:55]}…", flush=True)
-    print(f"  🎬 Motions: {motions}", flush=True)
+    print(f"  🎬 Motions: {motions}  ⏱️  {duration}s", flush=True)
 
     result = http_post(url, payload, api_key)
     request_id = result.get("request_id")
@@ -211,6 +214,7 @@ def generate_transition_clip(
     motions: list = None,
     max_retries: int = 1,
     endpoint: str = None,
+    duration: int = 5,
 ) -> dict:
     """Genera un clip de transición entre dos imágenes con motions y reintentos."""
     label = f"Clip {idx} (escena {idx}→{idx + 1})"
@@ -228,6 +232,7 @@ def generate_transition_clip(
                 TRANSITION_PROMPT, api_key,
                 motions=motions,
                 endpoint=endpoint,
+                duration=duration,
             )
             video_url = poll_clip(request_id, api_key)
             print(f"  ✅ {label} → {video_url[:80]}", flush=True)
@@ -402,6 +407,14 @@ def main():
         # Limpiar del raw para que extract_image_urls no se confunda
         raw = re.sub(r',?\s*"dop_motion"\s*:\s*"[^"]+"', '', raw)
 
+    # ── Extraer target_duration (duración objetivo del video en segundos) ──
+    target_duration = 0
+    _tdur_match = re.search(r'"target_duration"\s*:\s*(\d+)', raw)
+    if _tdur_match:
+        target_duration = int(_tdur_match.group(1))
+        raw = re.sub(r',?\s*"target_duration"\s*:\s*\d+', '', raw)
+        print(f"  ⏱️  Duración objetivo recibida: {target_duration}s", flush=True)
+
     # ── Extraer imágenes de entrada ───────────────────────────
     image_urls = extract_image_urls(raw)
 
@@ -419,12 +432,25 @@ def main():
     # Construir pares consecutivos: (img0→img1), (img1→img2), ...
     pairs = [(image_urls[i], image_urls[i + 1]) for i in range(len(image_urls) - 1)]
     n_clips = len(pairs)
+
+    # ── Calcular duración por clip ────────────────────────────
+    # Si llega target_duration (del storytelling), dividir entre clips.
+    # Si no, usar 5s por defecto (vs ~3s default de la API).
+    # Rango válido: 3–8 segundos.
+    if target_duration > 0 and n_clips > 0:
+        # ceil(target / clips) para asegurar que el video llegue al objetivo
+        clip_duration = min(8, max(3, -(-target_duration // n_clips)))
+        print(f"  ⏱️  Duración por clip: {clip_duration}s ({n_clips} clips → ~{clip_duration * n_clips}s total)", flush=True)
+    else:
+        clip_duration = 5  # 5s default → 15 clips × 5s = 75s
+        print(f"  ⏱️  Duración por clip: {clip_duration}s (default)", flush=True)
+
     print(f"\n🚀 Generando {n_clips} clips de transición (3 en paralelo)…", flush=True)
 
     # Mostrar el plan de motions antes de empezar
     for i in range(n_clips):
         m = [dop_motion_override] if dop_motion_override else select_motions(i, n_clips)
-        print(f"  📋 Clip {i+1}: {m}", flush=True)
+        print(f"  📋 Clip {i+1}: {m}  {clip_duration}s", flush=True)
 
     results = [None] * n_clips
 
@@ -437,6 +463,7 @@ def main():
             api_key       = api_key,
             motions       = motions,
             endpoint      = dop_endpoint,
+            duration      = clip_duration,
         )
 
     # Lotes de 3 clips: esperar que termine cada lote antes del siguiente.

@@ -1164,8 +1164,21 @@ PROMPT ORIGINAL:
     # ── Fase 6b: Imagen Video — DoP Lite First-Last Frame ────
     # DoP Lite (2 cr/clip): toma pares de imágenes consecutivas
     # (img0→img1, img1→img2 …) y genera un clip cinematográfico por par.
-    # Con 2 lotes Popcorn × 8 imágenes → hasta 16 imágenes → 15 clips → ~75s.
+    # Con 2 lotes Popcorn × 8 imágenes → hasta 16 imágenes → 15 clips.
     # Ya NO necesitamos Video Prompt Generator — DoP interpreta las transiciones solo.
+
+    # Extraer duración objetivo del storytelling (ej. "70 segundos", "Duración: 60s")
+    _dur_target = 0
+    _dur_m = _re.search(
+        r'[Dd]urac[ií][oó]n[^:\d]*[:\-]?\s*[^\d]*(\d{2,3})\s*s(?:eg(?:undos?)?)?',
+        storytelling_result
+    )
+    if _dur_m:
+        _dur_target = int(_dur_m.group(1))
+        print(f"  ⏱️  Duración objetivo extraída del storytelling: {_dur_target}s", flush=True)
+    else:
+        print(f"  ⏱️  Duración objetivo no detectada — imagen_video usará 5s/clip por defecto", flush=True)
+
     imagen_video_result = ""
     if higgsfield_key and _img_urls and len(_img_urls) >= 2:
         _asm_params = {
@@ -1184,6 +1197,8 @@ PROMPT ORIGINAL:
             "image_urls": _img_urls,
             "source":     "popcorn_auto",
         }
+        if _dur_target > 0:
+            _iv_json["target_duration"] = _dur_target
         _iv_input = json.dumps(_iv_json, ensure_ascii=False)
         _iv_task = (
             f"ASSEMBLER_PARAMS:{json.dumps(_asm_params, ensure_ascii=False)}\n\n"
