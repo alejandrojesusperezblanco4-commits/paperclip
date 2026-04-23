@@ -53,18 +53,28 @@ def extract_narration(script: str) -> str:
     """
     Extrae solo el texto de narración del guión de storytelling.
     Detecta marcadores 🎙️/🎙 y NARRACIÓN/VOZ EN OFF de forma robusta.
+    La ficha técnica final (MÚSICA, TÍTULO, HASHTAGS, CTA, PARTE 2) se
+    excluye completamente del loop mediante BREAK, no solo continue.
+    El CTA FINAL se extrae por separado y se añade como cierre limpio.
     """
     parts = []
     in_narration = False
 
-    # Secciones que señalan que NO es narración y deben ignorarse
-    NON_NARRATION_MARKERS = (
-        "🎬", "⏱️", "━━", "⚡", "🎵", "📌", "#️⃣", "💬", "🔁",
-        "VISUAL:", "MICRO-HOOK", "DURACIÓN:", "MÚSICA:", "TÍTULO:",
-        "HASHTAGS:", "CTA FINAL:", "PARTE 2",
+    # Marcadores que PARAN la sección de narración activa (continue)
+    SECTION_STOP_MARKERS = (
+        "🎬", "⏱️", "━━", "⚡",
+        "VISUAL:", "MICRO-HOOK", "DURACIÓN:",
     )
 
-    # Líneas que son claramente instrucciones de dirección (inicio de línea)
+    # Marcadores de FICHA TÉCNICA FINAL — rompen el loop por completo (break)
+    # Una vez que aparecen, no hay más narración posible en el guión.
+    FICHA_MARKERS = (
+        "🎵", "📌", "🔁",
+        "MÚSICA:", "MÚSICA ", "TÍTULO:", "HASHTAGS:", "CTA FINAL:", "¿PARTE 2",
+        "FICHA TÉCNICA", "FICHA TECNICA",
+    )
+
+    # Líneas que son instrucciones de dirección (inicio de línea)
     DIRECTION_PREFIXES = (
         "Plano", "Iluminación", "Fondo", "Ambiente", "Encuadre",
         "Corte a", "Transición", "Efecto", "Música:", "Sonido:",
@@ -72,12 +82,10 @@ def extract_narration(script: str) -> str:
     )
 
     # Regex para detectar la línea del marcador de narración
-    # Acepta: 🎙️, 🎙, NARRACIÓN, VOZ EN OFF, LOCUCIÓN (con o sin emoji, con o sin bold **)
     _NARRATION_MARKER = re.compile(
         r'(?:🎙[️\ufe0f]?\s*)?(?:\*{1,3})?\s*(?:NARRACIÓN|VOZ\s+EN\s+OFF|LOCUCIÓN|VOICE\s*OVER)\b',
         re.IGNORECASE
     )
-    # Regex para limpiar la línea completa del marcador (incluye la descripción entre paréntesis)
     _MARKER_CLEANUP = re.compile(
         r'(?:🎙[️\ufe0f]?\s*)?(?:\*{1,3})?\s*(?:NARRACIÓN|VOZ\s+EN\s+OFF|LOCUCIÓN|VOICE\s*OVER)'
         r'(?:\s*\([^)]*\))?\s*(?:\*{1,3})?\s*[:：\-–]?\s*',
@@ -87,78 +95,106 @@ def extract_narration(script: str) -> str:
     for line in script.split("\n"):
         stripped = line.strip()
 
-        # Activar captura de narración
+        # ── STOP DURO: ficha técnica — romper el loop completo ──
+        if any(marker in stripped for marker in FICHA_MARKERS):
+            in_narration = False
+            break
+
+        # ── Activar captura de narración ──────────────────────
         is_narration_marker = (
-            "\U0001f399" in stripped          # 🎙 base codepoint (con o sin variante)
+            "\U0001f399" in stripped
             or _NARRATION_MARKER.search(stripped)
         )
         if is_narration_marker:
             in_narration = True
-            # Extraer texto que venga en la misma línea tras el marcador
             after = _MARKER_CLEANUP.sub('', stripped).strip()
-            # Limpiar asteriscos markdown residuales
             after = re.sub(r'\*+', '', after).strip()
-            # Solo añadir si es texto real (no solo puntuación o descripción de instrucción)
             if after and len(after) > 5 and not re.match(r'^[\(\[]', after):
                 parts.append(after)
             continue
 
         if in_narration:
-            # Detener si encontramos un marcador de otra sección
-            if any(marker in stripped for marker in NON_NARRATION_MARKERS):
+            # Parar sección activa si encontramos marcador visual/duración
+            if any(marker in stripped for marker in SECTION_STOP_MARKERS):
                 in_narration = False
                 continue
-            # Detener en encabezados de escena nuevos (ej: "ESCENA 2 — ...")
+            # Parar en encabezado de nueva escena
             if re.match(r'^(?:\*{1,3})?ESCENA\s+\d', stripped, re.IGNORECASE):
                 in_narration = False
                 continue
             if stripped:
-                # Filtrar líneas que son instrucciones de dirección
                 if not any(stripped.startswith(p) for p in DIRECTION_PREFIXES):
-                    # Limpiar markdown bold de la línea antes de añadir
                     clean_line = re.sub(r'\*+', '', stripped).strip()
                     if clean_line:
                         parts.append(clean_line)
 
     narration = " ".join(parts).strip()
-
-    # Limpiar acotaciones, etiquetas de rol y markdown
     narration = _clean_narration_text(narration)
     narration = re.sub(r'\s+', ' ', narration)
     narration = re.sub(r'\.{3,}', '...', narration)
 
-    # Considerar éxito si hay al menos 20 palabras (evita falsos positivos)
+    # ── Extraer CTA FINAL como cierre limpio ─────────────────
+    # El CTA es la pregunta que se dice al final del video — tiene
+    # sentido leerla, pero de forma aislada y limpia, sin mezclarla
+    # con hashtags ni el texto de PARTE 2.
+    _cta_match = re.search(
+        r'(?:💬\s*)?CTA\s*FINAL\s*[:：]\s*(.+?)(?:\n|$)',
+        script, re.IGNORECASE
+    )
+    cta_closing = ""
+    if _cta_match:
+        cta_raw = re.sub(r'\*+', '', _cta_match.group(1)).strip()
+        # Quedarse solo con la primera oración/pregunta (hasta punto o signo)
+        cta_sentence = re.split(r'(?<=[.!?])\s', cta_raw)[0].strip()
+        if cta_sentence and len(cta_sentence) > 5:
+            cta_closing = cta_sentence
+            print(f"  💬 CTA extraído: {cta_closing[:80]}", flush=True)
+
+    # Unir narración + CTA
+    if cta_closing and narration:
+        # Asegurarse de que hay pausa natural entre narración y CTA
+        if not narration.rstrip().endswith((".", "...", "?", "!")):
+            narration = narration.rstrip() + "."
+        narration = narration + " " + cta_closing
+
+    # Considerar éxito si hay al menos 20 palabras
     if narration and len(narration.split()) >= 20:
         print(f"  📝 Narración extraída: {len(narration.split())} palabras", flush=True)
         return narration
 
     if narration:
-        print(f"  ⚠️  Narración muy corta ({len(narration.split())} palabras) — activando fallback", flush=True)
+        print(f"  ⚠️  Narración corta ({len(narration.split())} palabras) — activando fallback", flush=True)
     else:
         print("  ⚠️  No se detectó sección de narración — activando fallback", flush=True)
 
-    # Fallback mejorado: quitar TODO lo que no sea texto hablado
-    # Elimina líneas de instrucción, emojis de sección, markdown de headers
+    # ── Fallback: solo líneas de texto hablado, sin ficha técnica ──
+    # Procesar hasta el primer marcador de ficha técnica (break)
     fallback_lines = []
     for line in script.split("\n"):
         s = line.strip()
         if not s:
             continue
-        if any(m in s for m in NON_NARRATION_MARKERS):
+        if any(m in s for m in FICHA_MARKERS):
+            break  # stop duro también en fallback
+        if any(m in s for m in SECTION_STOP_MARKERS):
             continue
         if re.match(r'^(?:\*{1,3})?(?:ESCENA|VISUAL|FICHA|MÚSICA|TÍTULO|CTA|HASHTAG)', s, re.IGNORECASE):
             continue
-        if s.startswith(("#", "━", "—", "🎬", "⚡", "⏱", "🎵", "📌", "#️⃣", "💬", "🔁")):
-            continue
         if any(s.startswith(p) for p in ("Plano", "Iluminación", "Fondo", "Ambiente",
-                                          "Corte a", "Transición", "Efecto", "INT.", "EXT.")):
+                                          "Corte a", "Transición", "Efecto", "INT.", "EXT.",
+                                          "#", "━", "—")):
             continue
+        if "\U0001f399" in s or _NARRATION_MARKER.search(s):
+            continue  # saltar líneas de marcador
         clean = re.sub(r'\*+', '', s).strip()
         if clean and len(clean) > 10:
             fallback_lines.append(clean)
 
     fallback = " ".join(fallback_lines)[:3000]
-    return _clean_narration_text(fallback)
+    result = _clean_narration_text(fallback)
+    if cta_closing and result:
+        result = result.rstrip(".!?") + ". " + cta_closing
+    return result
 
 
 def get_best_voice(api_key: str) -> str:
