@@ -1196,12 +1196,15 @@ Guión completo:
 
     imagen_video_result = ""
     if higgsfield_key and _img_urls and len(_img_urls) >= 2:
+        # IMPORTANTE: no incluir image_urls ni narration_text largo aquí —
+        # el description del sub-issue tiene límite de 4000 chars y el JSON
+        # se trunca, rompiendo la extracción de image_urls en imagen_video.
+        # image_urls las pasa imagen_video al assembler directamente.
         _asm_params = {
-            "image_urls":      _img_urls,
-            "audio_path":      audio_path,
-            "audio_url":       audio_url_tts,
-            "tema":            objetivo[:100],
-            "narration_text":  narration_text[:3000] if narration_text else "",
+            "audio_path":     audio_path,
+            "audio_url":      audio_url_tts,
+            "tema":           objetivo[:100],
+            "narration_text": narration_text[:300] if narration_text else "",
         }
         # Construir tarea: ASSEMBLER_PARAMS primero + JSON con image_urls para el agente
         # El Director NO pasa dop_motion — imagen_video usa su arco narrativo

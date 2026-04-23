@@ -296,10 +296,14 @@ def extract_image_urls(raw: str) -> list:
     return result
 
 
-def launch_video_assembler(clip_urls: list, assembler_params: dict) -> None:
+def launch_video_assembler(clip_urls: list, assembler_params: dict,
+                           fallback_image_urls: list = None) -> None:
     """
     Lanza video_assembler.py como proceso detachado con los clips reales.
     Se ejecuta DESPUÉS de que todos los clips están listos.
+    fallback_image_urls: las image_urls originales de Popcorn, para uso
+    como fallback en el assembler si no hay clips (no las ponemos en
+    assembler_params para no superar el límite de 4000 chars del sub-issue).
     """
     import subprocess as _sub
 
@@ -308,7 +312,7 @@ def launch_video_assembler(clip_urls: list, assembler_params: dict) -> None:
 
     task = json.dumps({
         "video_clips":     clip_urls,
-        "image_urls":      assembler_params.get("image_urls", []),
+        "image_urls":      fallback_image_urls or assembler_params.get("image_urls", []),
         "audio_path":      assembler_params.get("audio_path", ""),
         "audio_url":       assembler_params.get("audio_url", ""),
         "tema":            assembler_params.get("tema", ""),
@@ -547,7 +551,8 @@ def main():
             print(f"\n✅ {len(video_clip_urls)} clips listos → lanzando Video Assembler", flush=True)
         else:
             print(f"\n⚠️  Sin clips — Video Assembler usará imágenes como fallback", flush=True)
-        launch_video_assembler(video_clip_urls, assembler_params)
+        launch_video_assembler(video_clip_urls, assembler_params,
+                               fallback_image_urls=image_urls)
     else:
         print("\nℹ️  Sin ASSEMBLER_PARAMS — Video Assembler no lanzado desde aquí", flush=True)
 
