@@ -288,7 +288,8 @@ export async function createApp(
         return;
       }
       const current = rows[0].adapterConfig as Record<string, unknown> ?? {};
-      const updated = { ...current, timeoutSec };
+      // Sobrescribir tanto timeoutSec como timeout (legacy) para cubrir ambos campos
+      const updated = { ...current, timeoutSec, timeout: timeoutSec };
       await (db as any).update(agentsTable).set({ adapterConfig: updated }).where(eq(agentsTable.id, agentId));
       res.json({ ok: true, agent: rows[0].name, id: agentId, timeoutSec, adapterConfig: updated });
     } catch (err: unknown) {
