@@ -105,11 +105,13 @@ def submit_popcorn(prompt: str, num_images: int, aspect_ratio: str,
     return request_id
 
 
-def poll_images(request_id: str, api_key: str, max_wait: int = 240) -> list:
+def poll_images(request_id: str, api_key: str, max_wait: int = 360) -> list:
     """
     Polling hasta obtener las URLs de las imágenes.
     Popcorn puede tardar más que Soul dependiendo del num_images.
-    Timeout 4 min.
+    Timeout 6 min (cola de Higgsfield puede ser larga).
+    Lanza ServerFailedError en vez de Exception genérica para distinguir
+    errores de servidor (reintentables) de errores de contenido.
     """
     deadline   = time.time() + max_wait
     interval   = 8
@@ -135,13 +137,21 @@ def poll_images(request_id: str, api_key: str, max_wait: int = 240) -> list:
             raise Exception(f"completed pero sin imágenes: {json.dumps(data)[:300]}")
 
         if status == "nsfw":
-            raise Exception("Imágenes rechazadas por moderación (NSFW).")
-        if status in ("failed", "canceled"):
-            raise Exception(f"Generación fallida ({status}): {data.get('error', '')}")
+            raise Exception("NSFW: Imágenes rechazadas por moderación.")
+        if status == "canceled":
+            raise Exception("Generación cancelada.")
+        if status == "failed":
+            # Error de servidor — lanzar tipo especial para activar retry en main()
+            raise _ServerFailedError(f"Higgsfield server failed: {data.get('error', 'Generation failed')}")
 
         time.sleep(interval)
 
     raise Exception(f"Timeout ({max_wait}s) esperando imágenes de {request_id}")
+
+
+class _ServerFailedError(Exception):
+    """Error de servidor de Higgsfield — reintentable."""
+    pass
 
 
 def extract_params(raw: str) -> dict:
@@ -215,19 +225,37 @@ def main():
     print(f"📝 Prompt: {params['prompt'][:120]}…", flush=True)
     print(f"🎬 {params['num_images']} imágenes · {params['aspect_ratio']} · {params['resolution']}", flush=True)
 
-    try:
-        request_id = submit_popcorn(
-            prompt       = params["prompt"],
-            num_images   = params["num_images"],
-            aspect_ratio = params["aspect_ratio"],
-            resolution   = params["resolution"],
-            image_urls   = params["image_urls"],
-            api_key      = api_key,
-        )
-        image_urls = poll_images(request_id, api_key)
-    except Exception as e:
-        print(f"❌ Error: {e}", file=sys.stderr)
-        sys.exit(1)
+    MAX_ATTEMPTS = 3
+    image_urls   = []
+    last_error   = None
+
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        if attempt > 1:
+            wait = 30 * (attempt - 1)
+            print(f"  🔄 Reintento {attempt}/{MAX_ATTEMPTS} en {wait}s…", flush=True)
+            time.sleep(wait)
+        try:
+            request_id = submit_popcorn(
+                prompt       = params["prompt"],
+                num_images   = params["num_images"],
+                aspect_ratio = params["aspect_ratio"],
+                resolution   = params["resolution"],
+                image_urls   = params["image_urls"],
+                api_key      = api_key,
+            )
+            image_urls = poll_images(request_id, api_key)
+            break  # éxito — salir del loop
+        except _ServerFailedError as e:
+            # Error de servidor de Higgsfield — reintentable
+            last_error = e
+            print(f"  ⚠️  Intento {attempt} falló (servidor): {e}", flush=True)
+            if attempt == MAX_ATTEMPTS:
+                print(f"❌ Error tras {MAX_ATTEMPTS} intentos: {e}", file=sys.stderr)
+                sys.exit(1)
+        except Exception as e:
+            # Error no reintentable (NSFW, cancelado, prompt inválido…)
+            print(f"❌ Error: {e}", file=sys.stderr)
+            sys.exit(1)
 
     print(f"\n✅ {len(image_urls)} imágenes generadas por Popcorn", flush=True)
 
