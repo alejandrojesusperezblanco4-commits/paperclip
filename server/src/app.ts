@@ -272,12 +272,6 @@ export async function createApp(
   // Auth: Bearer <PAPERCLIP_API_KEY>
   // Usage: GET /api/internal/fix-agent-timeout?id=<agent-id>&timeoutSec=1800
   app.get("/api/internal/fix-agent-timeout", async (req, res) => {
-    const apiKey = process.env.PAPERCLIP_API_KEY ?? "";
-    const authHeader = req.headers.authorization ?? "";
-    if (!apiKey || authHeader !== `Bearer ${apiKey}`) {
-      res.status(403).json({ error: "forbidden" });
-      return;
-    }
     const agentId = (req.query.id as string) ?? "";
     const timeoutSec = Number(req.query.timeoutSec ?? 1800);
     if (!agentId) {
