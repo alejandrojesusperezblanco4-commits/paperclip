@@ -302,11 +302,12 @@ def launch_video_assembler(clip_urls: list, assembler_params: dict) -> None:
     script     = os.path.join(script_dir, "video_assembler.py")
 
     task = json.dumps({
-        "video_clips": clip_urls,
-        "image_urls":  assembler_params.get("image_urls", []),
-        "audio_path":  assembler_params.get("audio_path", ""),
-        "audio_url":   assembler_params.get("audio_url", ""),
-        "tema":        assembler_params.get("tema", ""),
+        "video_clips":     clip_urls,
+        "image_urls":      assembler_params.get("image_urls", []),
+        "audio_path":      assembler_params.get("audio_path", ""),
+        "audio_url":       assembler_params.get("audio_url", ""),
+        "tema":            assembler_params.get("tema", ""),
+        "narration_text":  assembler_params.get("narration_text", ""),
     }, ensure_ascii=False)
 
     env = {**os.environ}

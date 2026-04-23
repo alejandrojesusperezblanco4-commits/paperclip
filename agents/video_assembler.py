@@ -390,6 +390,83 @@ def assemble_video(image_paths: list, audio_path: str,
     return True
 
 
+def generate_srt(narration_text: str, total_duration: float, output_path: str) -> bool:
+    """
+    Genera archivo SRT a partir del texto de narración y la duración total del video.
+    Divide en chunks de ~6 palabras para estilo TikTok/Shorts.
+    """
+    # Limpiar texto: quitar comillas, asteriscos, corchetes, instrucciones de cámara
+    text = re.sub(r'["\*\[\]#]+', '', narration_text)
+    text = re.sub(r'\b(ESCENA|NARRACIÓN|VOZ EN OFF|HOOK|CTA)\b.*?(?=\n|$)', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s+', ' ', text).strip()
+
+    words = text.split()
+    if not words or total_duration <= 1:
+        print("  ⚠️  SRT: sin texto o duración insuficiente", flush=True)
+        return False
+
+    # Chunks de 6 palabras → ritmo natural para Shorts
+    CHUNK_SIZE = 6
+    chunks = [' '.join(words[i:i+CHUNK_SIZE]) for i in range(0, len(words), CHUNK_SIZE)]
+    chunks = [c.strip() for c in chunks if c.strip()]
+
+    if not chunks:
+        return False
+
+    time_per_chunk = total_duration / len(chunks)
+
+    def fmt(secs: float) -> str:
+        h = int(secs // 3600)
+        m = int((secs % 3600) // 60)
+        s = int(secs % 60)
+        ms = int((secs % 1) * 1000)
+        return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+    with open(output_path, 'w', encoding='utf-8') as f:
+        for i, chunk in enumerate(chunks):
+            start = i * time_per_chunk
+            end   = min((i + 1) * time_per_chunk, total_duration - 0.05)
+            f.write(f"{i + 1}\n{fmt(start)} --> {fmt(end)}\n{chunk}\n\n")
+
+    print(f"  ✅ SRT: {len(chunks)} subtítulos × {time_per_chunk:.1f}s", flush=True)
+    return True
+
+
+def burn_subtitles(video_path: str, srt_path: str, output_path: str) -> bool:
+    """Quema subtítulos estilo TikTok en el video (blanco, negrita, outline negro)."""
+    # Escapar ruta para el filtro de ffmpeg (barras en Windows)
+    srt_escaped = srt_path.replace('\\', '/').replace(':', r'\:')
+    style = (
+        "FontName=Arial,"
+        "FontSize=24,"
+        "PrimaryColour=&H00FFFFFF,"
+        "OutlineColour=&H00000000,"
+        "BackColour=&H60000000,"
+        "Bold=1,"
+        "Outline=2,"
+        "Shadow=1,"
+        "Alignment=2,"
+        "MarginV=80"
+    )
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", video_path,
+        "-vf", f"subtitles='{srt_escaped}':force_style='{style}'",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+    print("  🔤 Quemando subtítulos en el video…", flush=True)
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+    if r.returncode != 0:
+        print(f"  ⚠️  Subtítulos fallaron (se entrega sin ellos):\n{r.stderr[-400:]}", flush=True)
+        return False
+    size_kb = os.path.getsize(output_path) // 1024
+    print(f"  ✅ Video con subtítulos: {output_path} ({size_kb}KB)", flush=True)
+    return True
+
+
 def upload_file(file_path: str) -> str:
     """
     Sube archivo usando curl (streaming — no carga el archivo en RAM de Python).
@@ -511,10 +588,11 @@ def main():
         except Exception:
             pass
 
-    video_clips = data.get("video_clips") or []   # clips animados del DOP (preferido)
-    image_urls  = data.get("image_urls")  or extract_image_urls(raw)  # fallback estático
-    audio_path  = data.get("audio_path", "")
-    audio_url   = data.get("audio_url", "") or extract_audio_url(raw)
+    video_clips     = data.get("video_clips") or []
+    image_urls      = data.get("image_urls")  or extract_image_urls(raw)
+    audio_path      = data.get("audio_path", "")
+    audio_url       = data.get("audio_url", "") or extract_audio_url(raw)
+    narration_text  = data.get("narration_text", "")
 
     print(f"🎞️  video_clips recibidos: {len(video_clips)}", flush=True)
     for u in video_clips[:6]:
@@ -611,6 +689,16 @@ def main():
     if not os.path.exists(output_path):
         print("ERROR: output_path no existe tras ensamblado", file=sys.stderr)
         sys.exit(1)
+
+    # ── Subtítulos automáticos ────────────────────────────────
+    if narration_text and total_dur > 1:
+        srt_path    = f"{tmp_dir}/subtitulos.srt"
+        sub_output  = f"{tmp_dir}/video_subtitulado.mp4"
+        if generate_srt(narration_text, total_dur, srt_path):
+            if burn_subtitles(output_path, srt_path, sub_output):
+                output_path = sub_output   # usar el video con subtítulos
+    else:
+        print("ℹ️  Sin narración — video sin subtítulos", flush=True)
 
     file_size = os.path.getsize(output_path)
     print(f"📦 Tamaño del video: {file_size/1024/1024:.1f} MB", flush=True)

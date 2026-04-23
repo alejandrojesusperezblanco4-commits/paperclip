@@ -772,6 +772,7 @@ Diferenciacion vs competencia:
     tts_result     = ""
     audio_path     = ""
     audio_url_tts  = ""
+    narration_text = ""
     elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY", "")
     _tts_executor  = None
     _tts_future    = None
@@ -878,9 +879,10 @@ Guión completo:
         try:
             _m = _re.search(r'\{[\s\S]*?"audio_(?:path|url)"[\s\S]*?\}', tts_result)
             if _m:
-                _tts_data     = json.loads(_m.group(0))
-                audio_path    = _tts_data.get("audio_path", "")
-                audio_url_tts = _tts_data.get("audio_url", "")
+                _tts_data        = json.loads(_m.group(0))
+                audio_path       = _tts_data.get("audio_path", "")
+                audio_url_tts    = _tts_data.get("audio_url", "")
+                narration_text   = _tts_data.get("narration_text", "")
         except Exception:
             pass
         if not audio_path or not os.path.exists(audio_path):
@@ -1167,25 +1169,27 @@ PROMPT ORIGINAL:
     imagen_video_result = ""
     if higgsfield_key and _img_urls and len(_img_urls) >= 2:
         _asm_params = {
-            "image_urls": _img_urls,
-            "audio_path": audio_path,
-            "audio_url":  audio_url_tts,
-            "tema":       objetivo[:100],
+            "image_urls":      _img_urls,
+            "audio_path":      audio_path,
+            "audio_url":       audio_url_tts,
+            "tema":            objetivo[:100],
+            "narration_text":  narration_text[:3000] if narration_text else "",
         }
         # Construir tarea: ASSEMBLER_PARAMS primero + JSON con image_urls para el agente
-        # Incluir dop_motion si el LLM eligió uno específico (no "auto")
+        # El Director NO pasa dop_motion — imagen_video usa su arco narrativo
+        # automático (motions variados según posición del clip).
+        # El LLM elige soul_style para las imágenes pero los motions los
+        # gestiona imagen_video internamente para máxima variedad cinemática.
         _iv_json: dict = {
             "image_urls": _img_urls,
             "source":     "popcorn_auto",
         }
-        if dop_motion_choice and dop_motion_choice.lower() != "auto":
-            _iv_json["dop_motion"] = dop_motion_choice
         _iv_input = json.dumps(_iv_json, ensure_ascii=False)
         _iv_task = (
             f"ASSEMBLER_PARAMS:{json.dumps(_asm_params, ensure_ascii=False)}\n\n"
             + _iv_input
         )
-        _motion_label = f" · motion: **{dop_motion_choice}**" if dop_motion_choice and dop_motion_choice.lower() != "auto" else " · arco narrativo automático"
+        _motion_label = " · arco narrativo automático"
         post_issue_comment(
             f"🎞️ **Fase 6b — Imagen Video (DoP Lite)** en proceso…\n"
             f"Generando {len(_img_urls) - 1} clips de transición entre las {len(_img_urls)} escenas"
