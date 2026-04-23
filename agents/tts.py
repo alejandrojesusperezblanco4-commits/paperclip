@@ -51,8 +51,8 @@ def _clean_narration_text(text: str) -> str:
 
 def extract_narration(script: str) -> str:
     """
-    Extrae solo el texto de narración (🎙️) del guión de storytelling.
-    También elimina secciones no narrativas: visual, micro-hook, duración, ficha técnica.
+    Extrae solo el texto de narración del guión de storytelling.
+    Detecta marcadores 🎙️/🎙 y NARRACIÓN/VOZ EN OFF de forma robusta.
     """
     parts = []
     in_narration = False
@@ -71,17 +71,35 @@ def extract_narration(script: str) -> str:
         "VISUAL", "ESCENA", "Escena", "INT.", "EXT.",
     )
 
+    # Regex para detectar la línea del marcador de narración
+    # Acepta: 🎙️, 🎙, NARRACIÓN, VOZ EN OFF, LOCUCIÓN (con o sin emoji, con o sin bold **)
+    _NARRATION_MARKER = re.compile(
+        r'(?:🎙[️\ufe0f]?\s*)?(?:\*{1,3})?\s*(?:NARRACIÓN|VOZ\s+EN\s+OFF|LOCUCIÓN|VOICE\s*OVER)\b',
+        re.IGNORECASE
+    )
+    # Regex para limpiar la línea completa del marcador (incluye la descripción entre paréntesis)
+    _MARKER_CLEANUP = re.compile(
+        r'(?:🎙[️\ufe0f]?\s*)?(?:\*{1,3})?\s*(?:NARRACIÓN|VOZ\s+EN\s+OFF|LOCUCIÓN|VOICE\s*OVER)'
+        r'(?:\s*\([^)]*\))?\s*(?:\*{1,3})?\s*[:：\-–]?\s*',
+        re.IGNORECASE
+    )
+
     for line in script.split("\n"):
         stripped = line.strip()
 
         # Activar captura de narración
-        if "🎙️" in stripped or re.search(r'\bNARRACI[OÓ]N\b', stripped, re.IGNORECASE):
+        is_narration_marker = (
+            "\U0001f399" in stripped          # 🎙 base codepoint (con o sin variante)
+            or _NARRATION_MARKER.search(stripped)
+        )
+        if is_narration_marker:
             in_narration = True
-            # Capturar contenido después del marcador en la misma línea
-            # Usar flags=re.IGNORECASE en llamada separada (Python 3.13 no permite (?i) inline en alternados)
-            after = re.sub(r'🎙️\s*', '', stripped)
-            after = re.sub(r'\bNARRACI[OÓ]N\s*[:：]?\s*', '', after, flags=re.IGNORECASE).strip()
-            if after:
+            # Extraer texto que venga en la misma línea tras el marcador
+            after = _MARKER_CLEANUP.sub('', stripped).strip()
+            # Limpiar asteriscos markdown residuales
+            after = re.sub(r'\*+', '', after).strip()
+            # Solo añadir si es texto real (no solo puntuación o descripción de instrucción)
+            if after and len(after) > 5 and not re.match(r'^[\(\[]', after):
                 parts.append(after)
             continue
 
@@ -91,32 +109,55 @@ def extract_narration(script: str) -> str:
                 in_narration = False
                 continue
             # Detener en encabezados de escena nuevos (ej: "ESCENA 2 — ...")
-            if re.match(r'^ESCENA\s+\d', stripped, re.IGNORECASE):
+            if re.match(r'^(?:\*{1,3})?ESCENA\s+\d', stripped, re.IGNORECASE):
                 in_narration = False
                 continue
             if stripped:
                 # Filtrar líneas que son instrucciones de dirección
                 if not any(stripped.startswith(p) for p in DIRECTION_PREFIXES):
-                    parts.append(stripped)
+                    # Limpiar markdown bold de la línea antes de añadir
+                    clean_line = re.sub(r'\*+', '', stripped).strip()
+                    if clean_line:
+                        parts.append(clean_line)
 
     narration = " ".join(parts).strip()
 
     # Limpiar acotaciones, etiquetas de rol y markdown
     narration = _clean_narration_text(narration)
-    # Colapsar espacios extra
     narration = re.sub(r'\s+', ' ', narration)
     narration = re.sub(r'\.{3,}', '...', narration)
 
-    if narration:
+    # Considerar éxito si hay al menos 20 palabras (evita falsos positivos)
+    if narration and len(narration.split()) >= 20:
         print(f"  📝 Narración extraída: {len(narration.split())} palabras", flush=True)
         return narration
 
-    # Fallback: usar todo el texto del issue, quitando líneas de instrucción
-    print("  ⚠️  No se detectó sección 🎙️ — usando texto completo como narración", flush=True)
-    lines = [l.strip() for l in script.split("\n") if l.strip()
-             and not any(m in l for m in NON_NARRATION_MARKERS)
-             and not l.strip().startswith("#")]
-    fallback = " ".join(lines)[:3000]
+    if narration:
+        print(f"  ⚠️  Narración muy corta ({len(narration.split())} palabras) — activando fallback", flush=True)
+    else:
+        print("  ⚠️  No se detectó sección de narración — activando fallback", flush=True)
+
+    # Fallback mejorado: quitar TODO lo que no sea texto hablado
+    # Elimina líneas de instrucción, emojis de sección, markdown de headers
+    fallback_lines = []
+    for line in script.split("\n"):
+        s = line.strip()
+        if not s:
+            continue
+        if any(m in s for m in NON_NARRATION_MARKERS):
+            continue
+        if re.match(r'^(?:\*{1,3})?(?:ESCENA|VISUAL|FICHA|MÚSICA|TÍTULO|CTA|HASHTAG)', s, re.IGNORECASE):
+            continue
+        if s.startswith(("#", "━", "—", "🎬", "⚡", "⏱", "🎵", "📌", "#️⃣", "💬", "🔁")):
+            continue
+        if any(s.startswith(p) for p in ("Plano", "Iluminación", "Fondo", "Ambiente",
+                                          "Corte a", "Transición", "Efecto", "INT.", "EXT.")):
+            continue
+        clean = re.sub(r'\*+', '', s).strip()
+        if clean and len(clean) > 10:
+            fallback_lines.append(clean)
+
+    fallback = " ".join(fallback_lines)[:3000]
     return _clean_narration_text(fallback)
 
 
@@ -150,9 +191,9 @@ def generate_audio(text: str, voice_id: str, api_key: str, output_path: str) -> 
         "text": text,
         "model_id": MODEL_ID,
         "voice_settings": {
-            "stability": 0.35,        # más bajo = más expresivo y dramático
+            "stability": 0.20,         # muy bajo = máxima expresividad y dramatismo
             "similarity_boost": 0.80,  # fidelidad a la voz base
-            "style": 0.55,             # más estilo = más emoción en pausas y énfasis
+            "style": 0.80,             # alto = mucha emoción en pausas y énfasis
             "use_speaker_boost": True
         }
     }).encode("utf-8")
