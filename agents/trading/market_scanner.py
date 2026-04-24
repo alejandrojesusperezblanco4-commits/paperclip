@@ -32,8 +32,15 @@ MAX_PRICE      = 0.90
 def fetch_markets(limit: int = 50) -> list:
     """Obtiene mercados activos de Polymarket via Gamma API."""
     url = f"{GAMMA_API}/markets?active=true&closed=false&limit={limit}&order=volume&ascending=false"
-    req = urllib.request.Request(url, headers={"Accept": "application/json"}, method="GET")
-    with urllib.request.urlopen(req, timeout=20) as r:
+    headers = {
+        "Accept":          "application/json",
+        "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Origin":          "https://polymarket.com",
+        "Referer":         "https://polymarket.com/",
+    }
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read().decode("utf-8"))
 
 
