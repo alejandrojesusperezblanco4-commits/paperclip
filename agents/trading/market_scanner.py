@@ -12,6 +12,7 @@ Output: lista de mercados candidatos con precio, volumen y metadata.
 import os
 import sys
 import json
+import re
 import urllib.request
 import urllib.error
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent))
@@ -30,6 +31,34 @@ CRYPTO_KEYWORDS     = ["bitcoin", "btc", "ethereum", "eth", "crypto", "solana", 
 MIN_VOLUME_USD = 5_000   # Bajado a 5k para capturar más mercados crypto
 MIN_PRICE      = 0.05
 MAX_PRICE      = 0.95
+
+
+def extract_slug(text: str) -> str | None:
+    """Extrae el slug de una URL de Polymarket si viene en el input."""
+    m = re.search(r'polymarket\.com/(?:es/|en/)?event/([a-zA-Z0-9_-]+)', text)
+    return m.group(1) if m else None
+
+
+def fetch_event_by_slug(slug: str) -> list:
+    """Obtiene los mercados de un evento específico de Polymarket por slug."""
+    url = f"{GAMMA_API}/events?slug={slug}"
+    headers = {
+        "Accept":          "application/json",
+        "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Origin":          "https://polymarket.com",
+        "Referer":         "https://polymarket.com/",
+    }
+    req  = urllib.request.Request(url, headers=headers, method="GET")
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = json.loads(r.read().decode("utf-8"))
+
+    events = data if isinstance(data, list) else [data]
+    markets = []
+    for event in events:
+        for m in (event.get("markets") or []):
+            markets.append(m)
+    return markets
 
 
 def fetch_markets(limit: int = 50) -> list:
@@ -107,16 +136,39 @@ def filter_candidates(markets: list) -> list:
 
 def main():
     issue_title, issue_body = resolve_issue_context()
+    raw = f"{issue_title} {issue_body}".strip()
 
-    post_issue_comment("🔍 Market Scanner iniciando escaneo de Polymarket...")
+    # Detectar si viene una URL específica de Polymarket
+    slug = extract_slug(raw)
 
     try:
-        print("📡 Fetching markets from Gamma API...", flush=True)
-        markets = fetch_markets(limit=100)
-        print(f"  → {len(markets)} mercados obtenidos", flush=True)
-
-        candidates = filter_candidates(markets)
-        print(f"  → {len(candidates)} candidatos filtrados", flush=True)
+        if slug:
+            post_issue_comment(f"🔍 Market Scanner → mercado específico: `{slug}`")
+            print(f"📡 Fetching event by slug: {slug}", flush=True)
+            markets    = fetch_event_by_slug(slug)
+            candidates = filter_candidates(markets) or [
+                # Si no pasa el filtro de volumen, incluirlo igual
+                {
+                    "id":           m.get("id", ""),
+                    "question":     m.get("question", ""),
+                    "category":     "crypto",
+                    "price_yes":    round(float((json.loads(m.get("outcomePrices", "[0.5]")) or [0.5])[0]), 4),
+                    "price_no":     round(1 - float((json.loads(m.get("outcomePrices", "[0.5]")) or [0.5])[0]), 4),
+                    "volume_usd":   round(float(m.get("volumeNum", 0) or 0), 2),
+                    "end_date":     m.get("endDate", ""),
+                    "condition_id": m.get("conditionId", ""),
+                    "slug":         m.get("slug", slug),
+                }
+                for m in markets
+            ]
+            print(f"  → {len(candidates)} mercados en el evento", flush=True)
+        else:
+            post_issue_comment("🔍 Market Scanner iniciando escaneo de Polymarket...")
+            print("📡 Fetching markets from Gamma API...", flush=True)
+            markets    = fetch_markets(limit=100)
+            print(f"  → {len(markets)} mercados obtenidos", flush=True)
+            candidates = filter_candidates(markets)
+            print(f"  → {len(candidates)} candidatos filtrados", flush=True)
 
         lines = [f"# 🔍 MARKET SCANNER — Polymarket\n"]
         lines.append(f"**{len(candidates)} mercados candidatos** (volumen > ${MIN_VOLUME_USD:,})\n")
