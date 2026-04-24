@@ -22,11 +22,14 @@ sys.stderr.reconfigure(encoding="utf-8")
 
 GAMMA_API = "https://gamma-api.polymarket.com"
 
-# Categorías con mejor edge histórico
-PRIORITY_CATEGORIES = ["politics", "crypto", "economics", "finance"]
-MIN_VOLUME_USD = 10_000
-MIN_PRICE      = 0.10
-MAX_PRICE      = 0.90
+# Filtro de categorías — solo crypto
+PRIORITY_CATEGORIES = ["crypto"]
+CRYPTO_KEYWORDS     = ["bitcoin", "btc", "ethereum", "eth", "crypto", "solana", "sol",
+                        "xrp", "ripple", "bnb", "doge", "dogecoin", "coinbase", "binance",
+                        "altcoin", "defi", "nft", "blockchain", "token", "price"]
+MIN_VOLUME_USD = 5_000   # Bajado a 5k para capturar más mercados crypto
+MIN_PRICE      = 0.05
+MAX_PRICE      = 0.95
 
 
 def fetch_markets(limit: int = 50) -> list:
@@ -44,19 +47,35 @@ def fetch_markets(limit: int = 50) -> list:
         return json.loads(r.read().decode("utf-8"))
 
 
+def is_crypto_market(m: dict) -> bool:
+    """Detecta si un mercado es de crypto por categoría o keywords en la pregunta."""
+    category = (m.get("category") or m.get("groupItemTitle") or "").lower()
+    question = (m.get("question") or "").lower()
+    tags = [t.get("label", "").lower() for t in (m.get("tags") or [])]
+
+    if any(c in category for c in PRIORITY_CATEGORIES):
+        return True
+    if any(k in question for k in CRYPTO_KEYWORDS):
+        return True
+    if any(k in tag for k in CRYPTO_KEYWORDS for tag in tags):
+        return True
+    return False
+
+
 def filter_candidates(markets: list) -> list:
-    """Filtra mercados con potencial de edge."""
+    """Filtra mercados crypto con potencial de edge."""
     candidates = []
     for m in markets:
         try:
+            # Filtro crypto
+            if not is_crypto_market(m):
+                continue
+
             volume = float(m.get("volumeNum", 0) or 0)
             if volume < MIN_VOLUME_USD:
                 continue
 
             # Obtener precio YES del primer outcome
-            outcomes = m.get("outcomes", "[]")
-            if isinstance(outcomes, str):
-                outcomes = json.loads(outcomes)
             prices = m.get("outcomePrices", "[]")
             if isinstance(prices, str):
                 prices = json.loads(prices)
@@ -70,7 +89,7 @@ def filter_candidates(markets: list) -> list:
             candidates.append({
                 "id":           m.get("id", ""),
                 "question":     m.get("question", ""),
-                "category":     m.get("category", "").lower(),
+                "category":     m.get("category", "crypto").lower(),
                 "price_yes":    round(price_yes, 4),
                 "price_no":     round(1 - price_yes, 4),
                 "volume_usd":   round(volume, 2),
