@@ -354,13 +354,14 @@ export async function createApp(
         );
 
         if (existing) {
+          // Restaurar status idle + actualizar adapterConfig (por si estaba terminated)
           await (db as any)
             .update(agentsTable)
-            .set({ adapterConfig: spec.adapterConfig })
+            .set({ adapterConfig: spec.adapterConfig, status: "idle" })
             .where(eq(agentsTable.id, existing.id));
           results[spec.envVar] = { id: existing.id, created: false };
           if (spec.name === "CEO") ceoId = existing.id;
-          console.log(`  ✅ Updated ${spec.name} (${existing.id})`);
+          console.log(`  ✅ Restored ${spec.name} (${existing.id}) → idle`);
           continue;
         }
 
