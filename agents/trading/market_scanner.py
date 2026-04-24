@@ -186,6 +186,8 @@ def main():
             "total_scanned": len(markets),
             "source":       "gamma_api",
         }
+        # Separar el condition_id para que nunca se trunque
+        lines.append(f"\n**condition_id completo:** `{output_json.get('candidates', [{}])[0].get('condition_id', '') if output_json.get('candidates') else ''}`\n")
         lines.append("```json")
         lines.append(json.dumps(output_json, indent=2, ensure_ascii=False))
         lines.append("```")

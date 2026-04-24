@@ -114,14 +114,33 @@ def extract_market_meta(raw: str) -> dict:
 
 def get_market_holders(condition_id: str, limit: int = 50) -> list:
     """Obtiene los holders de un mercado específico."""
-    url = (
-        f"{DATA_API}/positions"
-        f"?market={condition_id}&limit={limit}"
-        f"&sortBy=CASHPNL&sortDirection=DESC"
-    )
-    print(f"  📡 Holders: {url[:80]}...", flush=True)
-    data = http_get(url)
-    return data if isinstance(data, list) else []
+    # Validar formato condition_id (debe ser 0x + 64 hex chars = 66 chars)
+    if not condition_id or len(condition_id) < 60:
+        print(f"  ⚠️  condition_id inválido o truncado: '{condition_id[:20]}...'", flush=True)
+        return []
+
+    # Intentar con parámetro 'market' primero, luego 'conditionId'
+    for param in ["market", "conditionId", "condition_id"]:
+        url = (
+            f"{DATA_API}/positions"
+            f"?{param}={condition_id}&limit={limit}"
+            f"&sortBy=TOKENS&sortDirection=DESC"
+        )
+        print(f"  📡 Holders [{param}]: {url[:90]}...", flush=True)
+        try:
+            data = http_get(url)
+            result = data if isinstance(data, list) else []
+            if result:
+                print(f"  ✅ {len(result)} holders encontrados con param '{param}'", flush=True)
+                return result
+        except urllib.error.HTTPError as e:
+            print(f"  ⚠️  HTTP {e.code} con param '{param}'", flush=True)
+            continue
+        except Exception as e:
+            print(f"  ⚠️  Error con param '{param}': {e}", flush=True)
+            continue
+
+    return []
 
 
 def get_wallet_pnl(wallet: str) -> float:
