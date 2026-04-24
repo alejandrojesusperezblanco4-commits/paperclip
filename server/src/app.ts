@@ -470,9 +470,9 @@ export async function createApp(
         },
       ];
 
-      // Listar agentes existentes en la empresa de trading
-      const existingAgents: { id: string; name: string }[] = await (db as any)
-        .select({ id: agentsTable.id, name: agentsTable.name })
+      // Listar agentes existentes en la empresa de trading (incluyendo terminated)
+      const existingAgents: { id: string; name: string; status: string }[] = await (db as any)
+        .select({ id: agentsTable.id, name: agentsTable.name, status: agentsTable.status })
         .from(agentsTable)
         .where(eq(agentsTable.companyId, TRADING_COMPANY_ID));
 
@@ -485,15 +485,22 @@ export async function createApp(
         );
 
         if (existing) {
-          // Restaurar status idle + actualizar adapterConfig (por si estaba terminated)
-          await (db as any)
-            .update(agentsTable)
-            .set({ adapterConfig: spec.adapterConfig, status: "idle" })
-            .where(eq(agentsTable.id, existing.id));
-          results[spec.envVar] = { id: existing.id, created: false };
-          if (spec.name === "CEO") ceoId = existing.id;
-          console.log(`  ✅ Restored ${spec.name} (${existing.id}) → idle`);
-          continue;
+          if (existing.status === "terminated") {
+            // Borrar el registro terminado y crear uno limpio
+            await (db as any).delete(agentsTable).where(eq(agentsTable.id, existing.id));
+            console.log(`  🗑️  Deleted terminated ${spec.name} (${existing.id})`);
+            // Continuar al bloque de inserción
+          } else {
+            // Restaurar status idle + actualizar adapterConfig
+            await (db as any)
+              .update(agentsTable)
+              .set({ adapterConfig: spec.adapterConfig, status: "idle" })
+              .where(eq(agentsTable.id, existing.id));
+            results[spec.envVar] = { id: existing.id, created: false };
+            if (spec.name === "CEO") ceoId = existing.id;
+            console.log(`  ✅ Restored ${spec.name} (${existing.id}) → idle`);
+            continue;
+          }
         }
 
         const insertValues: Record<string, unknown> = {
