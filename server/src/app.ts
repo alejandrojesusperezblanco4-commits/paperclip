@@ -268,6 +268,137 @@ export async function createApp(
     }
   });
 
+  // ── Seed dropshipping agents in DiscontrolDrops ─────────────────────────────
+  // Finds company by issuePrefix and creates all dropshipping agents.
+  // Usage: GET /api/internal/seed-drops-agents?secret=<first-16-chars>
+  app.get("/api/internal/seed-drops-agents", async (req, res) => {
+    const secret = (req.query.secret as string) ?? "";
+    const expectedSecret = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!secret || !expectedSecret || secret !== expectedSecret) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    try {
+      // Buscar empresa por issuePrefix (el slug de la URL)
+      const [company] = await (db as any)
+        .select({ id: companiesTable.id, name: companiesTable.name })
+        .from(companiesTable)
+        .where(eq(companiesTable.issuePrefix, "DISA"))
+        .limit(1);
+
+      if (!company) {
+        res.status(404).json({ error: "DiscontrolDrops company not found (issuePrefix DISA)" });
+        return;
+      }
+
+      const DROPS_AGENTS = [
+        {
+          name: "CEO",
+          envVar: "DROPS_CEO_AGENT_ID",
+          title: "Dropshipping Orchestrator",
+          role: "manager" as const,
+          adapterConfig: { command: "python3", args: ["agents/drops/ceo.py"], cwd: "/app", timeoutSec: 1800 },
+          budgetMonthlyCents: 10000,
+        },
+        {
+          name: "Product Hunter",
+          envVar: "DROPS_PRODUCT_HUNTER_AGENT_ID",
+          title: "Winning Product Finder",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/drops/product_hunter.py"], cwd: "/app", timeoutSec: 180 },
+          budgetMonthlyCents: 5000,
+        },
+        {
+          name: "Ad Spy",
+          envVar: "DROPS_AD_SPY_AGENT_ID",
+          title: "Facebook & TikTok Ad Analyzer",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/drops/ad_spy.py"], cwd: "/app", timeoutSec: 180 },
+          budgetMonthlyCents: 5000,
+        },
+        {
+          name: "Lead Qualifier",
+          envVar: "DROPS_LEAD_QUALIFIER_AGENT_ID",
+          title: "Product & Niche Qualifier",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/drops/lead_qualifier.py"], cwd: "/app", timeoutSec: 120 },
+          budgetMonthlyCents: 4000,
+        },
+        {
+          name: "Web Designer",
+          envVar: "DROPS_WEB_DESIGNER_AGENT_ID",
+          title: "Shopify Landing Page Designer",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/drops/web_designer.py"], cwd: "/app", timeoutSec: 180 },
+          budgetMonthlyCents: 5000,
+        },
+        {
+          name: "Marketing Creator",
+          envVar: "DROPS_MARKETING_CREATOR_AGENT_ID",
+          title: "Ad Copy & Marketing Assets Creator",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/drops/marketing_creator.py"], cwd: "/app", timeoutSec: 180 },
+          budgetMonthlyCents: 5000,
+        },
+      ];
+
+      const existingAgents: { id: string; name: string }[] = await (db as any)
+        .select({ id: agentsTable.id, name: agentsTable.name })
+        .from(agentsTable)
+        .where(eq(agentsTable.companyId, company.id));
+
+      const results: Record<string, { id: string; created: boolean }> = {};
+      let ceoId: string | null = null;
+
+      for (const spec of DROPS_AGENTS) {
+        const existing = existingAgents.find(
+          (a) => a.name.toLowerCase() === spec.name.toLowerCase(),
+        );
+
+        if (existing) {
+          await (db as any)
+            .update(agentsTable)
+            .set({ adapterConfig: spec.adapterConfig, status: "idle" })
+            .where(eq(agentsTable.id, existing.id));
+          results[spec.envVar] = { id: existing.id, created: false };
+          if (spec.name === "CEO") ceoId = existing.id;
+          continue;
+        }
+
+        const insertValues: Record<string, unknown> = {
+          companyId:          company.id,
+          name:               spec.name,
+          role:               spec.role,
+          title:              spec.title,
+          status:             "idle",
+          adapterType:        "process",
+          adapterConfig:      spec.adapterConfig,
+          budgetMonthlyCents: spec.budgetMonthlyCents,
+        };
+        if (spec.name !== "CEO" && ceoId) {
+          insertValues.reportsTo = ceoId;
+        }
+
+        const [created] = await (db as any)
+          .insert(agentsTable)
+          .values(insertValues)
+          .returning({ id: agentsTable.id });
+
+        results[spec.envVar] = { id: created.id, created: true };
+        if (spec.name === "CEO") ceoId = created.id;
+      }
+
+      const envLines = Object.entries(results)
+        .map(([k, v]) => `${k}=${v.id}`)
+        .join("\n");
+
+      res.json({ ok: true, company: company.name, companyId: company.id, results, envVars: envLines });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: msg });
+    }
+  });
+
   // ── Seed trading agents in DiscontrolsBags ──────────────────────────────────
   // Creates Polymarket trading agents in the DiscontrolsBags company.
   // Protected by the first 16 chars of BETTER_AUTH_SECRET.
