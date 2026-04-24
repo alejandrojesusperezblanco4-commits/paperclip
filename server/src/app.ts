@@ -268,6 +268,144 @@ export async function createApp(
     }
   });
 
+  // ── Seed trading agents in DiscontrolsBags ──────────────────────────────────
+  // Creates Polymarket trading agents in the DiscontrolsBags company.
+  // Protected by the first 16 chars of BETTER_AUTH_SECRET.
+  // Usage: GET /api/internal/seed-trading-agents?secret=<first-16-chars>
+  app.get("/api/internal/seed-trading-agents", async (req, res) => {
+    const secret = (req.query.secret as string) ?? "";
+    const expectedSecret = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!secret || !expectedSecret || secret !== expectedSecret) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    try {
+      const TRADING_COMPANY_ID = "866b74e7-79a7-4166-9f9f-025faa751aa1";
+
+      const TRADING_AGENTS = [
+        {
+          name: "CEO",
+          envVar: "CEO_AGENT_ID",
+          title: "Trading Orchestrator — Polymarket",
+          role: "manager" as const,
+          adapterConfig: { command: "python3", args: ["agents/trading/ceo.py"], cwd: "/app", timeoutSec: 1800 },
+          budgetMonthlyCents: 10000,
+          reportsTo: null as string | null,
+        },
+        {
+          name: "Market Scanner",
+          envVar: "MARKET_SCANNER_AGENT_ID",
+          title: "Polymarket Opportunity Scanner",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/trading/market_scanner.py"], cwd: "/app", timeoutSec: 120 },
+          budgetMonthlyCents: 4000,
+          reportsTo: null as string | null,
+        },
+        {
+          name: "Probability Estimator",
+          envVar: "PROBABILITY_ESTIMATOR_AGENT_ID",
+          title: "LLM-based Probability Analyst",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/trading/probability_estimator.py"], cwd: "/app", timeoutSec: 120 },
+          budgetMonthlyCents: 6000,
+          reportsTo: null as string | null,
+        },
+        {
+          name: "Risk Manager",
+          envVar: "RISK_MANAGER_AGENT_ID",
+          title: "Position Sizing & Risk Control",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/trading/risk_manager.py"], cwd: "/app", timeoutSec: 60 },
+          budgetMonthlyCents: 2000,
+          reportsTo: null as string | null,
+        },
+        {
+          name: "Executor",
+          envVar: "EXECUTOR_AGENT_ID",
+          title: "Polymarket Order Executor",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/trading/executor.py"], cwd: "/app", timeoutSec: 120 },
+          budgetMonthlyCents: 2000,
+          reportsTo: null as string | null,
+        },
+        {
+          name: "Reporter",
+          envVar: "REPORTER_AGENT_ID",
+          title: "Trade Reporter — Telegram & Logs",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/trading/reporter.py"], cwd: "/app", timeoutSec: 60 },
+          budgetMonthlyCents: 2000,
+          reportsTo: null as string | null,
+        },
+      ];
+
+      // Listar agentes existentes en la empresa de trading
+      const existingAgents: { id: string; name: string }[] = await (db as any)
+        .select({ id: agentsTable.id, name: agentsTable.name })
+        .from(agentsTable)
+        .where(eq(agentsTable.companyId, TRADING_COMPANY_ID));
+
+      const results: Record<string, { id: string; created: boolean }> = {};
+      let ceoId: string | null = null;
+
+      for (const spec of TRADING_AGENTS) {
+        const existing = existingAgents.find(
+          (a) => a.name.toLowerCase() === spec.name.toLowerCase(),
+        );
+
+        if (existing) {
+          await (db as any)
+            .update(agentsTable)
+            .set({ adapterConfig: spec.adapterConfig })
+            .where(eq(agentsTable.id, existing.id));
+          results[spec.envVar] = { id: existing.id, created: false };
+          if (spec.name === "CEO") ceoId = existing.id;
+          console.log(`  ✅ Updated ${spec.name} (${existing.id})`);
+          continue;
+        }
+
+        const insertValues: Record<string, unknown> = {
+          companyId:           TRADING_COMPANY_ID,
+          name:                spec.name,
+          role:                spec.role,
+          title:               spec.title,
+          status:              "idle",
+          adapterType:         "process",
+          adapterConfig:       spec.adapterConfig,
+          budgetMonthlyCents:  spec.budgetMonthlyCents,
+        };
+        // Los agentes (excepto CEO) reportan al CEO
+        if (spec.name !== "CEO" && ceoId) {
+          insertValues.reportsTo = ceoId;
+        }
+
+        const [created] = await (db as any)
+          .insert(agentsTable)
+          .values(insertValues)
+          .returning({ id: agentsTable.id });
+
+        results[spec.envVar] = { id: created.id, created: true };
+        if (spec.name === "CEO") ceoId = created.id;
+        console.log(`  ✅ Created ${spec.name} (${created.id})`);
+      }
+
+      const envLines = Object.entries(results)
+        .map(([k, v]) => `${k}=${v.id}`)
+        .join("\n");
+
+      res.json({
+        ok: true,
+        company: "DiscontrolsBags",
+        companyId: TRADING_COMPANY_ID,
+        results,
+        envVars: envLines,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: msg });
+    }
+  });
+
   // ── Quick fix: set timeoutSec on process agents by ID ───────────────────────
   // Auth: Bearer <PAPERCLIP_API_KEY>
   // Usage: GET /api/internal/fix-agent-timeout?id=<agent-id>&timeoutSec=1800
