@@ -468,6 +468,15 @@ export async function createApp(
           budgetMonthlyCents: 2000,
           reportsTo: null as string | null,
         },
+        {
+          name: "Wallet Analyzer",
+          envVar: "WALLET_ANALYZER_AGENT_ID",
+          title: "Polymarket Whale Tracker & Copy Signal",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/trading/wallet_analyzer.py"], cwd: "/app", timeoutSec: 300 },
+          budgetMonthlyCents: 4000,
+          reportsTo: null as string | null,
+        },
       ];
 
       // Listar agentes existentes en la empresa de trading (incluyendo terminated)
