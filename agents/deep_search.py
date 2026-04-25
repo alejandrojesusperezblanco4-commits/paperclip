@@ -1,10 +1,13 @@
 """
 Agente: Deep Search YouTube & TikTok
-Busca tendencias, keywords virales y oportunidades de contenido en tiempo real.
-Usa Perplexity (sonar-pro) via OpenRouter para acceso a internet.
+Busca tendencias virales con DATOS REALES via YouTube Data API v3 + LLM analysis.
 """
 import os
 import sys
+import json
+import urllib.request
+import urllib.parse
+from datetime import datetime, timezone, timedelta
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save, append_keywords
 from api_client import call_llm, post_issue_result, post_issue_comment, resolve_issue_context
@@ -12,104 +15,237 @@ from api_client import call_llm, post_issue_result, post_issue_comment, resolve_
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-SYSTEM_PROMPT = """Eres el investigador de tendencias virales más agudo para contenido en español. No das generalidades — das datos, patrones y ángulos exactos que un creador puede usar HOY para publicar algo que explote.
+YT_API_BASE = "https://www.googleapis.com/youtube/v3"
 
-Buscas en TODAS estas fuentes simultáneamente con acceso a internet en tiempo real:
-- TikTok LATAM: hashtags con más de 5M vistas esta semana, sonidos en ascenso (no en pico), videos de 30-90s con mayor retención
-- YouTube Shorts & Long-form: títulos con CTR >15%, videos que duplicaron suscriptores en 7 días, thumbnails con expresión facial extrema
-- Reddit en español: hilos con 500+ upvotes, comentarios con 100+ likes donde la gente confiesa algo personal
-- Twitter/X LATAM: tweets con más de 5k RTs sobre este tema, frases que se repiten en quote tweets
-- Google Trends (últimas 48h): búsquedas en pico para México, Colombia, Argentina, España
-- Noticias y casos reales: hechos de esta semana que generan indignación, ternura, asombro o debate moral
 
-## ESTRUCTURA DE RESPUESTA — 6 secciones obligatorias:
+# ── YouTube API helpers ───────────────────────────────────────────────────────
 
-### 1. 🔥 TOP 5 TENDENCIAS DEL MOMENTO (con datos reales)
-Para cada tendencia:
-- Nombre exacto + fuente + fecha aproximada de pico
-- Número de vistas/interacciones reales o estimadas
-- **Por qué está viral AHORA**: el disparador emocional específico (no "es interesante" — ¿qué hace que la gente lo comparta? ¿rabia, ternura, identificación, asombro, miedo?)
-- Potencial de vida: ¿cuántos días más durará esta ola? ¿tiene segunda parte?
+def yt_get(endpoint: str, params: dict, api_key: str) -> dict:
+    params["key"] = api_key
+    url = f"{YT_API_BASE}/{endpoint}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(url, headers={"Accept": "application/json"}, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  ⚠️  YouTube API error ({endpoint}): {e}", flush=True)
+        return {}
 
-### 2. 📌 10 TÍTULOS VIRALES REALES DE ESTA SEMANA
-Títulos literales de videos que reventaron esta semana en este nicho. Con plataforma, vistas y la razón psicológica exacta por la que funcionan (curiosity gap / shock / confesión / promesa / identidad).
 
-### 3. 💬 FRASES DE LA AUDIENCIA (oro para el hook)
-Las frases TEXTUALES que repite la gente en comentarios de este nicho. Ejemplos:
-- "Yo viví algo así y..."
-- "Esto me pasó exactamente a mí..."
-- "Necesitaba escuchar esto hoy"
-Estas frases son el hook perfecto — el espectador las reconoce en el primer segundo y no puede irse.
+def search_trending_videos(query: str, api_key: str, days: int = 7,
+                            max_results: int = 10, region: str = "MX") -> list:
+    """Busca videos trending del nicho en los últimos N días."""
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    data  = yt_get("search", {
+        "part":              "snippet",
+        "q":                 query,
+        "type":              "video",
+        "order":             "viewCount",
+        "publishedAfter":    since,
+        "maxResults":        max_results,
+        "relevanceLanguage": "es",
+        "regionCode":        region,
+        "videoDuration":     "short",   # shorts y videos cortos
+    }, api_key)
+    return data.get("items", [])
+
+
+def get_video_details(video_ids: list, api_key: str) -> list:
+    """Obtiene estadísticas detalladas de los videos."""
+    if not video_ids:
+        return []
+    data = yt_get("videos", {
+        "part": "statistics,snippet,contentDetails",
+        "id":   ",".join(video_ids[:10]),
+    }, api_key)
+    return data.get("items", [])
+
+
+def get_regional_trending(api_key: str, region: str = "MX", category: str = "25") -> list:
+    """Obtiene videos trending por región (25 = Noticias, 24 = Entertainment)."""
+    data = yt_get("videos", {
+        "part":              "statistics,snippet",
+        "chart":             "mostPopular",
+        "regionCode":        region,
+        "videoCategoryId":   category,
+        "maxResults":        10,
+        "relevanceLanguage": "es",
+    }, api_key)
+    return data.get("items", [])
+
+
+def format_number(n) -> str:
+    n = int(n)
+    if n >= 1_000_000:
+        return f"{n/1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n/1_000:.1f}K"
+    return str(n)
+
+
+def build_trending_context(query: str, api_key: str) -> str:
+    """Construye contexto de tendencias reales para el LLM."""
+    if not api_key:
+        return ""
+
+    lines = ["## 📊 DATOS REALES DE YOUTUBE (obtenidos ahora mismo)\n"]
+    lines.append(f"Query: '{query}' | Fecha: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n")
+
+    # 1. Videos trending del nicho — últimos 7 días
+    print(f"  📡 Buscando trending videos: '{query}' (7 días)...", flush=True)
+    search_items = search_trending_videos(query, api_key, days=7, max_results=10)
+    if search_items:
+        video_ids = [i["id"]["videoId"] for i in search_items if i.get("id", {}).get("videoId")]
+        details   = get_video_details(video_ids, api_key)
+
+        lines.append("### 🔥 TOP VIDEOS DEL NICHO (últimos 7 días, ordenados por views)\n")
+        for v in details[:10]:
+            snippet = v.get("snippet", {})
+            stats   = v.get("statistics", {})
+            title     = snippet.get("title", "?")
+            channel   = snippet.get("channelTitle", "?")
+            views     = format_number(stats.get("viewCount", 0))
+            likes     = format_number(stats.get("likeCount", 0))
+            comments  = format_number(stats.get("commentCount", 0))
+            published = snippet.get("publishedAt", "")[:10]
+            desc      = snippet.get("description", "")[:120].replace("\n", " ")
+            tags      = snippet.get("tags", [])[:6]
+            vid_id    = v.get("id", "")
+
+            lines.append(f"**\"{title}\"**")
+            lines.append(f"- Canal: {channel} | Views: {views} | Likes: {likes} | Comentarios: {comments}")
+            lines.append(f"- Publicado: {published}")
+            lines.append(f"- Descripción: {desc}...")
+            if tags:
+                lines.append(f"- Tags: {', '.join(tags)}")
+            lines.append(f"- URL: https://youtu.be/{vid_id}")
+            lines.append("")
+
+    # 2. Trending MX — Noticias/Entretenimiento
+    print("  📡 Buscando trending MX (Entretenimiento)...", flush=True)
+    trending_mx = get_regional_trending(api_key, region="MX", category="24")  # Entertainment
+    if trending_mx:
+        lines.append("### 📱 TRENDING EN MÉXICO AHORA (Entretenimiento)\n")
+        for v in trending_mx[:5]:
+            snippet = v.get("snippet", {})
+            stats   = v.get("statistics", {})
+            title   = snippet.get("title", "?")
+            views   = format_number(stats.get("viewCount", 0))
+            channel = snippet.get("channelTitle", "?")
+            lines.append(f"- \"{title}\" — {channel} ({views} views)")
+
+    # 3. Trending ES — España
+    print("  📡 Buscando trending ES (España)...", flush=True)
+    trending_es = get_regional_trending(api_key, region="ES", category="24")
+    if trending_es:
+        lines.append("\n### 📱 TRENDING EN ESPAÑA AHORA\n")
+        for v in trending_es[:5]:
+            snippet = v.get("snippet", {})
+            stats   = v.get("statistics", {})
+            title   = snippet.get("title", "?")
+            views   = format_number(stats.get("viewCount", 0))
+            channel = snippet.get("channelTitle", "?")
+            lines.append(f"- \"{title}\" — {channel} ({views} views)")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+SYSTEM_PROMPT = """Eres el investigador de tendencias virales más agudo para contenido en español. Recibes DATOS REALES de YouTube y los conviertes en inteligencia accionable para crear contenido que explote HOY.
+
+## ESTRUCTURA — 6 secciones obligatorias:
+
+### 1. 🔥 TOP 5 TENDENCIAS DEL MOMENTO (basadas en datos reales)
+Para cada tendencia, usa los datos reales proporcionados:
+- Nombre + views reales + fecha
+- Por qué está viral AHORA: el disparador emocional específico
+- Potencial de vida: ¿cuántos días más durará?
+
+### 2. 📌 10 TÍTULOS VIRALES (de los datos reales)
+Títulos literales de los videos proporcionados con más views. Con la razón psicológica exacta de cada uno.
+
+### 3. 💬 FRASES DE LA AUDIENCIA (para el hook)
+Frases textuales que probablemente repite la gente en comentarios de estos videos. Basadas en el tipo de contenido.
 
 ### 4. 🧠 MAPA DE EMOCIONES VIRALES
-Las 3 emociones que más comparte la audiencia latina en este nicho esta semana, ordenadas por potencia viral:
-1. [emoción] → [por qué]: qué situación específica la dispara, en qué segundo del video suele aparecer
-2. [emoción] → [por qué]
-3. [emoción] → [por qué]
-Incluye: ¿el contenido de este nicho hace llorar, enrabia, da esperanza o genera vergüenza ajena? ¿Cuál de estas emociones genera más comentarios/shares?
+Las 3 emociones dominantes en el nicho esta semana según los datos:
+1. [emoción] → disparador → segundo del video
+2. [emoción] → disparador → segundo del video
+3. [emoción] → disparador → segundo del video
 
 ### 5. 🎯 ÁNGULO GANADOR ESTA SEMANA
-El enfoque exacto que más va a conectar AHORA:
+El enfoque exacto que más va a conectar basado en los datos reales:
 - Emoción dominante a explotar
-- Perspectiva narrativa: primera persona íntima / revelación sorpresa / "te cuento lo que nadie sabe" / formato documental
-- El giro o elemento inesperado que hace que la gente mande el video a alguien
-- Ejemplo de título con este ángulo aplicado al tema pedido
+- Perspectiva narrativa recomendada
+- Ejemplo de título con este ángulo
 
 ### 6. 📱 ESTRATEGIA DE PLATAFORMA
-- TikTok: duración ideal, hora pico LATAM, hashtags exactos (máximo 5, no genéricos), sonido tendencia que encaja
-- YouTube Shorts: thumbnail concept ganador, título con keyword de búsqueda alta, descripción de primeros 100 caracteres
-- ¿En qué plataforma publicar PRIMERO esta semana y por qué?
+- TikTok: duración ideal, hora pico LATAM, hashtags exactos (máximo 5)
+- YouTube Shorts: thumbnail concept, título con keyword
+- ¿En qué plataforma publicar PRIMERO y por qué?
 
-## REGLAS: datos específicos con números reales. Nada de "podría funcionar" o "quizás". Si no tienes el dato exacto, da el mejor estimado con fuente. Adapta TODO al nicho pedido.
+## REGLAS: usa los datos reales como base principal. Cita views y títulos reales. Adapta TODO al nicho pedido.
 """
-
-def call_openrouter(task: str, api_key: str) -> str:
-    return call_llm(
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": task}
-        ],
-        api_key=api_key,
-        max_tokens=2000,
-        title="Paperclip - Deep Search Agent",
-    )
 
 
 def main():
-    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    api_key    = os.environ.get("OPENROUTER_API_KEY", "")
+    yt_api_key = os.environ.get("YOUTUBE_API_KEY_DEEP_SEARCH", "")
+
     if not api_key:
         print("ERROR: OPENROUTER_API_KEY no configurada", file=sys.stderr)
         sys.exit(1)
 
-    # Leer tarea desde stdin o args
+    issue_title, issue_body = resolve_issue_context()
     if len(sys.argv) > 1:
         task = " ".join(sys.argv[1:])
+    elif issue_title:
+        task = issue_body if issue_body and len(issue_body) > len(issue_title) else issue_title
     else:
         task = sys.stdin.read().strip()
 
-    # Variables de contexto de Paperclip
-    issue_title, issue_body = resolve_issue_context()
     if issue_title:
-        context = issue_body if issue_body and len(issue_body) > len(issue_title) else issue_title
-        task = f"Búsqueda solicitada: {context}\n\nDetalles adicionales: {issue_body or 'ninguno'}"
         post_issue_comment(
-            f"🔍 Entendido. Voy a buscar en TikTok, YouTube, Reddit, Twitter y Google Trends "
-            f"sobre: **{issue_title}**\n\nDame un par de minutos — te traigo las tendencias más "
-            f"calientes del momento con datos reales."
+            f"🔍 Buscando tendencias para: **{issue_title}**\n\n"
+            f"{'🔑 Obteniendo datos reales de YouTube API + análisis LLM...' if yt_api_key else '⚠️  Sin YouTube API key — análisis solo con LLM'}"
         )
 
     if not task:
-        task = "Dame las tendencias más importantes en YouTube Shorts y TikTok esta semana para canales de contenido en español. Incluye nichos de oportunidad con baja competencia."
+        task = "crimen real historias impactantes español"
 
-    # Inyectar contexto de memoria Obsidian
-    memory_ctx = get_context_summary("deep_search", task)
+    # Obtener datos reales de YouTube
+    real_data = ""
+    if yt_api_key:
+        print("🔑 YouTube API key detectada — fetching trending data...", flush=True)
+        real_data = build_trending_context(task, yt_api_key)
+        if real_data:
+            print(f"  ✅ Datos reales obtenidos ({len(real_data)} chars)", flush=True)
+        else:
+            print("  ⚠️  Sin datos de YouTube, continuando con LLM puro", flush=True)
+    else:
+        print("⚠️  YOUTUBE_API_KEY_DEEP_SEARCH no configurada — modo LLM puro", flush=True)
+
+    # Construir prompt
+    memory_ctx  = get_context_summary("deep_search", task)
+    user_prompt = f"Busca tendencias para: {task}\n\n"
+    if real_data:
+        user_prompt += f"{real_data}\n\n---\nCon estos datos reales, realiza el análisis completo."
     if memory_ctx:
-        task = f"{task}\n\n---\n{memory_ctx}"
+        user_prompt += f"\n\n---\nCONTEXTO PREVIO:\n{memory_ctx}"
 
     try:
-        response = call_openrouter(task, api_key)
+        response = call_llm(
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user",   "content": user_prompt},
+            ],
+            api_key    = api_key,
+            max_tokens = 2500,
+            title      = "Paperclip - Deep Search",
+            model      = "perplexity/sonar-pro",
+        )
         save("deep_search", task[:60], response)
-        print(response)
+        print(response, flush=True)
         post_issue_result(response)
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)

@@ -21,6 +21,8 @@ import hashlib
 import base64
 import time
 import urllib.request
+import urllib.parse
+from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -105,6 +107,61 @@ REGLAS ABSOLUTAS:
 
 def b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def fetch_yt_viral_titles(query: str, api_key: str, max_results: int = 8) -> str:
+    """
+    Obtiene los títulos más virales del nicho en YouTube (últimos 7 días).
+    Devuelve un bloque de texto con los títulos reales para inyectar en los prompts.
+    """
+    if not api_key:
+        return ""
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        params = {
+            "key":               api_key,
+            "part":              "snippet",
+            "q":                 query,
+            "type":              "video",
+            "order":             "viewCount",
+            "publishedAfter":    since,
+            "maxResults":        max_results,
+            "relevanceLanguage": "es",
+            "regionCode":        "MX",
+        }
+        url = f"https://www.googleapis.com/youtube/v3/search?{urllib.parse.urlencode(params)}"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"}, method="GET")
+        with urllib.request.urlopen(req, timeout=12) as r:
+            data = json.loads(r.read().decode("utf-8"))
+
+        items = data.get("items", [])
+        if not items:
+            return ""
+
+        # Obtener estadísticas de los videos
+        video_ids = [i["id"]["videoId"] for i in items if i.get("id", {}).get("videoId")]
+        if not video_ids:
+            return ""
+
+        stats_params = {"key": api_key, "part": "statistics,snippet", "id": ",".join(video_ids)}
+        stats_url = f"https://www.googleapis.com/youtube/v3/videos?{urllib.parse.urlencode(stats_params)}"
+        stats_req = urllib.request.Request(stats_url, headers={"Accept": "application/json"}, method="GET")
+        with urllib.request.urlopen(stats_req, timeout=12) as r:
+            stats_data = json.loads(r.read().decode("utf-8"))
+
+        lines = ["🎬 TÍTULOS VIRALES REALES DE YOUTUBE (últimos 7 días):"]
+        for v in stats_data.get("items", []):
+            title   = v.get("snippet", {}).get("title", "")
+            views   = int(v.get("statistics", {}).get("viewCount", 0))
+            channel = v.get("snippet", {}).get("channelTitle", "")
+            if title and views > 0:
+                views_fmt = f"{views/1_000_000:.1f}M" if views >= 1_000_000 else f"{views/1_000:.0f}K"
+                lines.append(f'  • "{title}" — {views_fmt} views ({channel})')
+
+        return "\n".join(lines) if len(lines) > 1 else ""
+    except Exception as e:
+        print(f"  ⚠️  YouTube Director API error: {e}", flush=True)
+        return ""
 
 
 def create_agent_jwt(agent_id: str, company_id: str, run_id: str, secret: str) -> str:
@@ -731,9 +788,19 @@ def main():
         print(f"📚 Source context: {len(source_context)} chars", flush=True)
 
     # ── Fase 1: Investigación ──────────────────────────────────
+    # Obtener títulos virales reales de YouTube para enriquecer los prompts
+    _yt_director_key = os.environ.get("YOUTUBE_API_KEY_DIRECTOR", "")
+    _yt_viral_titles = ""
+    if _yt_director_key:
+        print("🎬 Obteniendo títulos virales reales de YouTube...", flush=True)
+        _yt_viral_titles = fetch_yt_viral_titles(objetivo[:100], _yt_director_key)
+        if _yt_viral_titles:
+            print(f"  ✅ {_yt_viral_titles.count(chr(10))} títulos reales obtenidos", flush=True)
+
+    _yt_hint      = f"\n\n{_yt_viral_titles}" if _yt_viral_titles else ""
     _source_hint  = f"\n\nFUENTES REALES PROCESADAS:\n{source_context[:800]}" if source_context else ""
-    search_task   = f"Busca tendencias virales y keywords de oportunidad para el tema: {objetivo}{_source_hint}"
-    analyzer_task = f"Analiza los canales más exitosos de YouTube y TikTok sobre: {objetivo}. Encuentra sus debilidades.{_source_hint}"
+    search_task   = f"Busca tendencias virales y keywords de oportunidad para el tema: {objetivo}{_source_hint}{_yt_hint}"
+    analyzer_task = f"Analiza los canales más exitosos de YouTube y TikTok sobre: {objetivo}. Encuentra sus debilidades.{_source_hint}{_yt_hint}"
 
     _fase_inv = 2 if has_sources else 1
     post_issue_comment(
@@ -760,7 +827,8 @@ Contexto de tendencias encontradas:
 {deep_search_result[:400]}
 
 Diferenciacion vs competencia:
-{channel_result[:250]}""")
+{channel_result[:250]}
+{_yt_viral_titles[:300] if _yt_viral_titles else ""}""")
 
     post_issue_comment("✍️ **Fase 3 — Storytelling** en progreso…")
     storytelling_result = run_tracked("storytelling.py", storytelling_task,
