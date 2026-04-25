@@ -1323,6 +1323,34 @@ Guión completo:
                     "Video Assembler — MP4 final", "video_assembler",
                     paperclip_timeout=0)
 
+    # ── Fase 8: TikTok Publisher (opcional) ─────────────────────
+    # Solo si TIKTOK_ACCESS_TOKEN está configurado y AUTO_PUBLISH_TIKTOK=true
+    tiktok_token      = os.environ.get("TIKTOK_ACCESS_TOKEN", "").strip()
+    auto_publish_tt   = os.environ.get("AUTO_PUBLISH_TIKTOK", "false").lower() == "true"
+    if tiktok_token and auto_publish_tt and audio_url_tts:
+        # Extraer hashtags del storytelling (palabras con #)
+        import re as _re2
+        _hashtags = _re2.findall(r'#\w+', storytelling_result)[:8] or ["#viral", "#fyp", "#español"]
+        _tt_task  = json.dumps({
+            "video_url":  audio_url_tts,  # URL del video final (cuando esté disponible)
+            "tema":       objetivo[:80],
+            "hashtags":   _hashtags,
+            "caption":    f"{objetivo[:150]}\n",
+        }, ensure_ascii=False)
+        post_issue_comment("📱 **Fase 8 — TikTok Publisher** publicando automáticamente...")
+        run_tracked(
+            "tiktok_publisher.py", _tt_task,
+            "TikTok Publisher — Auto-publicación", "tiktok_publisher",
+            extra_env={
+                "TIKTOK_CLIENT_KEY":    os.environ.get("TIKTOK_CLIENT_KEY", ""),
+                "TIKTOK_CLIENT_SECRET": os.environ.get("TIKTOK_CLIENT_SECRET", ""),
+                "TIKTOK_ACCESS_TOKEN":  tiktok_token,
+                "TIKTOK_REFRESH_TOKEN": os.environ.get("TIKTOK_REFRESH_TOKEN", ""),
+                "TIKTOK_PRIVACY":       os.environ.get("TIKTOK_PRIVACY", "SELF_ONLY"),
+            },
+            paperclip_timeout=120,
+        )
+
 
 if __name__ == "__main__":
     main()

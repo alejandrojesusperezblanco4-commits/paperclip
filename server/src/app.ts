@@ -268,6 +268,73 @@ export async function createApp(
     }
   });
 
+  // ── TikTok OAuth — one-time token setup ─────────────────────────────────────
+  // Step 1: GET /auth/tiktok/start  → redirects to TikTok login
+  // Step 2: TikTok redirects to GET /auth/tiktok/callback?code=...
+  //         → exchanges code for tokens, shows them in browser
+  // Copy TIKTOK_ACCESS_TOKEN + TIKTOK_REFRESH_TOKEN to Railway Variables.
+
+  app.get("/auth/tiktok/start", (req, res) => {
+    const clientKey   = process.env.TIKTOK_CLIENT_KEY ?? "";
+    const baseUrl     = (process.env.PAPERCLIP_API_URL ?? "https://spirited-charm-production.up.railway.app").replace(/\/$/, "");
+    const redirectUri = `${baseUrl}/auth/tiktok/callback`;
+    const scope       = "user.info.basic,video.upload,video.publish,video.list";
+    const state       = Math.random().toString(36).slice(2);
+
+    const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=${encodeURIComponent(scope)}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+    res.redirect(authUrl);
+  });
+
+  app.get("/auth/tiktok/callback", async (req, res) => {
+    const code        = (req.query.code as string) ?? "";
+    const clientKey   = process.env.TIKTOK_CLIENT_KEY ?? "";
+    const clientSecret = process.env.TIKTOK_CLIENT_SECRET ?? "";
+    const baseUrl     = (process.env.PAPERCLIP_API_URL ?? "https://spirited-charm-production.up.railway.app").replace(/\/$/, "");
+    const redirectUri = `${baseUrl}/auth/tiktok/callback`;
+
+    if (!code) {
+      res.status(400).send("No code received from TikTok");
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        client_key:    clientKey,
+        client_secret: clientSecret,
+        code,
+        grant_type:    "authorization_code",
+        redirect_uri:  redirectUri,
+      });
+
+      const tokenRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+        method:  "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body:    params.toString(),
+      });
+      const tokenData = await tokenRes.json() as Record<string, unknown>;
+
+      const accessToken  = tokenData.access_token  as string ?? "";
+      const refreshToken = tokenData.refresh_token as string ?? "";
+      const openId       = tokenData.open_id       as string ?? "";
+      const expiresIn    = tokenData.expires_in    as number ?? 0;
+
+      res.send(`
+        <html><body style="font-family:monospace;padding:32px;background:#111;color:#eee">
+        <h2>✅ TikTok Auth Success</h2>
+        <p>Copia estos valores en <strong>Railway Variables</strong>:</p>
+        <pre style="background:#222;padding:16px;border-radius:8px">
+TIKTOK_ACCESS_TOKEN=${accessToken}
+TIKTOK_REFRESH_TOKEN=${refreshToken}
+TIKTOK_OPEN_ID=${openId}
+        </pre>
+        <p>El access token expira en ${Math.round(expiresIn / 3600)}h. El refresh token lo renueva automáticamente.</p>
+        </body></html>
+      `);
+    } catch (err) {
+      res.status(500).send(`Error exchanging code: ${err}`);
+    }
+  });
+
   // ── Seed dropshipping agents in DiscontrolDrops ─────────────────────────────
   // Finds company by issuePrefix and creates all dropshipping agents.
   // Usage: GET /api/internal/seed-drops-agents?secret=<first-16-chars>
