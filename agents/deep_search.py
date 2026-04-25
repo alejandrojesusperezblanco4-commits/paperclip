@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save, append_keywords
 from api_client import call_llm, post_issue_result, post_issue_comment, resolve_issue_context
+from tiktok_trends import build_tiktok_trends_context
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -219,17 +220,33 @@ def main():
         print("🔑 YouTube API key detectada — fetching trending data...", flush=True)
         real_data = build_trending_context(task, yt_api_key)
         if real_data:
-            print(f"  ✅ Datos reales obtenidos ({len(real_data)} chars)", flush=True)
+            print(f"  ✅ Datos YouTube obtenidos ({len(real_data)} chars)", flush=True)
         else:
             print("  ⚠️  Sin datos de YouTube, continuando con LLM puro", flush=True)
     else:
         print("⚠️  YOUTUBE_API_KEY_DEEP_SEARCH no configurada — modo LLM puro", flush=True)
 
+    # Obtener tendencias de TikTok Creative Center (sin API key)
+    print("📱 Obteniendo tendencias del TikTok Creative Center...", flush=True)
+    tiktok_data = ""
+    try:
+        tiktok_data = build_tiktok_trends_context(["mx", "es", "co"])
+        if tiktok_data:
+            print(f"  ✅ Datos TikTok obtenidos ({len(tiktok_data)} chars)", flush=True)
+        else:
+            print("  ⚠️  Sin datos de TikTok Creative Center", flush=True)
+    except Exception as e:
+        print(f"  ⚠️  TikTok Creative Center error: {e}", flush=True)
+
     # Construir prompt
     memory_ctx  = get_context_summary("deep_search", task)
     user_prompt = f"Busca tendencias para: {task}\n\n"
     if real_data:
-        user_prompt += f"{real_data}\n\n---\nCon estos datos reales, realiza el análisis completo."
+        user_prompt += f"{real_data}\n\n"
+    if tiktok_data:
+        user_prompt += f"{tiktok_data}\n\n"
+    if real_data or tiktok_data:
+        user_prompt += "---\nCon estos datos reales de YouTube y TikTok, realiza el análisis completo."
     if memory_ctx:
         user_prompt += f"\n\n---\nCONTEXTO PREVIO:\n{memory_ctx}"
 
