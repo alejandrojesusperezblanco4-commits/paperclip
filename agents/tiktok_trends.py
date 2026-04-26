@@ -27,7 +27,11 @@ COUNTRY_CODES = {
     "us": "US",
 }
 
-GOOGLE_TRENDS_RSS = "https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}"
+# Google Trends RSS — intentar ambos endpoints (el viejo y el nuevo)
+GOOGLE_TRENDS_RSS_URLS = [
+    "https://trends.google.com/trending/rss?geo={geo}",
+    "https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}",
+]
 
 GT_HEADERS = {
     "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -42,14 +46,19 @@ def get_google_trends(country: str = "mx", limit: int = 15) -> list:
     Devuelve lista de {term, traffic, related_queries}.
     """
     geo = COUNTRY_CODES.get(country.lower(), "MX")
-    url = GOOGLE_TRENDS_RSS.format(geo=geo)
-    req = urllib.request.Request(url, headers=GT_HEADERS, method="GET")
+    xml_content = None
 
-    try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            xml_content = r.read().decode("utf-8", errors="replace")
-    except Exception as e:
-        print(f"  ⚠️  Google Trends error ({country}): {e}", flush=True)
+    for url_template in GOOGLE_TRENDS_RSS_URLS:
+        url = url_template.format(geo=geo)
+        req = urllib.request.Request(url, headers=GT_HEADERS, method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                xml_content = r.read().decode("utf-8", errors="replace")
+            break  # éxito — salir del loop
+        except Exception as e:
+            print(f"  ⚠️  Google Trends error ({country}, {url[:50]}): {e}", flush=True)
+
+    if not xml_content:
         return []
 
     try:

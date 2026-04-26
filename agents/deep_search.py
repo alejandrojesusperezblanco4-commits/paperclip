@@ -94,6 +94,14 @@ def build_trending_context(query: str, api_key: str) -> str:
     lines.append(f"Query: '{query}' | Fecha: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n")
 
     # 1. Videos trending del nicho — últimos 7 días
+    # Limpiar query para YouTube API (max 80 chars, solo keywords)
+    import re as _re
+    _q = _re.sub(r'https?://\S+', '', query)
+    _q = _re.sub(r'@\w+', '', _q)
+    _q = _re.sub(r'\n+', ' ', _q)
+    _q = _re.sub(r'\s+', ' ', _q).strip()
+    _words = [w for w in _q.split() if len(w) > 3][:10]
+    query  = ' '.join(_words)[:80] or "videos virales español tiktok"
     print(f"  📡 Buscando trending videos: '{query}' (7 días)...", flush=True)
     search_items = search_trending_videos(query, api_key, days=7, max_results=10)
     if search_items:

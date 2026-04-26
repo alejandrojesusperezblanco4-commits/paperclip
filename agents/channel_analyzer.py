@@ -105,6 +105,17 @@ def build_real_data_context(query: str, api_key: str) -> str:
     if not api_key:
         return ""
 
+    # Extraer solo keywords clave (max 60 chars) para la búsqueda de YouTube
+    import re as _re
+    # Quitar URLs, handles, números de lista y quedarse con palabras clave
+    _clean = _re.sub(r'https?://\S+', '', query)
+    _clean = _re.sub(r'@\w+', '', _clean)
+    _clean = _re.sub(r'\d+\.\s', ' ', _clean)
+    _clean = _re.sub(r'\n+', ' ', _clean)
+    _clean = _re.sub(r'\s+', ' ', _clean).strip()
+    # Tomar las primeras palabras que sean relevantes
+    _words = [w for w in _clean.split() if len(w) > 3][:8]
+    query  = ' '.join(_words)[:80] or "canal youtube español viral"
     print(f"  📡 Buscando canales para: '{query}'", flush=True)
     channel_items = search_channels(query, api_key, max_results=5)
     if not channel_items:
