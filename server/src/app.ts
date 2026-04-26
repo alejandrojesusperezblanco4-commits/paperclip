@@ -150,6 +150,12 @@ export async function createApp(
   }
   app.use(llmRoutes(db));
 
+  // ── TikTok URL verification file ────────────────────────────────────────────
+  app.get("/tiktokLEfIkRPAJgbq8y0D9WQQDhDqo2ZVtqxa.txt", (req, res) => {
+    res.setHeader("Content-Type", "text/plain");
+    res.send("tiktok-developers-site-verification=LEfIkRPAJgbq8y0D9WQQDhDqo2ZVtqxa");
+  });
+
   // ── Legal pages (required for TikTok app review) ────────────────────────────
   app.get("/terms", (req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
