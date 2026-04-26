@@ -78,7 +78,7 @@ NARRATIVE_MOTIONS = [
 ]
 
 # Prompt de texto complementario (breve, DoP prioriza los motions)
-TRANSITION_PROMPT = "cinematic, photorealistic, dramatic lighting, smooth"
+TRANSITION_PROMPT = "Cinematic dramatic scene. Artistic composition, atmospheric lighting, photorealistic style. Smooth transition."
 
 
 def select_motions(clip_index: int, total_clips: int) -> list:
@@ -174,10 +174,10 @@ def submit_clip(image_url: str, end_image_url: str, prompt: str,
     return request_id
 
 
-def poll_clip(request_id: str, api_key: str, max_wait: int = 300) -> str:
-    """Polling hasta obtener la URL del clip MP4. Timeout 5 min por clip."""
+def poll_clip(request_id: str, api_key: str, max_wait: int = 180) -> str:
+    """Polling hasta obtener la URL del clip MP4. Timeout 3 min por clip."""
     deadline   = time.time() + max_wait
-    interval   = 5
+    interval   = 6
     status_url = f"{BASE_URL}/requests/{request_id}/status"
 
     while time.time() < deadline:
@@ -212,7 +212,7 @@ def generate_transition_clip(
     end_image_url: str,
     api_key: str,
     motions: list = None,
-    max_retries: int = 1,
+    max_retries: int = 0,
     endpoint: str = None,
     duration: int = 5,
 ) -> dict:
@@ -496,10 +496,16 @@ def main():
     # algunos clips pudieron fallar los 2 intentos. Los reintentamos
     # de uno en uno con más espera (no en paralelo para no saturar).
     failed_indices = [i for i, r in enumerate(results) if not r or r["status"] != "ok"]
-    if failed_indices:
+    ok_first_pass  = n_clips - len(failed_indices)
+
+    # Solo recuperar si al menos el 40% de los clips del primer pase salieron bien
+    # y hay menos de 5 clips fallidos. Si hay demasiados fallos, Higgsfield está
+    # inestable y reintentar solo gasta más créditos sin garantía de éxito.
+    MAX_RECOVERY = 4
+    if failed_indices and ok_first_pass >= n_clips * 0.4 and len(failed_indices) <= MAX_RECOVERY:
         print(f"\n  🔁 Pase de recuperación: {len(failed_indices)} clip(s) fallido(s)…", flush=True)
-        time.sleep(15)  # dar respiro a Higgsfield antes de reintentar
-        for i in failed_indices:
+        time.sleep(20)  # dar respiro a Higgsfield antes de reintentar
+        for i in failed_indices[:MAX_RECOVERY]:
             first_url, last_url = pairs[i]
             print(f"  🔄 Reintentando clip {i+1}…", flush=True)
             _, result = run(i, first_url, last_url)
@@ -507,7 +513,11 @@ def main():
             icon = "✅" if result["status"] == "ok" else "❌"
             print(f"  {icon} Recuperación clip {i+1}: {result['status']}", flush=True)
             if result["status"] != "ok":
-                time.sleep(10)  # esperar entre fallos en el pase de recuperación
+                time.sleep(15)
+    elif failed_indices:
+        print(f"\n  ⚠️  {len(failed_indices)} clips fallidos — omitiendo recuperación "
+              f"(demasiados fallos o primer pase insuficiente). "
+              f"El video se ensambla con los {ok_first_pass} clips disponibles.", flush=True)
 
     # ── Construir output ──────────────────────────────────────
     ok_count        = sum(1 for r in results if r and r["status"] == "ok")
