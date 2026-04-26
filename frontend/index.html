@@ -2530,6 +2530,7 @@ function updateClipsPanel(clips) {
     }).join('')}
   </div>`;
 
+  _sfx.success();
   // Auto-cambiar a la pestaña de clips cuando llegan
   switchArtTab('clipsTab', document.querySelector('[data-art="clipsTab"]'));
 }
@@ -2576,6 +2577,7 @@ function updateVideoPanel(videoUrl, raw) {
     </div>
   </div>`;
 
+  _sfx.success();
   // Auto-cambiar a la pestaña de video cuando llega
   switchArtTab('videoTab', document.querySelector('[data-art="videoTab"]'));
 }
@@ -2583,10 +2585,10 @@ function updateVideoPanel(videoUrl, raw) {
 /* ── Sound Effects ── */
 const _sfx = {
   success() {
-    try { const a = new Audio('/sounds/success.m4a'); a.volume = 0.7; a.play().catch(()=>{}); } catch(e){}
+    try { const a = new Audio('/sounds/error.m4a'); a.volume = 0.7; a.play().catch(()=>{}); } catch(e){}
   },
   error() {
-    try { const a = new Audio('/sounds/error.m4a'); a.volume = 0.7; a.play().catch(()=>{}); } catch(e){}
+    try { const a = new Audio('/sounds/success.m4a'); a.volume = 0.7; a.play().catch(()=>{}); } catch(e){}
   },
 };
 
