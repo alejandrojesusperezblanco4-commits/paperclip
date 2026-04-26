@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Historias en Sombra — Studio</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -27,7 +27,7 @@
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Barlow', system-ui, sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -416,16 +416,257 @@
     }
     .panel-left-scroll::-webkit-scrollbar { width: 3px; }
     .panel-left-scroll::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+
+    /* ══════════════════════════════════════
+       REDESIGN — Visual Overhaul
+    ══════════════════════════════════════ */
+
+    /* ── Typography ── */
+    .panel-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+    }
+    .tab-name  { font-family: 'Barlow', sans-serif; font-weight: 600; }
+    .card-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.1em; }
+    .stage-name { font-family: 'Barlow', sans-serif; font-weight: 600; }
+    .history-title { font-family: 'Barlow', sans-serif; font-weight: 600; }
+    .log-line { font-family: 'DM Mono', monospace; font-size: 11px; }
+
+    /* ── Header — gradient glow border ── */
+    header {
+      background: linear-gradient(90deg,
+        rgba(13,13,15,0.97) 0%,
+        rgba(22,10,38,0.97) 40%,
+        rgba(15,10,28,0.97) 70%,
+        rgba(13,13,15,0.97) 100%);
+      border-bottom: 1px solid rgba(168,85,247,0.2);
+      box-shadow: 0 1px 24px rgba(168,85,247,0.06);
+    }
+    .logo { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 0.04em; }
+    @keyframes logoPulse {
+      0%,100% { box-shadow: 0 0 8px var(--accent), 0 0 0px rgba(168,85,247,0); }
+      50%      { box-shadow: 0 0 14px var(--accent), 0 0 28px rgba(168,85,247,0.35); }
+    }
+    .logo-dot { animation: logoPulse 2.5s ease-in-out infinite; }
+
+    /* Global progress bar in header */
+    .header-progress {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: transparent;
+      overflow: hidden;
+    }
+    .header-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent2), var(--accent), #c084fc);
+      transition: width 0.5s ease;
+      box-shadow: 0 0 8px rgba(168,85,247,0.6);
+      display: none;
+    }
+
+    /* ── Agent tabs — 2-column card grid ── */
+    .agent-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      padding: 12px 12px 0;
+    }
+    .agent-tab {
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 10px 6px 8px;
+      gap: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 10px;
+    }
+    .agent-tab:hover {
+      background: rgba(168,85,247,0.06);
+      border-color: rgba(168,85,247,0.25);
+    }
+    .agent-tab.active {
+      background: rgba(168,85,247,0.12);
+      border-color: rgba(168,85,247,0.45);
+      box-shadow: 0 0 12px rgba(168,85,247,0.1) inset;
+    }
+    .tab-icon {
+      width: 36px; height: 36px;
+      border-radius: 9px;
+      font-size: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .agent-tab.active .tab-icon {
+      background: rgba(168,85,247,0.2);
+      border-color: rgba(168,85,247,0.3);
+    }
+    .tab-name { font-size: 10.5px; line-height: 1.2; }
+    /* Hide description in card mode — too cramped */
+    .agent-tabs .tab-desc { display: none; }
+
+    /* ── Input area — glow on focus ── */
+    .input-area {
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input-area:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(168,85,247,0.12), 0 0 12px rgba(168,85,247,0.08);
+    }
+    .input-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 4px;
+    }
+    .char-counter {
+      font-family: 'DM Mono', monospace;
+      font-size: 9.5px;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+    .char-counter.warn { color: var(--yellow); }
+    .char-counter.over { color: var(--red); }
+
+    /* ── Run button — cinematic glow ── */
+    .btn-run {
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      border: 1px solid rgba(168,85,247,0.4);
+      box-shadow: 0 2px 16px rgba(168,85,247,0.2);
+      transition: box-shadow 0.2s, transform 0.1s, opacity 0.2s;
+      letter-spacing: 0.04em;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .btn-run:hover:not(:disabled) {
+      box-shadow: 0 4px 24px rgba(168,85,247,0.35);
+      transform: translateY(-1px);
+      background: linear-gradient(135deg, var(--accent), #c084fc);
+    }
+    .btn-run:active:not(:disabled) { transform: translateY(0); }
+
+    /* ── Pipeline — stepper with connectors ── */
+    .stages { gap: 0; position: relative; }
+    .stage {
+      border-radius: 0;
+      border-top: none;
+      padding: 7px 10px;
+      position: relative;
+    }
+    .stage:first-child { border-radius: 8px 8px 0 0; border-top: 1px solid var(--border); }
+    .stage:last-child  { border-radius: 0 0 8px 8px; }
+    .stage.active { border-color: var(--accent); z-index: 1; }
+    .stage.done   { border-color: var(--green); }
+    .stage.error  { border-color: var(--red); }
+    /* Connector dot between stages */
+    .stage-connector {
+      height: 10px;
+      display: flex;
+      align-items: center;
+      padding-left: 18px;
+      gap: 0;
+    }
+    .stage-connector::before {
+      content: '';
+      width: 1px;
+      height: 100%;
+      background: var(--border);
+      margin-left: 11px;
+    }
+    /* Active connector glows */
+    .stage.active + .stage-connector::before,
+    .stage.done  + .stage-connector::before { background: rgba(168,85,247,0.3); }
+
+    /* ── Empty state — animated cinematic bg ── */
+    .empty-state {
+      position: relative;
+      overflow: hidden;
+    }
+    .empty-state::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 25% 35%, rgba(168,85,247,0.07) 0%, transparent 100%),
+        radial-gradient(ellipse 50% 60% at 75% 65%, rgba(59,130,246,0.05) 0%, transparent 100%),
+        radial-gradient(ellipse 40% 40% at 50% 20%, rgba(124,58,237,0.06) 0%, transparent 100%);
+      animation: bgDrift 14s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    .empty-state::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.025;
+      pointer-events: none;
+    }
+    @keyframes bgDrift {
+      0%   { transform: translate(0%, 0%) scale(1); }
+      33%  { transform: translate(1.5%, -2%) scale(1.04); }
+      66%  { transform: translate(-1%, 1.5%) scale(1.02); }
+      100% { transform: translate(2%, 0.5%) scale(1.05); }
+    }
+    .empty-state > * { position: relative; z-index: 1; }
+    .empty-icon {
+      font-size: 44px;
+      opacity: 0.5;
+      filter: drop-shadow(0 0 20px rgba(168,85,247,0.4));
+      animation: iconFloat 4s ease-in-out infinite;
+    }
+    @keyframes iconFloat {
+      0%,100% { transform: translateY(0px); }
+      50%      { transform: translateY(-6px); }
+    }
+    .empty-state h2 {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      opacity: 0.6;
+    }
+
+    /* ── History — color coded by agent ── */
+    .history-item {
+      border-left: 3px solid var(--border);
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .history-item:hover   { border-left-color: var(--muted); background: rgba(255,255,255,0.02); }
+    .history-item.active-run { border-left-color: var(--accent) !important; }
+    .history-item[data-agent="director"]    { border-left-color: rgba(168,85,247,0.5); }
+    .history-item[data-agent="search"]      { border-left-color: rgba(59,130,246,0.5); }
+    .history-item[data-agent="analyzer"]    { border-left-color: rgba(34,197,94,0.5); }
+    .history-item[data-agent="story"]       { border-left-color: rgba(234,179,8,0.5); }
+    .history-item[data-agent="imagen"]      { border-left-color: rgba(239,68,68,0.5); }
+    .history-item[data-agent="tts"]         { border-left-color: rgba(249,115,22,0.5); }
+    .history-item[data-agent="video"]       { border-left-color: rgba(20,184,166,0.5); }
+    .history-title { font-size: 11.5px; }
+
+    /* ── Cards — subtle depth ── */
+    .card {
+      border-color: rgba(255,255,255,0.06);
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: rgba(255,255,255,0.1); }
+    .running-log { border-color: rgba(168,85,247,0.2); }
   </style>
 </head>
 <body>
 
-<header>
+<header style="position:relative">
   <div class="logo">
     <div class="logo-dot"></div>
     historias.en.sombra — Studio
   </div>
   <div class="badge">Pipeline IA</div>
+  <div class="header-progress">
+    <div class="header-progress-bar" id="headerProgressBar"></div>
+  </div>
 </header>
 
 <main>
@@ -438,73 +679,43 @@
       <div class="agent-tabs" id="agentTabs">
         <div class="agent-tab active" data-agent="director" onclick="selectAgent('director')">
           <div class="tab-icon">🎬</div>
-          <div class="tab-info">
-            <div class="tab-name">Director</div>
-            <div class="tab-desc">Pipeline completo</div>
-          </div>
+          <div class="tab-name">Director</div>
         </div>
         <div class="agent-tab" data-agent="search" onclick="selectAgent('search')">
           <div class="tab-icon">🔍</div>
-          <div class="tab-info">
-            <div class="tab-name">Deep Search</div>
-            <div class="tab-desc">Tendencias en tiempo real</div>
-          </div>
+          <div class="tab-name">Deep Search</div>
         </div>
         <div class="agent-tab" data-agent="analyzer" onclick="selectAgent('analyzer')">
           <div class="tab-icon">📊</div>
-          <div class="tab-info">
-            <div class="tab-name">Channel Analyzer</div>
-            <div class="tab-desc">Analiza canales rivales</div>
-          </div>
+          <div class="tab-name">Channel Analyzer</div>
         </div>
         <div class="agent-tab" data-agent="story" onclick="selectAgent('story')">
           <div class="tab-icon">✍️</div>
-          <div class="tab-info">
-            <div class="tab-name">Storytelling</div>
-            <div class="tab-desc">Guión en 4-5 escenas</div>
-          </div>
+          <div class="tab-name">Storytelling</div>
         </div>
         <div class="agent-tab" data-agent="prompt" onclick="selectAgent('prompt')">
           <div class="tab-icon">🎨</div>
-          <div class="tab-info">
-            <div class="tab-name">Prompt Generator</div>
-            <div class="tab-desc">Prompts para Higgsfield</div>
-          </div>
+          <div class="tab-name">Prompt Gen</div>
         </div>
         <div class="agent-tab" data-agent="imagen" onclick="selectAgent('imagen')">
           <div class="tab-icon">🖼️</div>
-          <div class="tab-info">
-            <div class="tab-name">Imagen AI</div>
-            <div class="tab-desc">Genera con Higgsfield Soul</div>
-          </div>
+          <div class="tab-name">Imagen AI</div>
         </div>
         <div class="agent-tab" data-agent="video_prompt" onclick="selectAgent('video_prompt')">
           <div class="tab-icon">🎞️</div>
-          <div class="tab-info">
-            <div class="tab-name">Video Prompt Gen</div>
-            <div class="tab-desc">Motion prompts por escena</div>
-          </div>
+          <div class="tab-name">Video Prompt</div>
         </div>
         <div class="agent-tab" data-agent="imagen_video" onclick="selectAgent('imagen_video')">
           <div class="tab-icon">🎬</div>
-          <div class="tab-info">
-            <div class="tab-name">Imagen Video</div>
-            <div class="tab-desc">Clips MP4 · Higgsfield DOP</div>
-          </div>
+          <div class="tab-name">Img → Video</div>
         </div>
         <div class="agent-tab" data-agent="tts" onclick="selectAgent('tts')">
           <div class="tab-icon">🎙️</div>
-          <div class="tab-info">
-            <div class="tab-name">TTS — Voz en off</div>
-            <div class="tab-desc">Narración con ElevenLabs</div>
-          </div>
+          <div class="tab-name">TTS Voz</div>
         </div>
         <div class="agent-tab" data-agent="video" onclick="selectAgent('video')">
           <div class="tab-icon">📱</div>
-          <div class="tab-info">
-            <div class="tab-name">Video Assembler</div>
-            <div class="tab-desc">MP4 9:16 TikTok/Reels</div>
-          </div>
+          <div class="tab-name">Assembler</div>
         </div>
       </div>
 
@@ -513,7 +724,10 @@
       <!-- Input -->
       <div class="input-section">
         <div class="panel-label" id="inputLabel">Historia / tema</div>
-        <textarea id="topicInput" class="input-area" placeholder="Ej: Ella descubre que su esposo la engañó con su mejor amiga…"></textarea>
+        <textarea id="topicInput" class="input-area" placeholder="Ej: Ella descubre que su esposo la engañó con su mejor amiga…" oninput="updateCharCounter(this)"></textarea>
+        <div class="input-footer">
+          <span class="char-counter" id="charCounter">0</span>
+        </div>
 
         <!-- Soul Style selector (visible solo para agentes que usan Higgsfield Soul) -->
         <div id="soulStyleSection" style="display:none;margin-top:8px">
@@ -829,41 +1043,49 @@
             <div class="stage-name">Director</div>
             <div class="stage-badge">En espera</div>
           </div>
+          <div class="stage-connector"></div>
           <div class="stage waiting" id="stage-search">
             <div class="stage-icon">🔍</div>
             <div class="stage-name">Deep Search</div>
             <div class="stage-badge">En espera</div>
           </div>
+          <div class="stage-connector"></div>
           <div class="stage waiting" id="stage-analyzer">
             <div class="stage-icon">📊</div>
             <div class="stage-name">Channel Analyzer</div>
             <div class="stage-badge">En espera</div>
           </div>
+          <div class="stage-connector"></div>
           <div class="stage waiting" id="stage-story">
             <div class="stage-icon">✍️</div>
             <div class="stage-name">Storytelling</div>
             <div class="stage-badge">En espera</div>
           </div>
+          <div class="stage-connector"></div>
           <div class="stage waiting" id="stage-tts">
             <div class="stage-icon">🎙️</div>
             <div class="stage-name">TTS — Voz en off</div>
             <div class="stage-badge">En espera</div>
           </div>
+          <div class="stage-connector"></div>
           <div class="stage waiting" id="stage-prompt">
             <div class="stage-icon">🎨</div>
             <div class="stage-name">Prompt Generator</div>
             <div class="stage-badge">En espera</div>
           </div>
+          <div class="stage-connector"></div>
           <div class="stage waiting" id="stage-imagen">
             <div class="stage-icon">🍿</div>
             <div class="stage-name">Popcorn Auto</div>
             <div class="stage-badge">En espera</div>
           </div>
+          <div class="stage-connector"></div>
           <div class="stage waiting" id="stage-imagen_video">
             <div class="stage-icon">🎬</div>
             <div class="stage-name">Imagen Video</div>
             <div class="stage-badge">En espera</div>
           </div>
+          <div class="stage-connector"></div>
           <div class="stage waiting" id="stage-video">
             <div class="stage-icon">📱</div>
             <div class="stage-name">Video Assembler</div>
@@ -2004,7 +2226,7 @@ function renderHistory() {
   }
   list.innerHTML = runHistory.map((h,i) => {
     const cfg = AGENTS[h.agent] || AGENTS.director;
-    return `<div class="history-item ${h.id===currentIssueId?'active-run':''}" onclick="loadHistory(${i})">
+    return `<div class="history-item ${h.id===currentIssueId?'active-run':''}" data-agent="${h.agent||'director'}" onclick="loadHistory(${i})">
       <div class="history-title">${escHtml((h.topic||'').slice(0,55))}</div>
       <div class="history-meta">
         <span class="history-agent">${cfg.icon} ${cfg.name}</span>
@@ -2354,6 +2576,32 @@ function updateVideoPanel(videoUrl, raw) {
   // Auto-cambiar a la pestaña de video cuando llega
   switchArtTab('videoTab', document.querySelector('[data-art="videoTab"]'));
 }
+
+/* ── Char counter ── */
+function updateCharCounter(el) {
+  const counter = document.getElementById('charCounter');
+  if (!counter) return;
+  const len = el.value.length;
+  counter.textContent = len;
+  counter.className = 'char-counter' + (len > 500 ? ' warn' : '') + (len > 800 ? ' over' : '');
+}
+
+/* ── Header progress bar (mirrors sidebar bar) ── */
+(function() {
+  const headerBar = document.getElementById('headerProgressBar');
+  if (!headerBar) return;
+  const sideBar  = document.getElementById('progressBar');
+  const sideWrap = document.getElementById('progressWrap');
+  if (!sideBar || !sideWrap) return;
+
+  const observer = new MutationObserver(() => {
+    const visible = sideWrap.style.display !== 'none';
+    headerBar.style.display = visible ? 'block' : 'none';
+    headerBar.style.width   = sideBar.style.width || '0%';
+  });
+  observer.observe(sideBar,  { attributes: true, attributeFilter: ['style'] });
+  observer.observe(sideWrap, { attributes: true, attributeFilter: ['style'] });
+})();
 
 /* ── Init ── */
 selectAgent('director');
