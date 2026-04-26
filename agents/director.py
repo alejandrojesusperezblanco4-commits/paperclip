@@ -894,13 +894,17 @@ General: General, Realistic
 DOP MOTIONS disponibles (elige 1, o "auto" para arco narrativo automático):
 Cámara: Dolly In, Dolly Out, Dolly Zoom In, Arc Left, Arc Right, Crane Up, Crane Down, Crash Zoom In, Super Dolly In, Whip Pan, FPV Drone, Overhead, Snorricam, Zoom In
 Efectos: Focus Change, Glitch, VHS, Datamosh, Lens Flare, Glowshift, Paparazzi
-Personaje: Catwalk, Levitation, Agent Reveal, Soul Jump
+Personaje: Catwalk, Levitation, Agent Reveal, Soul Jump, Action Run
 General: General, Handheld
+
+GÉNEROS disponibles:
+horror, conspiracion, accion, misterio, drama
 
 Responde SOLO con JSON válido (sin explicaciones fuera del JSON):
 {
   "soul_style": "nombre exacto del estilo o vacío",
-  "dop_motion": "nombre exacto del motion o auto",
+  "dop_motion": "auto",
+  "genre": "horror|conspiracion|accion|misterio|drama",
   "razon": "1 línea explicando la elección"
 }"""
 
@@ -931,12 +935,14 @@ TONO DEL GUIÓN (primeras líneas):
             _style_data   = json.loads(_style_m.group(0))
             soul_style_choice = (_style_data.get("soul_style") or "").strip()
             dop_motion_choice = (_style_data.get("dop_motion") or "").strip()
+            genre_choice      = (_style_data.get("genre") or "drama").strip().lower()
             _razon            = _style_data.get("razon", "")
-            print(f"🎨 Estilo elegido: soul_style='{soul_style_choice}' | dop_motion='{dop_motion_choice}'", flush=True)
+            print(f"🎨 Estilo elegido: soul_style='{soul_style_choice}' | genre='{genre_choice}'", flush=True)
             if _razon:
                 print(f"   📝 {_razon}", flush=True)
     except Exception as _se:
         print(f"⚠️  No se pudo elegir estilo automáticamente: {_se}", flush=True)
+        genre_choice = "drama"
 
     # ── Fase 4: Prompt Generator ──────────────────────────────
     # Nuevo rol: genera UN prompt narrativo optimizado para Popcorn Auto
@@ -1320,9 +1326,23 @@ TONO DEL GUIÓN (primeras líneas):
         # automático (motions variados según posición del clip).
         # El LLM elige soul_style para las imágenes pero los motions los
         # gestiona imagen_video internamente para máxima variedad cinemática.
+        # Extraer contextos de escena del storytelling para motion LLM
+        _scene_ctxs = _re.findall(
+            r'(?:ESCENA\s+\d+[^:\n]*|##\s*🎬[^\n]*|###\s*Escena\s*\d+[^\n]*)[:\n]+([^\n]{20,200})',
+            storytelling_result, _re.IGNORECASE
+        )
+        _scene_ctxs = [s.strip() for s in _scene_ctxs[:15] if s.strip()]
+        if not _scene_ctxs:
+            # Fallback: tomar las primeras líneas de cada narración
+            _narr_lines = _re.findall(r'(?:NARRACIÓN|VOZ EN OFF)[^:]*:\s*([^\n]{20,150})', storytelling_result, _re.IGNORECASE)
+            _scene_ctxs = _narr_lines[:15]
+        print(f"  🎬 Contextos de escena extraídos: {len(_scene_ctxs)}", flush=True)
+
         _iv_json: dict = {
-            "image_urls": _img_urls,
-            "source":     "popcorn_auto",
+            "image_urls":    _img_urls,
+            "source":        "popcorn_auto",
+            "genre":         genre_choice,
+            "scene_contexts": _scene_ctxs,
         }
         if _dur_target > 0:
             _iv_json["target_duration"] = _dur_target

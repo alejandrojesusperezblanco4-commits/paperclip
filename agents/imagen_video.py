@@ -24,7 +24,7 @@ import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
-from api_client import post_issue_result, post_issue_comment, resolve_issue_context, post_parent_update
+from api_client import post_issue_result, post_issue_comment, resolve_issue_context, post_parent_update, call_llm
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -60,44 +60,156 @@ def _resolve_motion(motion_name: str, api_key: str) -> dict:
     # Fallback: si no está en el catálogo, intentar con slug como id
     return {"id": motion_name.lower().replace(" ", "_"), "name": motion_name, "strength": 1.0}
 
-# ── Motion presets por posición narrativa ────────────────────────────────────
-# Cada lista representa los motions del clip en esa posición del relato.
-# El campo "motions" acepta array → podemos combinar varios.
-# Mapeado a un arco narrativo clásico: gancho → desarrollo → clímax → resolución.
-NARRATIVE_MOTIONS = [
-    # Clip 0 — GANCHO / apertura: entra al mundo del personaje
-    ["Dolly In"],
-    # Clip 1 — DESARROLLO: la situación se complica, cámara más dinámica
-    ["Arc Right", "Focus Change"],
-    # Clip 2 — TENSIÓN / punto de inflexión: energía máxima
-    ["Crash Zoom In"],
-    # Clip 3 — CLÍMAX o RESOLUCIÓN: perspectiva amplia, revelación final
-    ["Crane Up", "Dolly Out"],
-    # Clip 4+ — fallback cinematográfico genérico
-    ["Dolly In"],
+# ── Motion presets por género ─────────────────────────────────────────────────
+# Cada lista = [apertura, desarrollo, tensión, clímax, resolución]
+# El sistema escala dinámicamente para cualquier número de clips.
+GENRE_PRESETS: dict[str, list] = {
+    "horror": [
+        ["Handheld"],                     # apertura  — found footage, inmersivo
+        ["Dutch Angle", "VHS"],           # desarrollo — desasosiego psicológico
+        ["Crash Zoom In", "Static"],      # tensión    — shock visual
+        ["Disintegration"],               # clímax     — sobrenatural
+        ["Dolly Out"],                    # resolución — alejamiento
+    ],
+    "conspiracion": [
+        ["Handheld"],                     # apertura   — documental crudo
+        ["Dutch Angle", "Fisheye"],       # desarrollo — paranoia, realidad distorsionada
+        ["Crash Zoom In"],                # tensión    — revelación impactante
+        ["Datamosh"],                     # clímax     — corrupción digital, conspiración
+        ["Crane Up"],                     # resolución — perspectiva amplia
+    ],
+    "accion": [
+        ["FPV Drone"],                    # apertura   — inmersivo, dinámico
+        ["Action Run", "Whip Pan"],       # desarrollo — energía y movimiento
+        ["Bullet Time"],                  # tensión    — momento dramático
+        ["Crash Zoom In"],                # clímax     — impacto máximo
+        ["Crane Up", "Dolly Out"],        # resolución — panorámica
+    ],
+    "misterio": [
+        ["Dolly In"],                     # apertura   — acercamiento gradual
+        ["Focus Change", "Snorricam"],    # desarrollo — intriga, inestabilidad
+        ["Crash Zoom In"],                # tensión    — descubrimiento
+        ["Glitch"],                       # clímax     — realidad que falla
+        ["Crane Up"],                     # resolución — revelación
+    ],
+    "drama": [                            # default fallback
+        ["Dolly In"],
+        ["Arc Right", "Focus Change"],
+        ["Crash Zoom In"],
+        ["Crane Up", "Dolly Out"],
+        ["Dolly In"],
+    ],
+}
+
+# Fallback si el género no está en el dict
+NARRATIVE_MOTIONS = GENRE_PRESETS["drama"]
+
+# ── Motions disponibles para el LLM ──────────────────────────────────────────
+AVAILABLE_MOTIONS_FOR_LLM = [
+    # Cámara
+    "Dolly In", "Dolly Out", "Arc Left", "Arc Right", "Crane Up", "Crane Down",
+    "Crash Zoom In", "Crash Zoom Out", "FPV Drone", "Handheld", "Overhead",
+    "Snorricam", "Whip Pan", "Tilt Down", "Tilt up", "Dutch Angle", "Zoom In",
+    # Efectos
+    "Focus Change", "VHS", "Glitch", "Static", "Datamosh", "Fisheye",
+    "Lens Flare", "Lens Crack", "Paparazzi", "Innerlight",
+    # Personaje
+    "Action Run", "Catwalk", "Levitation", "Agent Reveal", "Soul Jump",
+    "Disintegration", "Melting", "Clone Explosion", "Freezing",
+    # General
+    "General",
 ]
 
 # Prompt de texto complementario (breve, DoP prioriza los motions)
 TRANSITION_PROMPT = "Cinematic dramatic scene. Artistic composition, atmospheric lighting, photorealistic style. Smooth transition."
 
 
-def select_motions(clip_index: int, total_clips: int) -> list:
+def select_motions(clip_index: int, total_clips: int, genre: str = "drama") -> list:
     """
-    Selecciona motions según la posición narrativa del clip dentro del total.
+    Selecciona motions según género + posición narrativa.
     Escala dinámicamente para cualquier número de clips.
     """
     if total_clips == 1:
         return ["Dolly In"]
-    # Mapear posición relativa (0.0–1.0) a categoría narrativa
-    ratio = clip_index / max(total_clips - 1, 1)
-    if ratio < 0.20:
-        return NARRATIVE_MOTIONS[0]   # apertura
-    elif ratio < 0.45:
-        return NARRATIVE_MOTIONS[1]   # desarrollo
-    elif ratio < 0.70:
-        return NARRATIVE_MOTIONS[2]   # tensión
-    else:
-        return NARRATIVE_MOTIONS[3]   # clímax / resolución
+    preset = GENRE_PRESETS.get(genre, GENRE_PRESETS["drama"])
+    ratio  = clip_index / max(total_clips - 1, 1)
+    if ratio < 0.20:   return preset[0]   # apertura
+    elif ratio < 0.45: return preset[1]   # desarrollo
+    elif ratio < 0.70: return preset[2]   # tensión
+    elif ratio < 0.85: return preset[3]   # clímax
+    else:              return preset[4]   # resolución
+
+
+def select_all_motions_llm(
+    scene_contexts: list,
+    genre: str,
+    n_clips: int,
+    api_key: str,
+) -> list[list]:
+    """
+    Usa LLM (una sola llamada) para asignar el mejor motion a cada clip
+    basándose en la descripción de la escena + el género.
+    Devuelve lista de listas: [[motion_clip_0], [motion_clip_1], ...]
+    Si falla, devuelve lista vacía (el caller usa el preset de género).
+    """
+    if not api_key or not scene_contexts:
+        return []
+
+    motions_str = ", ".join(AVAILABLE_MOTIONS_FOR_LLM)
+    scenes_str  = "\n".join(
+        f"Clip {i+1}: {scene_contexts[i] if i < len(scene_contexts) else '(escena de transición)'}"
+        for i in range(n_clips)
+    )
+
+    prompt = f"""Eres un director de fotografía especialista en content viral.
+Género del video: {genre}
+Motions disponibles: {motions_str}
+
+Asigna el motion MÁS APROPIADO para cada clip según lo que ocurre en la escena.
+- Si hay un personaje corriendo → Action Run
+- Si es un momento de shock/revelación → Crash Zoom In
+- Si es sobrenatural/horror → Disintegration, Melting, Clone Explosion
+- Si es documental/found footage → Handheld
+- Si es paranoia/conspiración → Dutch Angle, Fisheye, Datamosh
+- Si es calma/inicio → Dolly In
+- Para el clímax del género {genre} usa el motion más dramático disponible
+
+Escenas:
+{scenes_str}
+
+Responde SOLO con JSON (sin markdown):
+{{"motions": ["motion_clip_1", "motion_clip_2", ...]}}
+La lista debe tener exactamente {n_clips} elementos."""
+
+    try:
+        response = call_llm(
+            messages=[{"role": "user", "content": prompt}],
+            api_key     = api_key,
+            max_tokens  = 300,
+            temperature = 0.4,
+            title       = "Imagen Video - Motion Selection",
+            model       = "anthropic/claude-3-5-haiku",
+            timeout     = 15,
+            retries     = 0,
+        )
+        clean = response.strip()
+        if "```" in clean:
+            clean = clean.split("```")[1] if "```json" not in clean else clean.split("```json")[1].split("```")[0]
+        data    = json.loads(clean.strip())
+        motions = data.get("motions", [])
+        if len(motions) == n_clips:
+            # Validar que todos los motions existen
+            validated = []
+            for m in motions:
+                if m in AVAILABLE_MOTIONS_FOR_LLM:
+                    validated.append([m])
+                else:
+                    validated.append(None)  # None = usar preset
+            print(f"  🤖 LLM motions: {[m[0] if m else '(preset)' for m in validated]}", flush=True)
+            return validated
+    except Exception as e:
+        print(f"  ⚠️  LLM motion selection falló: {e} — usando preset de género", flush=True)
+    return []
 
 BROWSER_HEADERS = {
     "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -402,13 +514,30 @@ def main():
             f"Puede tardar 3-6 min."
         )
 
+    # ── Extraer género y contextos de escena (del Director) ──────
+    genre_input   = "drama"
+    scene_contexts = []
+    _genre_match  = re.search(r'"genre"\s*:\s*"([^"]+)"', raw)
+    if _genre_match:
+        genre_input = _genre_match.group(1).strip().lower()
+        raw = re.sub(r',?\s*"genre"\s*:\s*"[^"]+"', '', raw)
+    _scene_match = re.search(r'"scene_contexts"\s*:\s*(\[[^\]]*\])', raw)
+    if _scene_match:
+        try:
+            scene_contexts = json.loads(_scene_match.group(1))
+        except Exception:
+            scene_contexts = []
+        raw = re.sub(r',?\s*"scene_contexts"\s*:\s*\[[^\]]*\]', '', raw)
+    if genre_input not in GENRE_PRESETS:
+        genre_input = "drama"
+    print(f"  🎭 Género: {genre_input} | Escenas: {len(scene_contexts)}", flush=True)
+
     # ── Extraer dop_motion override (si viene de Studio) ──────
     dop_motion_override = None
     _dop_match = re.search(r'"dop_motion"\s*:\s*"([^"]+)"', raw)
     if _dop_match:
         dop_motion_override = _dop_match.group(1).strip()
-        print(f"  🎬 Motion override: {dop_motion_override}", flush=True)
-        # Limpiar del raw para que extract_image_urls no se confunda
+        print(f"  🎬 Motion override manual: {dop_motion_override}", flush=True)
         raw = re.sub(r',?\s*"dop_motion"\s*:\s*"[^"]+"', '', raw)
 
     # ── Extraer target_duration (duración objetivo del video en segundos) ──
@@ -449,17 +578,36 @@ def main():
         clip_duration = 5  # 5s default → 15 clips × 5s = 75s
         print(f"  ⏱️  Duración por clip: {clip_duration}s (default)", flush=True)
 
-    print(f"\n🚀 Generando {n_clips} clips de transición (3 en paralelo)…", flush=True)
+    print(f"\n🚀 Generando {n_clips} clips (género: {genre_input})…", flush=True)
 
-    # Mostrar el plan de motions antes de empezar
+    # ── Selección inteligente de motions ──────────────────────
+    # Si hay override manual de Studio → usarlo para todos
+    # Si no → LLM asigna por escena + preset de género como fallback
+    llm_motions: list = []
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not dop_motion_override and scene_contexts and openrouter_key:
+        print(f"  🤖 LLM seleccionando motions por escena…", flush=True)
+        llm_motions = select_all_motions_llm(scene_contexts, genre_input, n_clips, openrouter_key)
+
+    # Mostrar plan de motions
     for i in range(n_clips):
-        m = [dop_motion_override] if dop_motion_override else select_motions(i, n_clips)
+        if dop_motion_override:
+            m = [dop_motion_override]
+        elif llm_motions and i < len(llm_motions) and llm_motions[i]:
+            m = llm_motions[i]
+        else:
+            m = select_motions(i, n_clips, genre_input)
         print(f"  📋 Clip {i+1}: {m}  {clip_duration}s", flush=True)
 
     results = [None] * n_clips
 
     def run(idx, first_url, last_url):
-        motions = [dop_motion_override] if dop_motion_override else select_motions(idx, n_clips)
+        if dop_motion_override:
+            motions = [dop_motion_override]
+        elif llm_motions and idx < len(llm_motions) and llm_motions[idx]:
+            motions = llm_motions[idx]
+        else:
+            motions = select_motions(idx, n_clips, genre_input)
         return idx, generate_transition_clip(
             idx           = idx + 1,
             image_url     = first_url,
