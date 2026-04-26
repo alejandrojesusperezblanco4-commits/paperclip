@@ -35,13 +35,10 @@ def get_access_token(client_key: str = "", client_secret: str = "") -> str:
     """
     global _token_cache
 
-    # Research API usa credenciales SEPARADAS del app de Content Posting
-    # Añadir TIKTOK_RESEARCH_CLIENT_KEY y TIKTOK_RESEARCH_CLIENT_SECRET en Railway
-    # cuando tengas aprobado el Research Project en TikTok Developer Portal
     if not client_key:
-        client_key = os.environ.get("TIKTOK_RESEARCH_CLIENT_KEY", "").strip()
+        client_key = os.environ.get("TIKTOK_CLIENT_KEY", "").strip()
     if not client_secret:
-        client_secret = os.environ.get("TIKTOK_RESEARCH_CLIENT_SECRET", "").strip()
+        client_secret = os.environ.get("TIKTOK_CLIENT_SECRET", "").strip()
 
     if not client_key or not client_secret:
         print("  ⚠️  TikTok Research: TIKTOK_CLIENT_KEY/SECRET no configurados", flush=True)
