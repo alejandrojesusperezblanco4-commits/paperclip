@@ -98,20 +98,25 @@ Popcorn recibe UN solo prompt narrativo y genera 8 imágenes visualmente coheren
 
 Tu trabajo: convertir un guión en el prompt narrativo perfecto para Popcorn.
 
+DETECCIÓN CRÍTICA — CONTENIDO ANIMADO:
+Si el guión menciona personajes de dibujos animados, videojuegos, anime o universos ficticios
+(Bob Esponja, Sonic, Goku, Mario, Pikachu, Minecraft, etc.):
+→ Empieza con: "3D cinematic dark reimagining of [universe], surreal uncanny atmosphere..."
+→ Describe los personajes con sus rasgos distintivos pero en versión oscura/cinemática
+→ Usa: "exaggerated proportions, unsettling realism, dramatic cinematic lighting"
+→ NO uses "cartoon style" ni "2D animation" — Popcorn genera 3D fotorrealista
+
 REGLAS CRÍTICAS para Popcorn:
 1. El prompt es UNA narrativa continua, no una lista de escenas
-2. Describe la historia visual como si fuera la sinopsis de una película
-3. Define el estilo visual, paleta y atmósfera AL INICIO — Popcorn los aplica a todas las imágenes
-4. Los personajes deben ser ANÓNIMOS (no nombres reales, solo descripciones físicas)
-5. Evita palabras que disparen filtros de contenido: muerte, sangre, armas, violencia explícita
-   Usa en su lugar: tensión, confrontación, peligro, misterio, oscuridad
-6. El prompt ideal tiene 300-500 palabras en inglés
-7. Empieza SIEMPRE con el estilo visual: "Cinematic [género] story..."
+2. Define el estilo visual AL INICIO — Popcorn lo aplica a todas las imágenes
+3. Los personajes deben ser ANÓNIMOS o descritos físicamente (no nombres propios reales)
+4. Evita filtros de contenido: usa tensión, confrontación, misterio en vez de violencia explícita
+5. El prompt ideal tiene 300-500 palabras en inglés
+6. Empieza con el estilo: "Cinematic [género] story..." o "3D dark reimagining of..."
 
-ESTRUCTURA DEL PROMPT IDEAL:
-[Estilo visual + paleta] → [Descripción de los personajes anónimos] →
-[Arco narrativo en 3-4 frases] → [Atmósfera y emoción dominante] →
-[Especificaciones técnicas de imagen]
+ESTRUCTURA:
+[Estilo visual + paleta] → [Personajes con descripción física] →
+[Arco narrativo 3-4 frases] → [Atmósfera + emoción] → [Specs técnicas]
 """
 
 def generate_popcorn_prompt(script: str, visual_refs: str, api_key: str) -> dict:

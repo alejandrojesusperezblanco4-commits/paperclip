@@ -881,19 +881,26 @@ Diferenciacion vs competencia:
     _style_prompt = """Eres un director de arte de contenido viral en TikTok/YouTube.
 Analiza las tendencias detectadas y el guión, y elige las opciones de producción visual óptimas.
 
+DETECCIÓN DE CONTENIDO ANIMADO — MUY IMPORTANTE:
+Si el tema involucra personajes de dibujos animados, videojuegos, anime, cartoon o universos ficticios
+(ejemplos: Bob Esponja, Sonic, Goku, Pikachu, Mario, Minecraft, Fortnite, Mickey Mouse, etc.):
+→ Elige soul_style de la categoría SURREAL/ARTE: Creatures, Artwork, Mixed Media, Duplicate, Giant People, Clouded Dream, 2049
+→ NO uses estilos realistas como Realistic, Spotlight, Rainy Day, iPhone, CCTV
+→ genre: usa "horror" si es oscuro/creepy, "accion" si hay movimiento, "drama" si es emocional
+
 SOUL STYLES disponibles (elige 1, o deja vacío para base):
 Retratos/Makeup: Creatures, Babydoll MakeUp, Glazed doll skin makeup, Paper Face, Object Makeup
 Moda/Editorial: Medieval, Spotlight, Quiet luxury, FashionShow, 90's Editorial, Avant-garde, Grunge, Fairycore, Coquette core, Bimbocore, Indie sleaze, Gorpcore, Tumblr
 Y2K/Retro: DigitalCam, 2000s Cam, Y2K, 90s Grain, Vintage PhotoBooth, VHS
 Cámara/Efecto: Glitch, CCTV, iPhone, Overexposed, Realistic, Fisheye, Datamosh
 Escenarios: Subway, Library, Rainy Day, Sunset beach, Night Beach, Amalfi Summer, Gallery, Foggy Morning, Flight mode
-Surreal/Arte: Artwork, Mixed Media, Duplicate, Angel Wings, Giant Accessory, Geominimal, Clouded Dream
+Surreal/Arte: Artwork, Mixed Media, Duplicate, Angel Wings, Giant Accessory, Geominimal, Clouded Dream, 2049, Giant People
 Lifestyle: Selfcare, Graffiti, Tokyo Streetstyle, Paparazzi, Movie, Sand
 General: General, Realistic
 
 DOP MOTIONS disponibles (elige 1, o "auto" para arco narrativo automático):
-Cámara: Dolly In, Dolly Out, Dolly Zoom In, Arc Left, Arc Right, Crane Up, Crane Down, Crash Zoom In, Super Dolly In, Whip Pan, FPV Drone, Overhead, Snorricam, Zoom In
-Efectos: Focus Change, Glitch, VHS, Datamosh, Lens Flare, Glowshift, Paparazzi
+Cámara: Dolly In, Dolly Out, Dolly Zoom In, Arc Left, Arc Right, Crane Up, Crane Down, Crash Zoom In, Super Dolly In, Whip Pan, FPV Drone, Overhead, Snorricam, Zoom In, Dutch Angle
+Efectos: Focus Change, Lens Flare, Paparazzi
 Personaje: Catwalk, Levitation, Agent Reveal, Soul Jump, Action Run
 General: General, Handheld
 
