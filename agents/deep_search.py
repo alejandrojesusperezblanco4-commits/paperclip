@@ -244,7 +244,7 @@ def main():
 
     # Obtener trending de TikTok via Research API (datos reales)
     tiktok_data = ""
-    if os.environ.get("TIKTOK_CLIENT_KEY"):
+    if os.environ.get("TIKTOK_RESEARCH_CLIENT_KEY", "").strip():
         print("📱 TikTok Research API: buscando trending...", flush=True)
         try:
             # Extraer keywords para la búsqueda

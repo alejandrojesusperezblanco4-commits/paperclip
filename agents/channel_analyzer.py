@@ -268,7 +268,8 @@ def main():
     import re as _re2
     tiktok_data = ""
     _tt_handle = _re2.search(r'@([\w.]+)', task)
-    if _tt_handle and os.environ.get("TIKTOK_CLIENT_KEY"):
+    _tt_research_key = os.environ.get("TIKTOK_RESEARCH_CLIENT_KEY", "").strip()
+    if _tt_handle and _tt_research_key:
         print(f"📱 TikTok Research: obteniendo datos de @{_tt_handle.group(1)}...", flush=True)
         try:
             tiktok_data = tt_channel_context(_tt_handle.group(1))
