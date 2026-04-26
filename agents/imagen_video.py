@@ -65,34 +65,34 @@ def _resolve_motion(motion_name: str, api_key: str) -> dict:
 # El sistema escala dinámicamente para cualquier número de clips.
 GENRE_PRESETS: dict[str, list] = {
     "horror": [
-        ["Handheld"],                     # apertura  — found footage, inmersivo
-        ["Dutch Angle", "VHS"],           # desarrollo — desasosiego psicológico
-        ["Crash Zoom In", "Static"],      # tensión    — shock visual
-        ["Disintegration"],               # clímax     — sobrenatural
-        ["Dolly Out"],                    # resolución — alejamiento
+        ["Handheld"],           # apertura  — found footage
+        ["Dutch Angle"],        # desarrollo — desasosiego
+        ["Crash Zoom In"],      # tensión    — shock
+        ["Snorricam"],          # clímax     — persecución, terror
+        ["Dolly Out"],          # resolución — alejamiento
     ],
     "conspiracion": [
-        ["Handheld"],                     # apertura   — documental crudo
-        ["Dutch Angle", "Fisheye"],       # desarrollo — paranoia, realidad distorsionada
-        ["Crash Zoom In"],                # tensión    — revelación impactante
-        ["Datamosh"],                     # clímax     — corrupción digital, conspiración
-        ["Crane Up"],                     # resolución — perspectiva amplia
+        ["Handheld"],           # apertura   — documental crudo
+        ["Dutch Angle"],        # desarrollo — paranoia
+        ["Crash Zoom In"],      # tensión    — revelación
+        ["Dolly Zoom In"],      # clímax     — efecto Hitchcock
+        ["Crane Up"],           # resolución — perspectiva
     ],
     "accion": [
-        ["FPV Drone"],                    # apertura   — inmersivo, dinámico
-        ["Action Run", "Whip Pan"],       # desarrollo — energía y movimiento
-        ["Bullet Time"],                  # tensión    — momento dramático
-        ["Crash Zoom In"],                # clímax     — impacto máximo
-        ["Crane Up", "Dolly Out"],        # resolución — panorámica
+        ["FPV Drone"],          # apertura   — inmersivo
+        ["Action Run"],         # desarrollo — energía
+        ["Whip Pan"],           # tensión    — corte rápido
+        ["Crash Zoom In"],      # clímax     — impacto
+        ["Crane Up", "Dolly Out"], # resolución
     ],
     "misterio": [
-        ["Dolly In"],                     # apertura   — acercamiento gradual
-        ["Focus Change", "Snorricam"],    # desarrollo — intriga, inestabilidad
-        ["Crash Zoom In"],                # tensión    — descubrimiento
-        ["Glitch"],                       # clímax     — realidad que falla
-        ["Crane Up"],                     # resolución — revelación
+        ["Dolly In"],           # apertura   — acercamiento
+        ["Focus Change"],       # desarrollo — intriga
+        ["Snorricam"],          # tensión    — inestabilidad
+        ["Crash Zoom In"],      # clímax     — descubrimiento
+        ["Crane Up"],           # resolución
     ],
-    "drama": [                            # default fallback
+    "drama": [                  # default fallback
         ["Dolly In"],
         ["Arc Right", "Focus Change"],
         ["Crash Zoom In"],
@@ -104,18 +104,25 @@ GENRE_PRESETS: dict[str, list] = {
 # Fallback si el género no está en el dict
 NARRATIVE_MOTIONS = GENRE_PRESETS["drama"]
 
-# ── Motions disponibles para el LLM ──────────────────────────────────────────
+# ── Motions compatibles con First-Last Frame (FLF) ───────────────────────────
+# SOLO movimientos de cámara y personaje confirmados.
+# Efectos visuales (VHS, Glitch, Static, Datamosh, Innerlight, Disintegration,
+# Melting, Clone Explosion, Fisheye, Lens Crack) NO son compatibles con FLF.
 AVAILABLE_MOTIONS_FOR_LLM = [
-    # Cámara
-    "Dolly In", "Dolly Out", "Arc Left", "Arc Right", "Crane Up", "Crane Down",
-    "Crash Zoom In", "Crash Zoom Out", "FPV Drone", "Handheld", "Overhead",
-    "Snorricam", "Whip Pan", "Tilt Down", "Tilt up", "Dutch Angle", "Zoom In",
-    # Efectos
-    "Focus Change", "VHS", "Glitch", "Static", "Datamosh", "Fisheye",
-    "Lens Flare", "Lens Crack", "Paparazzi", "Innerlight",
-    # Personaje
+    # Cámara — todos compatibles con FLF
+    "Dolly In", "Dolly Out", "Dolly Zoom In", "Dolly Zoom Out",
+    "Arc Left", "Arc Right",
+    "Crane Up", "Crane Down",
+    "Crash Zoom In", "Crash Zoom Out",
+    "Super Dolly In", "Super Dolly Out",
+    "FPV Drone", "Handheld", "Overhead",
+    "Snorricam", "Whip Pan",
+    "Tilt Down", "Tilt up",
+    "Dutch Angle", "Zoom In", "Zoom Out",
+    # Efectos compatibles con FLF (confirmados)
+    "Focus Change", "Lens Flare", "Paparazzi",
+    # Personaje — compatibles con FLF
     "Action Run", "Catwalk", "Levitation", "Agent Reveal", "Soul Jump",
-    "Disintegration", "Melting", "Clone Explosion", "Freezing",
     # General
     "General",
 ]
