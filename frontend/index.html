@@ -1438,6 +1438,7 @@ async function pollMain() {
       startTime = null;
       if (AGENTS[currentAgent].showPipeline) setAllDone();
       document.getElementById('progressBar').style.width = '100%';
+      _sfx.success();
 
       const raw = await fetchLastComment(currentIssueId);
       showResults(raw, data);
@@ -2576,6 +2577,21 @@ function updateVideoPanel(videoUrl, raw) {
   // Auto-cambiar a la pestaña de video cuando llega
   switchArtTab('videoTab', document.querySelector('[data-art="videoTab"]'));
 }
+
+/* ── Sound Effects ── */
+// Pon aquí las URLs de tus sonidos y descomenta las líneas de play
+const _sfx = {
+  success() {
+    // const audio = new Audio('URL_DE_TU_SONIDO_EXITO');
+    // audio.volume = 0.6;
+    // audio.play().catch(()=>{});
+  },
+  error() {
+    // const audio = new Audio('URL_DE_TU_SONIDO_ERROR');
+    // audio.volume = 0.6;
+    // audio.play().catch(()=>{});
+  },
+};
 
 /* ── Char counter ── */
 function updateCharCounter(el) {
