@@ -12,6 +12,7 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save, append_keywords
 from api_client import call_llm, post_issue_result, post_issue_comment, resolve_issue_context
 from tiktok_trends import build_tiktok_trends_context
+from tiktok_research import build_trending_context as tt_trending_context
 from db_client import save_trends, is_configured as db_configured
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -241,17 +242,35 @@ def main():
     else:
         print("⚠️  YOUTUBE_API_KEY_DEEP_SEARCH no configurada — modo LLM puro", flush=True)
 
-    # Obtener tendencias de TikTok Creative Center (sin API key)
-    print("📱 Obteniendo tendencias del TikTok Creative Center...", flush=True)
+    # Obtener trending de TikTok via Research API (datos reales)
     tiktok_data = ""
-    try:
-        tiktok_data = build_tiktok_trends_context(["mx", "es", "co"])
-        if tiktok_data:
-            print(f"  ✅ Datos TikTok obtenidos ({len(tiktok_data)} chars)", flush=True)
-        else:
-            print("  ⚠️  Sin datos de TikTok Creative Center", flush=True)
-    except Exception as e:
-        print(f"  ⚠️  TikTok Creative Center error: {e}", flush=True)
+    if os.environ.get("TIKTOK_CLIENT_KEY"):
+        print("📱 TikTok Research API: buscando trending...", flush=True)
+        try:
+            # Extraer keywords para la búsqueda
+            import re as _re2
+            _kw_raw = _re2.sub(r'[^\w\sáéíóúüñÁÉÍÓÚÜÑ]', ' ', task)
+            _kw_words = [w for w in _kw_raw.split() if len(w) > 4][:4]
+            _hashtags = _re2.findall(r'#(\w+)', task)
+            tiktok_data = tt_trending_context(
+                keywords = _kw_words or ["viral", "trending"],
+                hashtags = _hashtags or None,
+                regions  = ["MX", "ES", "CO", "AR"],
+            )
+            if tiktok_data:
+                print(f"  ✅ TikTok Research datos obtenidos ({len(tiktok_data)} chars)", flush=True)
+        except Exception as e:
+            print(f"  ⚠️  TikTok Research error: {e}", flush=True)
+
+    # Fallback: Google Trends si Research API falla
+    if not tiktok_data:
+        print("📱 Fallback: Google Trends...", flush=True)
+        try:
+            tiktok_data = build_tiktok_trends_context(["mx", "es", "co"])
+            if tiktok_data:
+                print(f"  ✅ Google Trends obtenidos ({len(tiktok_data)} chars)", flush=True)
+        except Exception as e:
+            print(f"  ⚠️  Google Trends error: {e}", flush=True)
 
     # Construir prompt
     memory_ctx  = get_context_summary("deep_search", task)

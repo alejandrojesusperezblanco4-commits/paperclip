@@ -13,6 +13,7 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save, append_channel
 from api_client import call_llm, post_issue_result, post_issue_comment, resolve_issue_context
 from tiktok_trends import build_tiktok_trends_context
+from tiktok_research import build_channel_context as tt_channel_context
 from db_client import save_channel, is_configured as db_configured
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -263,15 +264,28 @@ def main():
     else:
         print("⚠️  YOUTUBE_API_KEY_CHANNEL_ANALYZER no configurada — modo LLM puro", flush=True)
 
-    # Obtener hashtags y sonidos trending de TikTok (enriquece el análisis del nicho)
-    print("📱 Obteniendo hashtags trending de TikTok Creative Center...", flush=True)
+    # Obtener datos reales del canal de TikTok si se menciona un @usuario
+    import re as _re2
     tiktok_data = ""
-    try:
-        tiktok_data = build_tiktok_trends_context(["mx", "es"])
-        if tiktok_data:
-            print(f"  ✅ Datos TikTok obtenidos ({len(tiktok_data)} chars)", flush=True)
-    except Exception as e:
-        print(f"  ⚠️  TikTok Creative Center error: {e}", flush=True)
+    _tt_handle = _re2.search(r'@([\w.]+)', task)
+    if _tt_handle and os.environ.get("TIKTOK_CLIENT_KEY"):
+        print(f"📱 TikTok Research: obteniendo datos de @{_tt_handle.group(1)}...", flush=True)
+        try:
+            tiktok_data = tt_channel_context(_tt_handle.group(1))
+            if tiktok_data:
+                print(f"  ✅ Datos TikTok canal obtenidos ({len(tiktok_data)} chars)", flush=True)
+        except Exception as e:
+            print(f"  ⚠️  TikTok Research error: {e}", flush=True)
+
+    # Fallback: Google Trends si no hay canal específico
+    if not tiktok_data:
+        print("📱 Obteniendo tendencias de Google Trends...", flush=True)
+        try:
+            tiktok_data = build_tiktok_trends_context(["mx", "es"])
+            if tiktok_data:
+                print(f"  ✅ Datos Google Trends obtenidos ({len(tiktok_data)} chars)", flush=True)
+        except Exception as e:
+            print(f"  ⚠️  Google Trends error: {e}", flush=True)
 
     # Construir prompt con datos reales
     memory_ctx  = get_context_summary("channel_analyzer", task)
