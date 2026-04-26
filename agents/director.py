@@ -27,6 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from api_client import call_llm, post_issue_comment
+from db_client import save_video, update_video, is_configured as db_configured
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -595,6 +596,18 @@ def main():
         objetivo = "crea contenido viral para TikTok y YouTube en español"
 
     print(f"📌 Objetivo: {objetivo[:120]}", flush=True)
+
+    # ── DB: registrar inicio del run ──────────────────────────
+    _db_video_id = None
+    if db_configured():
+        _db_video_id = save_video(
+            tema        = issue_title or objetivo[:200],
+            status      = "generating",
+            issue_id    = issue_id,
+            director_run = run_id,
+        )
+        if _db_video_id:
+            print(f"  📋 DB: run registrado → {_db_video_id}", flush=True)
 
     # ── Guardia: salir si el issue ya está cerrado ────────────
     # Previene re-runs de getWakeableParentAfterChildCompletion: cuando todos los
@@ -1322,6 +1335,22 @@ Guión completo:
         run_tracked("video_assembler.py", video_task,
                     "Video Assembler — MP4 final", "video_assembler",
                     paperclip_timeout=0)
+
+    # ── DB: actualizar video con resultados finales ──────────────
+    if _db_video_id and db_configured():
+        import re as _re3
+        _ht = _re3.findall(r'#\w+', storytelling_result)[:10]
+        _dur = _dur_target if '_dur_target' in dir() and _dur_target else None
+        update_video(
+            video_id     = _db_video_id,
+            guion        = storytelling_result[:8000],
+            audio_url    = audio_url_tts or "",
+            image_urls   = _img_urls if '_img_urls' in dir() else [],
+            hashtags     = _ht,
+            duration_sec = _dur,
+            status       = "generated",
+        )
+        print(f"  ✅ DB: video actualizado → {_db_video_id}", flush=True)
 
     # ── Fase 8: TikTok Publisher (opcional) ─────────────────────
     # Solo si TIKTOK_ACCESS_TOKEN está configurado y AUTO_PUBLISH_TIKTOK=true

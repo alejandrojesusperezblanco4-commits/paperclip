@@ -13,6 +13,7 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save, append_channel
 from api_client import call_llm, post_issue_result, post_issue_comment, resolve_issue_context
 from tiktok_trends import build_tiktok_trends_context
+from db_client import save_channel, is_configured as db_configured
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -278,6 +279,24 @@ def main():
             model      = "anthropic/claude-3-5-haiku",
         )
         save("channel_analyzer", task[:60], response)
+
+        # Guardar canales analizados en Supabase
+        if db_configured():
+            for ch in (channel_stats if 'channel_stats' in dir() and channel_stats else []):
+                snippet = ch.get("snippet", {})
+                stats   = ch.get("statistics", {})
+                subs    = int(stats.get("subscriberCount", 0))
+                views   = int(stats.get("viewCount", 0))
+                vids    = int(stats.get("videoCount", 1))
+                save_channel(
+                    channel_name = snippet.get("title", ""),
+                    subscribers  = subs,
+                    avg_views    = views // vids if vids else 0,
+                    niche        = task[:100],
+                    insights     = response[:2000],
+                    issue_id     = os.environ.get("PAPERCLIP_ISSUE_ID", ""),
+                )
+
         print(response, flush=True)
         post_issue_result(response)
     except Exception as e:

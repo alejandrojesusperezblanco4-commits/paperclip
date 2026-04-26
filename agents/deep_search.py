@@ -12,6 +12,7 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save, append_keywords
 from api_client import call_llm, post_issue_result, post_issue_comment, resolve_issue_context
 from tiktok_trends import build_tiktok_trends_context
+from db_client import save_trends, is_configured as db_configured
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
@@ -262,6 +263,21 @@ def main():
             model      = "perplexity/sonar-pro",
         )
         save("deep_search", task[:60], response)
+
+        # Guardar tendencias en Supabase
+        if db_configured():
+            import re as _re
+            _yt_items  = [{"title": t} for t in _re.findall(r'"([^"]{10,80})"', real_data)][:10]
+            _tt_items  = [{"hashtag": h} for h in _re.findall(r'`(#\w+)`', tiktok_data)][:15]
+            _kw_items  = [{"keyword": k} for k in _re.findall(r'`([^`#]{3,30})`', tiktok_data)][:10]
+            save_trends(
+                tema        = task[:200],
+                yt_titles   = _yt_items,
+                tt_hashtags = _tt_items,
+                keywords    = _kw_items,
+                issue_id    = os.environ.get("PAPERCLIP_ISSUE_ID", ""),
+            )
+
         print(response, flush=True)
         post_issue_result(response)
     except Exception as e:
