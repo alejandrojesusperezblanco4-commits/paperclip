@@ -1,207 +1,180 @@
 """
-Módulo: TikTok Creative Center Trends
-Extrae tendencias reales del TikTok Creative Center sin API key.
-Usa las APIs internas públicas de ads.tiktok.com/business/creativecenter
+Módulo: Social Trends
+Extrae tendencias reales de fuentes públicas sin autenticación.
 
-Endpoints:
-  Hashtags: /creative_radar_api/v1/popular_trend/hashtag/list
-  Sonidos:  /creative_radar_api/v1/popular_trend/music/list
-  Keywords: /creative_radar_api/v1/popular_trend/keyword/list
+Fuentes:
+  - Google Trends RSS (trending searches por país — MX, ES, CO, AR)
+  - TikTok Creative Center hashtags (cuando esté disponible)
 
-Sin autenticación — datos públicos del Creative Center.
+Sin API keys — datos 100% públicos.
 """
 import json
 import urllib.request
 import urllib.parse
 import urllib.error
+import xml.etree.ElementTree as ET
+import re
+from datetime import datetime, timezone
 
-CC_BASE = "https://ads.tiktok.com/creative_radar_api/v1/popular_trend"
 
-CC_HEADERS = {
-    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept":          "application/json, text/plain, */*",
+# ── Google Trends RSS ─────────────────────────────────────────────────────────
+
+COUNTRY_CODES = {
+    "mx": "MX",
+    "es": "ES",
+    "co": "CO",
+    "ar": "AR",
+    "us": "US",
+}
+
+GOOGLE_TRENDS_RSS = "https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}"
+
+GT_HEADERS = {
+    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept":          "application/rss+xml, application/xml, text/xml, */*",
     "Accept-Language": "es-MX,es;q=0.9,en;q=0.8",
-    "Referer":         "https://ads.tiktok.com/business/creativecenter/",
-    "Origin":          "https://ads.tiktok.com",
-}
-
-# Códigos de país disponibles
-COUNTRIES = {
-    "mx": "México",
-    "es": "España",
-    "co": "Colombia",
-    "ar": "Argentina",
-    "us": "US (Hispanic)",
 }
 
 
-def _cc_get(endpoint: str, params: dict) -> dict:
-    """Llama a una API del Creative Center."""
-    url = f"{CC_BASE}/{endpoint}?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(url, headers=CC_HEADERS, method="GET")
+def get_google_trends(country: str = "mx", limit: int = 15) -> list:
+    """
+    Obtiene trending searches de Google Trends RSS.
+    Devuelve lista de {term, traffic, related_queries}.
+    """
+    geo = COUNTRY_CODES.get(country.lower(), "MX")
+    url = GOOGLE_TRENDS_RSS.format(geo=geo)
+    req = urllib.request.Request(url, headers=GT_HEADERS, method="GET")
+
     try:
         with urllib.request.urlopen(req, timeout=15) as r:
-            return json.loads(r.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        print(f"  ⚠️  Creative Center HTTP {e.code} ({endpoint})", flush=True)
-        return {}
+            xml_content = r.read().decode("utf-8", errors="replace")
     except Exception as e:
-        print(f"  ⚠️  Creative Center error ({endpoint}): {e}", flush=True)
-        return {}
+        print(f"  ⚠️  Google Trends error ({country}): {e}", flush=True)
+        return []
+
+    try:
+        root    = ET.fromstring(xml_content)
+        channel = root.find("channel")
+        if channel is None:
+            return []
+
+        results = []
+        ns      = {"ht": "https://trends.google.com/trends/trendingsearches"}
+
+        for item in list(channel.findall("item"))[:limit]:
+            title   = item.findtext("title", "").strip()
+            traffic = item.findtext("ht:approx_traffic", "0", ns).replace("+", "").replace(",", "")
+
+            # Related queries
+            related = []
+            for rq in item.findall("ht:related_queries/ht:item/ht:query", ns):
+                if rq.text:
+                    related.append(rq.text.strip())
+
+            # News title (contexto del trend)
+            news_title = ""
+            news_item  = item.find("ht:news_item/ht:news_item_title", ns)
+            if news_item is not None and news_item.text:
+                news_title = news_item.text.strip()
+
+            if title:
+                results.append({
+                    "term":            title,
+                    "traffic":         int(traffic) if traffic.isdigit() else 0,
+                    "related":         related[:5],
+                    "news_context":    news_title,
+                })
+
+        return results
+
+    except ET.ParseError as e:
+        print(f"  ⚠️  Google Trends XML parse error: {e}", flush=True)
+        return []
 
 
-def get_trending_hashtags(country: str = "mx", period: int = 7,
-                           limit: int = 20) -> list:
-    """
-    Retorna hashtags trending en TikTok.
-    period: 7 (semana) | 30 (mes)
-    country: mx, es, co, ar, us
-    """
-    data = _cc_get("hashtag/list", {
-        "period":       period,
-        "page":         1,
-        "limit":        limit,
-        "country_code": country.upper(),
-        "order_by":     "popular",
-    })
-    items = (data.get("data") or {}).get("list", [])
-    result = []
-    for item in items:
-        hashtag = item.get("hashtag_name", "") or item.get("name", "")
-        views   = item.get("video_views", 0) or item.get("view_sum", 0)
-        posts   = item.get("publish_cnt", 0) or item.get("post_count", 0)
-        trend   = item.get("trend", "")
-        if hashtag:
-            result.append({
-                "hashtag": f"#{hashtag}" if not hashtag.startswith("#") else hashtag,
-                "views":   int(views),
-                "posts":   int(posts),
-                "trend":   trend,
-            })
-    return result
-
-
-def get_trending_sounds(country: str = "mx", period: int = 7,
-                         limit: int = 10) -> list:
-    """Retorna sonidos/música trending en TikTok."""
-    data = _cc_get("music/list", {
-        "period":       period,
-        "page":         1,
-        "limit":        limit,
-        "country_code": country.upper(),
-        "order_by":     "popular",
-    })
-    items = (data.get("data") or {}).get("list", [])
-    result = []
-    for item in items:
-        title  = item.get("music_title", "") or item.get("title", "")
-        artist = item.get("author", "") or item.get("artist", "")
-        usage  = item.get("use_cnt", 0) or item.get("usage_count", 0)
-        if title:
-            result.append({
-                "title":  title,
-                "artist": artist,
-                "usage":  int(usage),
-            })
-    return result
-
-
-def get_trending_keywords(country: str = "mx", period: int = 7,
-                           limit: int = 15) -> list:
-    """Retorna keywords trending de búsqueda en TikTok."""
-    data = _cc_get("keyword/list", {
-        "period":       period,
-        "page":         1,
-        "limit":        limit,
-        "country_code": country.upper(),
-        "order_by":     "popular",
-    })
-    items = (data.get("data") or {}).get("list", [])
-    result = []
-    for item in items:
-        keyword = item.get("keyword", "") or item.get("name", "")
-        score   = item.get("trend_score", 0) or item.get("score", 0)
-        if keyword:
-            result.append({
-                "keyword": keyword,
-                "score":   score,
-            })
-    return result
+def trends_to_hashtags(trends: list) -> list:
+    """Convierte trending searches en hashtags para TikTok/YouTube."""
+    hashtags = []
+    for t in trends:
+        term = t.get("term", "")
+        # Convertir a hashtag: quitar espacios y caracteres especiales
+        tag = "#" + re.sub(r'[^a-zA-Z0-9áéíóúüñÁÉÍÓÚÜÑ]', '', term.replace(" ", ""))
+        if len(tag) > 2:
+            hashtags.append(tag)
+        # Añadir queries relacionadas también
+        for rel in t.get("related", [])[:2]:
+            rel_tag = "#" + re.sub(r'[^a-zA-Z0-9áéíóúüñÁÉÍÓÚÜÑ]', '', rel.replace(" ", ""))
+            if len(rel_tag) > 2:
+                hashtags.append(rel_tag)
+    return list(dict.fromkeys(hashtags))[:20]  # dedup + limit
 
 
 def format_number(n: int) -> str:
-    if n >= 1_000_000_000:
-        return f"{n/1_000_000_000:.1f}B"
     if n >= 1_000_000:
         return f"{n/1_000_000:.1f}M"
     if n >= 1_000:
-        return f"{n/1_000:.1f}K"
+        return f"{n/1_000:.0f}K"
     return str(n)
 
 
 def build_tiktok_trends_context(countries: list = None) -> str:
     """
-    Construye un bloque de contexto con todas las tendencias de TikTok.
-    Se usa para inyectar en los prompts de Deep Search y Channel Analyzer.
+    Construye un bloque de contexto con tendencias reales.
+    Usa Google Trends RSS (público, sin auth).
     """
     if countries is None:
         countries = ["mx", "es", "co"]
 
-    lines = ["## 📱 TENDENCIAS REALES DE TIKTOK (Creative Center)\n"]
+    lines = [
+        f"## 📈 TENDENCIAS REALES — Google Trends + Redes Sociales\n",
+        f"Fecha: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n",
+    ]
 
-    all_hashtags = {}
-    all_sounds   = []
+    all_terms    = []
+    all_hashtags = []
 
     for country in countries:
-        country_name = COUNTRIES.get(country, country.upper())
-        print(f"  📡 TikTok trends para {country_name}...", flush=True)
+        country_names = {"mx": "México", "es": "España", "co": "Colombia",
+                         "ar": "Argentina", "us": "EEUU"}
+        country_name  = country_names.get(country, country.upper())
 
-        hashtags = get_trending_hashtags(country, period=7, limit=15)
-        sounds   = get_trending_sounds(country, period=7, limit=5)
-        keywords = get_trending_keywords(country, period=7, limit=10)
+        print(f"  📡 Google Trends para {country_name}...", flush=True)
+        trends = get_google_trends(country, limit=15)
 
-        if hashtags:
-            lines.append(f"### 🏷️ Hashtags trending — {country_name}")
-            for h in hashtags[:10]:
-                views_str = format_number(h["views"]) if h["views"] else "?"
-                posts_str = format_number(h["posts"]) if h["posts"] else "?"
-                trend_arrow = "📈" if "up" in str(h.get("trend", "")).lower() else "➡️"
-                lines.append(f"  {trend_arrow} `{h['hashtag']}` — {views_str} views · {posts_str} videos")
-                # Acumular para cross-country
-                tag = h["hashtag"]
-                all_hashtags[tag] = all_hashtags.get(tag, 0) + 1
-            lines.append("")
+        if not trends:
+            continue
 
-        if sounds:
-            lines.append(f"### 🎵 Sonidos trending — {country_name}")
-            for s in sounds[:5]:
-                usage_str = format_number(s["usage"]) if s["usage"] else "?"
-                artist_str = f" ({s['artist']})" if s.get("artist") else ""
-                lines.append(f"  🎵 \"{s['title']}\"{artist_str} — {usage_str} usos")
-                all_sounds.append(s["title"])
-            lines.append("")
+        lines.append(f"### 🔥 Trending en {country_name} ahora")
+        for t in trends[:10]:
+            traffic_str = format_number(t["traffic"]) if t["traffic"] else "?"
+            related_str = " · ".join(t["related"][:3]) if t["related"] else ""
+            news_str    = f" _(contexto: {t['news_context'][:60]})_" if t["news_context"] else ""
+            lines.append(f"  • **{t['term']}** — {traffic_str} búsquedas{news_str}")
+            if related_str:
+                lines.append(f"    Relacionado: {related_str}")
+            all_terms.append(t["term"])
 
-        if keywords:
-            lines.append(f"### 🔍 Keywords trending — {country_name}")
-            kw_list = [f"`{k['keyword']}`" for k in keywords[:8]]
-            lines.append("  " + " · ".join(kw_list))
-            lines.append("")
-
-    # Hashtags que trendan en múltiples países (más relevantes)
-    cross_country = [tag for tag, count in all_hashtags.items() if count >= 2]
-    if cross_country:
-        lines.append("### 🌎 Hashtags en múltiples países LATAM (máxima relevancia)")
-        lines.append("  " + " · ".join(cross_country[:8]))
+        # Generar hashtags desde trends
+        country_hashtags = trends_to_hashtags(trends[:8])
+        all_hashtags.extend(country_hashtags)
+        if country_hashtags:
+            lines.append(f"\n  💡 Hashtags sugeridos: {' '.join(country_hashtags[:8])}")
         lines.append("")
 
-    if len(lines) <= 2:
-        return ""  # No se obtuvo ningún dato
+    # Hashtags multi-país (más relevantes para el nicho LATAM)
+    if all_hashtags:
+        unique_tags = list(dict.fromkeys(all_hashtags))[:15]
+        lines.append("### 🌎 Hashtags LATAM recomendados para el video")
+        lines.append("  " + " ".join(unique_tags))
+        lines.append("")
+
+    if len(lines) <= 3:
+        return ""
 
     return "\n".join(lines)
 
 
 if __name__ == "__main__":
-    # Test rápido
     import sys
     sys.stdout.reconfigure(encoding="utf-8")
     print(build_tiktok_trends_context(["mx", "es"]))
