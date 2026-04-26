@@ -1,15 +1,26 @@
 """
-Agente: JSON Prompt Generator
-Crea prompts estructurados en JSON para generación de imágenes con IA.
-Compatible con Midjourney, DALL-E 3, Stable Diffusion, Flux y Leonardo.AI
+Agente: Prompt Generator — Optimizador de Popcorn
+Nuevo rol (Opción B): recibe el guión del Storytelling y genera UN
+prompt narrativo optimizado para Higgsfield Popcorn Auto.
 
-Flujo interno:
-  1. Búsqueda web de referencias visuales reales del tema (Perplexity sonar)
-  2. Generación del JSON de prompts usando esas referencias
+Flujo:
+  1. Detecta si el input es un guión (storytelling) o un brief manual
+  2. Busca referencias visuales reales con Perplexity (estilo, paleta, atmósfera)
+  3. Genera UN prompt narrativo cinematográfico de ~400-600 palabras
+     optimizado para que Popcorn cree 8 imágenes visualmente coherentes
+
+Output JSON:
+{
+  "popcorn_prompt": "...",     ← el prompt principal para Popcorn
+  "visual_style":  "...",     ← estilo visual dominante
+  "color_palette": "...",     ← paleta de colores
+  "scene_prompts": [...]      ← prompts individuales (legacy, para uso standalone)
+}
 """
 import os
 import sys
 import json
+import re
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from memory import get_context_summary, save
 from api_client import call_llm, post_issue_result, post_issue_comment, resolve_issue_context
@@ -17,180 +28,184 @@ from api_client import call_llm, post_issue_result, post_issue_comment, resolve_
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-# ── Paso 1: búsqueda de referencias visuales ────────────────────────────────
+
+# ── Detección de modo ─────────────────────────────────────────────────────────
+
+STORYTELLING_MARKERS = [
+    "🎙", "NARRACIÓN", "VOZ EN OFF", "ESCENA", "## ESCENA",
+    "HOOK", "## 🎬", "guión", "GUIÓN",
+]
+
+def is_storytelling_input(text: str) -> bool:
+    """Detecta si el input es un guión del Storytelling."""
+    return any(m.lower() in text.lower() for m in STORYTELLING_MARKERS)
+
+
+# ── Búsqueda de referencias visuales ─────────────────────────────────────────
 
 VISUAL_SEARCH_PROMPT = """Eres un experto en referencias visuales para generación de imágenes con IA.
-Tu tarea: dado un tema, extraer las referencias visuales EXACTAS y verificadas que necesita un prompt engineer para crear imágenes precisas.
+Dado un guión o tema, extrae las referencias visuales EXACTAS y verificadas.
 
-Busca y devuelve SOLO esto, en formato estructurado:
+Devuelve SOLO esto:
 
-## PERSONAJE / ELEMENTO PRINCIPAL
-- Descripción física exacta (rasgos, complexión, edad aparente, color de piel/cabello/ojos)
-- Ropa / atuendo / accesorios icónicos con colores exactos
-- Elementos visuales distintivos (cicatrices, tatuajes, armas, objetos)
+## ESTILO VISUAL DOMINANTE
+- Referencia de película/serie más cercana al tono
+- Tipo de iluminación dominante
+- Textura visual (hiperrealista, cinemático, grano de película, etc.)
 
 ## PALETA DE COLORES
-- Colores dominantes (hex o nombre exacto)
-- Colores de acento
-- Tono general: oscuro/brillante/saturado/desaturado
+- 3-4 colores dominantes (nombre exacto o hex)
+- Contraste general (alto/medio/bajo)
 
-## ESTILO VISUAL
-- Referencia de película, videojuego, serie o artista visual más cercana
-- Tipo de iluminación dominante en este universo visual
-- Textura y acabado visual (hiperrealista, dibujado, cinematográfico, etc.)
+## ATMÓSFERA
+- Hora del día / condiciones de luz
+- Emoción visual dominante
+- Elementos de entorno que refuerzan el tono
 
-## ESCENARIOS ICÓNICOS
-- 3-5 locaciones/fondos típicos de este universo con descripción visual detallada
+## PERSONAJES / FIGURAS
+- Si hay personajes: descripción física concreta (anónimos, sin nombres reales)
+- Ropa y accesorios clave
+- Lenguaje corporal dominante en el guión
 
-Sé específico con datos reales. No inventes — solo lo que realmente existe para este tema.
+Sé específico. Solo datos reales y concretos.
 """
 
 def search_visual_references(topic: str, api_key: str) -> str:
-    """Busca referencias visuales reales usando Perplexity sonar vía OpenRouter."""
+    """Busca referencias visuales reales usando Perplexity."""
     try:
-        # Detectar si es contenido animado/cartoon para ajustar la query
-        animated_keywords = [
-            "gumball", "spongebob", "rick and morty", "dragon ball", "naruto", "one piece",
-            "anime", "cartoon", "animated", "animation", "dibujo", "dibujos", "animado",
-            "fortnite", "minecraft", "pokemon", "simpsons", "futurama", "adventure time",
-            "steven universe", "gravity falls", "avatar", "spider-man", "batman", "superman",
-        ]
-        topic_lower = topic.lower()
-        is_animated = any(kw in topic_lower for kw in animated_keywords)
-        if is_animated:
-            query = f"Cartoon animation visual style reference: {topic} — exact character design, color palette, art style, animation aesthetic for AI image generation"
-        else:
-            query = f"Visual references for AI image generation: {topic} — character appearance, color palette, iconic visual style, art direction"
         result = call_llm(
             messages=[
                 {"role": "system", "content": VISUAL_SEARCH_PROMPT},
-                {"role": "user", "content": f"Busca referencias visuales reales para: {topic}\n\nQuery de búsqueda: {query}\n\n{'IMPORTANTE: Este es contenido ANIMADO/CARTOON. Devuelve el estilo artístico exacto, paleta de colores del show, diseño de personajes (proporciones, rasgos cartoon), NO referencias fotorrealistas.' if is_animated else ''}"}
+                {"role": "user",   "content": f"Extrae referencias visuales para este guión/tema:\n\n{topic[:800]}"}
             ],
-            api_key=api_key,
-            max_tokens=800,
-            temperature=0.3,
-            title="Paperclip - Visual Reference Search",
-            model="perplexity/sonar",  # acceso a internet en tiempo real
+            api_key     = api_key,
+            max_tokens  = 600,
+            temperature = 0.3,
+            title       = "Paperclip - Visual Reference Search",
+            model       = "perplexity/sonar",
         )
-        print(f"  🔎 Referencias visuales obtenidas ({len(result)} chars)", flush=True)
+        print(f"  🔎 Referencias visuales: {len(result)} chars", flush=True)
         return result
     except Exception as e:
-        print(f"  ⚠️  Búsqueda de referencias falló: {e} — continuando sin referencias web", flush=True)
+        print(f"  ⚠️  Referencias visuales fallaron: {e}", flush=True)
         return ""
 
 
-# ── Paso 2: generación de prompts ───────────────────────────────────────────
+# ── Generador de prompt Popcorn ───────────────────────────────────────────────
 
-SYSTEM_PROMPT = """Eres el prompt engineer más preciso del mundo para Higgsfield Soul (text-to-image, formato 9:16 vertical). Tu trabajo: transformar cada escena de un guión en una imagen que por sí sola cuente esa parte de la historia — sin texto, solo con composición, luz y emoción.
+POPCORN_PROMPT_SYSTEM = """Eres el mejor prompt engineer para Higgsfield Popcorn Auto.
+Popcorn recibe UN solo prompt narrativo y genera 8 imágenes visualmente coherentes.
 
-Recibes:
-1. El guión completo con narración y descripción visual por escena
-2. Referencias visuales REALES del tema (personaje físico exacto, paleta, estilo artístico)
+Tu trabajo: convertir un guión en el prompt narrativo perfecto para Popcorn.
 
-## ⚠️ DETECCIÓN CRÍTICA DE CONTENIDO ANIMADO / CARTOON:
+REGLAS CRÍTICAS para Popcorn:
+1. El prompt es UNA narrativa continua, no una lista de escenas
+2. Describe la historia visual como si fuera la sinopsis de una película
+3. Define el estilo visual, paleta y atmósfera AL INICIO — Popcorn los aplica a todas las imágenes
+4. Los personajes deben ser ANÓNIMOS (no nombres reales, solo descripciones físicas)
+5. Evita palabras que disparen filtros de contenido: muerte, sangre, armas, violencia explícita
+   Usa en su lugar: tensión, confrontación, peligro, misterio, oscuridad
+6. El prompt ideal tiene 300-500 palabras en inglés
+7. Empieza SIEMPRE con el estilo visual: "Cinematic [género] story..."
 
-**ANTES de escribir cualquier prompt, determina si el tema involucra personajes animados, de videojuego, manga, anime, o universos ficticios de dibujos animados** (ejemplos: Gumball, SpongeBob, Rick and Morty, Dragon Ball, Naruto, Minecraft, Fortnite, etc.)
-
-Si ES contenido animado/cartoon/videojuego:
-- **NUNCA generes personas reales ni imágenes fotorrealistas** — el modelo interpretará "blue cat boy" como una persona real si no especificas el estilo
-- **SIEMPRE empieza el prompt con el estilo de arte**: "2D cartoon animation style, [show name] aesthetic, hand-drawn characters..."
-- Usa referencias al estilo visual del show/juego: paleta de colores plana, contornos gruesos, proporciones exageradas
-- Describe el personaje con sus rasgos de cartoon exactos (Gumball = blue anthropomorphic cat, round head, big eyes, no nose, wearing a white t-shirt)
-- Cierra con: "cartoon illustration, 2D animation, flat colors, bold outlines, NOT photorealistic, NOT 3D render"
-
-Si es contenido REALISTA (personas reales, historias humanas, negocios, etc.):
-- Aplica el flujo cinematic estándar descrito abajo
-
----
-
-## PRINCIPIOS DE UN PROMPT GANADOR PARA HIGGSFIELD SOUL:
-
-**Personaje consistente**: Define los rasgos del personaje principal en el primer prompt con máximo detalle (color de piel exacto, tipo de cabello, rasgos faciales, ropa) y repítelos LITERALMENTE en cada prompt. La coherencia visual entre escenas es crítica.
-
-**Emoción en el cuerpo, no en la mente**: No escribas "she feels sad" — escribe "her jaw tightens, eyes glassy, lips pressed together, hands gripping the edge of the table". La emoción se ve en el cuerpo, no se describe.
-
-**Luz como narrativa**: La iluminación cuenta la historia tanto como la acción. Usa términos específicos:
-- Tensión/drama: harsh side lighting, chiaroscuro, deep shadows, single practical light source
-- Esperanza/revelación: warm golden hour, soft rim light, lens flare, overexposed highlights
-- Misterio/oscuridad: underexposed ambient, cold moonlight, colored practical lights (blue/green)
-- Intimidad/confesión: soft window light, diffused natural light, shallow depth of field
-
-**Plano de cámara = emoción**:
-- Extreme close-up (ojos, manos) = confesión íntima
-- Low angle looking up = poder, amenaza
-- High angle looking down = vulnerabilidad, fragilidad
-- Dutch angle (cámara inclinada) = desequilibrio psicológico, giro narrativo
-- Over-the-shoulder = tensión en la relación entre personajes
-
-**Paleta de colores que evoca**: Especifica tonos Hex o nombres exactos de colores para las sombras y luces. La paleta debe ser consistente en toda la secuencia.
-
-**Técnico de cine** (solo para contenido realista): Siempre cierra con especificaciones técnicas que elevan la calidad: "shot on ARRI Alexa, anamorphic lens, shallow depth of field, film grain, cinematic color grade, 4K"
-
-## ESTILOS POR NICHO (adapta al contenido que recibes):
-- **Animado/Cartoon**: 2D animation style, flat colors, bold outlines, match the exact show aesthetic, NOT photorealistic
-- **Anime/Manga**: anime illustration style, cel shading, vibrant colors, dramatic expressions, NOT photorealistic
-- **Videojuego 3D**: game render style, stylized 3D, match the game's art direction (e.g., Fortnite: vibrant stylized, Minecraft: voxel blocky)
-- Drama/historias personales: film noir moderno, paleta desaturada con un solo color de acento cálido (naranja/rojo), primer plano de manos o rostro, grain de película analógica
-- Finanzas/negocios: editorial contemporáneo, luces de oficina en contraste con luces de ciudad de noche, paleta azul-gris-plata, limpio y moderno
-- Fitness/salud: luz natural dura de exterior, sombras definidas en músculos, paleta naranja-terracota-negro, movimiento congelado o ligeramente borroso
-- Tech/IA: ambiental de neón cian/violeta, interfaces holográficas, fondo urbano nocturno, paleta oscura con puntos de luz intensos
-- Lifestyle/aspiracional: golden hour, paleta cálida saturada (ámbar, coral, crema), fondos limpios con bokeh suave
-- Animales/rescate: luz natural suave, paleta verde-terrosa-cálida, primer plano de ojos del animal, textura orgánica
-
-## DEVUELVES SOLO este JSON (sin markdown, sin texto extra):
-
-{
-  "scene_prompts": [
-    {
-      "scene": 1,
-      "title": "nombre corto de la escena",
-      "aspect_ratio": "9:16",
-      "resolution": "720p",
-      "prompt": "ENGLISH ONLY. For ANIMATED content: start with art style (e.g. '2D cartoon animation style, The Amazing World of Gumball aesthetic'), then character exact cartoon description, then scene action, then mood/lighting fitting the art style, then background. For REALISTIC content: start with character physical description, then action, then body language emotion, then camera angle, then lighting, then background with hex colors, then technical specs. Minimum 100 words."
-    }
-  ]
-}
-
-RECUERDA: Los primeros 15 palabras del prompt determinan el 70% del resultado. Para animación: empieza con el estilo de arte. Para contenido real: empieza con el personaje o elemento visual central.
+ESTRUCTURA DEL PROMPT IDEAL:
+[Estilo visual + paleta] → [Descripción de los personajes anónimos] →
+[Arco narrativo en 3-4 frases] → [Atmósfera y emoción dominante] →
+[Especificaciones técnicas de imagen]
 """
 
-def call_openrouter(task: str, visual_refs: str, api_key: str) -> str:
-    # Inyectar referencias visuales en el mensaje del usuario
-    if visual_refs:
-        user_content = f"""## REFERENCIAS VISUALES REALES (úsalas para ser preciso):
+def generate_popcorn_prompt(script: str, visual_refs: str, api_key: str) -> dict:
+    """Genera el prompt optimizado para Popcorn a partir del guión."""
+    user_content = f"""REFERENCIAS VISUALES REALES:
 {visual_refs}
 
 ---
 
-## GUIÓN Y TAREA:
-{task}"""
-    else:
-        user_content = task
+GUIÓN (para extraer la historia visual):
+{script[:3000]}
 
-    content = call_llm(
+---
+
+Genera el prompt narrativo optimizado para Popcorn Auto.
+Devuelve SOLO JSON válido sin markdown:
+{{
+  "popcorn_prompt": "el prompt en inglés, 300-500 palabras",
+  "visual_style": "estilo visual en 1 línea",
+  "color_palette": "paleta en 1 línea"
+}}"""
+
+    response = call_llm(
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_content}
+            {"role": "system", "content": POPCORN_PROMPT_SYSTEM},
+            {"role": "user",   "content": user_content},
         ],
-        api_key=api_key,
-        max_tokens=3000,
-        temperature=0.75,
-        title="Paperclip - Prompt Generator Agent",
+        api_key     = api_key,
+        max_tokens  = 1000,
+        temperature = 0.7,
+        title       = "Paperclip - Popcorn Prompt Generator",
+        model       = "anthropic/claude-3-5-haiku",
     )
 
-    # Limpiar markdown code blocks si el modelo los incluye
-    if "```json" in content:
-        content = content.split("```json")[1].split("```")[0].strip()
-    elif "```" in content:
-        content = content.split("```")[1].split("```")[0].strip()
+    # Limpiar markdown
+    clean = response.strip()
+    if "```json" in clean:
+        clean = clean.split("```json")[1].split("```")[0].strip()
+    elif "```" in clean:
+        clean = clean.split("```")[1].split("```")[0].strip()
 
-    # Validar que sea JSON válido
     try:
-        parsed = json.loads(content)
-        return json.dumps(parsed, indent=2, ensure_ascii=False)
-    except json.JSONDecodeError:
-        return content
+        return json.loads(clean)
+    except Exception:
+        # Fallback: extraer el prompt del texto si el JSON falla
+        m = re.search(r'"popcorn_prompt"\s*:\s*"([\s\S]+?)"(?:,|\})', clean)
+        if m:
+            return {"popcorn_prompt": m.group(1), "visual_style": "", "color_palette": ""}
+        return {"popcorn_prompt": clean[:600], "visual_style": "", "color_palette": ""}
 
+
+# ── Generador de scene_prompts (legacy / standalone) ─────────────────────────
+
+SCENE_PROMPTS_SYSTEM = """Eres el prompt engineer más preciso para Higgsfield Soul (text-to-image, 9:16 vertical).
+Transforma cada escena de un guión en un prompt de imagen que cuenta esa parte de la historia.
+
+Devuelve SOLO este JSON (sin markdown):
+{
+  "scene_prompts": [
+    {
+      "scene": 1,
+      "title": "nombre corto",
+      "aspect_ratio": "9:16",
+      "resolution": "720p",
+      "prompt": "ENGLISH. Character description + action + emotion in body language + camera angle + lighting + background + technical specs. Min 80 words."
+    }
+  ]
+}"""
+
+def generate_scene_prompts(task: str, visual_refs: str, api_key: str) -> str:
+    user_content = f"REFERENCIAS VISUALES:\n{visual_refs}\n\n---\n\nGUIÓN/TAREA:\n{task}" if visual_refs else task
+    response = call_llm(
+        messages=[
+            {"role": "system", "content": SCENE_PROMPTS_SYSTEM},
+            {"role": "user",   "content": user_content},
+        ],
+        api_key     = api_key,
+        max_tokens  = 3000,
+        temperature = 0.75,
+        title       = "Paperclip - Scene Prompt Generator",
+    )
+    clean = response.strip()
+    if "```json" in clean:
+        clean = clean.split("```json")[1].split("```")[0].strip()
+    elif "```" in clean:
+        clean = clean.split("```")[1].split("```")[0].strip()
+    try:
+        parsed = json.loads(clean)
+        return json.dumps(parsed, indent=2, ensure_ascii=False)
+    except Exception:
+        return clean
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -205,32 +220,46 @@ def main():
 
     issue_title, issue_body = resolve_issue_context()
     if issue_title:
-        context = issue_body if issue_body and len(issue_body) > len(issue_title) else issue_title
-        task = f"Genera prompts para: {context}\n\nContexto adicional: {issue_body or 'ninguno'}"
-        post_issue_comment(
-            f"🎨 Entendido. Voy a crear los prompts de imagen para: **{issue_title}**\n\n"
-            f"Primero busco referencias visuales reales del tema, luego genero los prompts "
-            f"con descripción precisa del personaje, paleta de colores y estilo visual exacto."
-        )
+        task = issue_body if issue_body and len(issue_body) > len(issue_title) else issue_title
 
     if not task:
-        task = "Genera prompts JSON para un thumbnail de YouTube sobre '5 herramientas de IA que cambiaran tu vida en 2025'. Canal tech moderno, audiencia hispana 18-35 anos."
+        task = "Genera prompts para un video de misterio cinematográfico"
+
+    # Detectar modo
+    mode = "popcorn" if is_storytelling_input(task) else "scene_prompts"
+    print(f"🎨 Prompt Generator — modo: {'Popcorn Optimizer' if mode == 'popcorn' else 'Scene Prompts'}", flush=True)
+
+    if issue_title:
+        post_issue_comment(
+            f"🎨 Generando {'prompt Popcorn optimizado' if mode == 'popcorn' else 'prompts de escena'} para: **{issue_title[:60]}**\n\n"
+            f"Buscando referencias visuales reales..."
+        )
 
     memory_ctx = get_context_summary("prompts", task)
     if memory_ctx:
         task = f"{task}\n\n---\n{memory_ctx}"
 
-    # ── Paso 1: buscar referencias visuales reales ──
-    print("🔎 Buscando referencias visuales reales del tema...", flush=True)
-    visual_refs = search_visual_references(task[:300], api_key)
+    # Buscar referencias visuales
+    print("🔎 Buscando referencias visuales...", flush=True)
+    visual_refs = search_visual_references(task[:500], api_key)
 
-    # ── Paso 2: generar prompts con las referencias ──
-    print("🎨 Generando prompts con referencias visuales...", flush=True)
     try:
-        response = call_openrouter(task, visual_refs, api_key)
-        save("prompts", task[:60], response)
-        print(response)
-        post_issue_result(response)
+        if mode == "popcorn":
+            # Modo principal: prompt optimizado para Popcorn
+            print("🍿 Generando prompt Popcorn optimizado...", flush=True)
+            result = generate_popcorn_prompt(task, visual_refs, api_key)
+            output = json.dumps(result, indent=2, ensure_ascii=False)
+            save("prompts", task[:60], output)
+            print(f"✅ Popcorn prompt: {len(result.get('popcorn_prompt',''))} chars", flush=True)
+            print(output, flush=True)
+            post_issue_result(output)
+        else:
+            # Modo legacy: scene_prompts individuales
+            print("🎨 Generando scene prompts...", flush=True)
+            response = generate_scene_prompts(task, visual_refs, api_key)
+            save("prompts", task[:60], response)
+            print(response, flush=True)
+            post_issue_result(response)
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)

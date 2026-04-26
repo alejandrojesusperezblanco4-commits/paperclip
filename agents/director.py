@@ -938,15 +938,14 @@ TONO DEL GUIÓN (primeras líneas):
     except Exception as _se:
         print(f"⚠️  No se pudo elegir estilo automáticamente: {_se}", flush=True)
 
-    # ── Fase 4: Imágenes ──────────────────────────────────────
-    prompt_task = sanitize(f"""Genera 5-6 prompts JSON (uno por escena) para el guión de: {objetivo}
+    # ── Fase 4: Prompt Generator ──────────────────────────────
+    # Nuevo rol: genera UN prompt narrativo optimizado para Popcorn Auto
+    # usando Perplexity para referencias visuales reales del nicho.
+    prompt_task = sanitize(f"""{storytelling_result[:4500]}""")
 
-Guión completo:
-{storytelling_result[:4500]}""")
-
-    post_issue_comment("🎨 **Fase 5 — Prompt Generator** en progreso…")
+    post_issue_comment("🎨 **Fase 5 — Prompt Generator** optimizando prompt para Popcorn…")
     prompt_result = run_tracked("prompt_generator.py", prompt_task,
-                                "Prompt Generator — 5-6 imágenes", "prompt_generator")
+                                "Prompt Generator — Popcorn Optimizer", "prompt_generator")
 
     # ── Esperar TTS (que corrió en paralelo con Style + PG) ──
     if _tts_future is not None:
@@ -1024,8 +1023,37 @@ Guión completo:
         for _pat, _repl in _nsfw_map:
             _guion_safe = _re.sub(_pat, _repl, _guion_safe, flags=_re.IGNORECASE)
 
-        _visual_brief = (_copyright_safe + f"Visual mood: {_ambiente}\n\nStory visuals:\n{_guion_safe}")[:2000]
-        print(f"  📝 Prompt Popcorn ({len(_visual_brief)} chars): {_visual_brief[:80]}…", flush=True)
+        # ── Usar prompt del Prompt Generator si está disponible ──
+        # El Prompt Generator ya corrió en paralelo y puede haber generado
+        # un prompt Popcorn optimizado con referencias visuales reales.
+        _pg_popcorn = ""
+        if prompt_result:
+            try:
+                _pg_json = None
+                _pg_m = _re.search(r'```json\s*([\s\S]+?)```', prompt_result)
+                if _pg_m:
+                    _pg_json = json.loads(_pg_m.group(1))
+                elif prompt_result.strip().startswith("{"):
+                    _pg_json = json.loads(prompt_result.strip())
+                if _pg_json and _pg_json.get("popcorn_prompt"):
+                    _pg_popcorn = _pg_json["popcorn_prompt"].strip()
+                    _vs = _pg_json.get("visual_style", "")
+                    print(f"  ✅ Usando prompt Popcorn del Prompt Generator ({len(_pg_popcorn)} chars)", flush=True)
+                    if _vs:
+                        print(f"  🎨 Estilo visual: {_vs[:80]}", flush=True)
+            except Exception as _pg_e:
+                print(f"  ⚠️  No se pudo extraer popcorn_prompt del PG: {_pg_e}", flush=True)
+
+        if _pg_popcorn:
+            # Sanitizar el prompt del PG con el mismo nsfw_map
+            _pg_safe = _pg_popcorn
+            for _pat, _repl in _nsfw_map:
+                _pg_safe = _re.sub(_pat, _repl, _pg_safe, flags=_re.IGNORECASE)
+            _visual_brief = (_copyright_safe + _pg_safe)[:2000]
+            print(f"  📝 Prompt Popcorn (PG, {len(_visual_brief)} chars): {_visual_brief[:80]}…", flush=True)
+        else:
+            _visual_brief = (_copyright_safe + f"Visual mood: {_ambiente}\n\nStory visuals:\n{_guion_safe}")[:2000]
+            print(f"  📝 Prompt Popcorn (manual, {len(_visual_brief)} chars): {_visual_brief[:80]}…", flush=True)
 
         # Lote 1: 8 imágenes (máximo por llamada Popcorn)
         _popcorn_task_1 = sanitize(json.dumps({
