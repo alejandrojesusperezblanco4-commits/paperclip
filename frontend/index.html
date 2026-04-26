@@ -1456,6 +1456,7 @@ async function pollMain() {
       clearInterval(subPollTimer);
       clearInterval(agentUpdateTimer);
       startTime = null;
+      _sfx.error();
       showError('El pipeline fue cancelado.');
       resetUI();
     }
@@ -2191,6 +2192,7 @@ function showRunningPanel(cfg, topic) {
 }
 
 function showError(msg) {
+  _sfx.error();
   document.getElementById('rightPanel').innerHTML = `
     <div class="empty-state">
       <div class="empty-icon">⚠️</div>
@@ -2579,17 +2581,12 @@ function updateVideoPanel(videoUrl, raw) {
 }
 
 /* ── Sound Effects ── */
-// Pon aquí las URLs de tus sonidos y descomenta las líneas de play
 const _sfx = {
   success() {
-    // const audio = new Audio('URL_DE_TU_SONIDO_EXITO');
-    // audio.volume = 0.6;
-    // audio.play().catch(()=>{});
+    try { const a = new Audio('/sounds/success.m4a'); a.volume = 0.7; a.play().catch(()=>{}); } catch(e){}
   },
   error() {
-    // const audio = new Audio('URL_DE_TU_SONIDO_ERROR');
-    // audio.volume = 0.6;
-    // audio.play().catch(()=>{});
+    try { const a = new Audio('/sounds/error.m4a'); a.volume = 0.7; a.play().catch(()=>{}); } catch(e){}
   },
 };
 

@@ -150,6 +150,17 @@ export async function createApp(
   }
   app.use(llmRoutes(db));
 
+  // ── Studio sound effects ─────────────────────────────────────────────────────
+  app.get("/sounds/:file", (req, res) => {
+    const allowed = ["success.m4a", "error.m4a"];
+    const file    = req.params.file;
+    if (!allowed.includes(file)) { res.status(404).end(); return; }
+    const p = path.join(path.dirname(fileURLToPath(import.meta.url)), "../../frontend/sounds", file);
+    res.setHeader("Content-Type", "audio/mp4");
+    res.setHeader("Cache-Control", "public, max-age=31536000");
+    res.sendFile(p, (err) => { if (err) res.status(404).end(); });
+  });
+
   // ── TikTok URL verification file ────────────────────────────────────────────
   app.get("/tiktokLEfIkRPAJgbq8y0D9WQQDhDqo2ZVtqxa.txt", (req, res) => {
     res.setHeader("Content-Type", "text/plain");
