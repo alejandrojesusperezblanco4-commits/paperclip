@@ -1,4 +1,18 @@
 /// <reference path="./types/express.d.ts" />
+
+// ── Global error handlers — prevent EPIPE crashes ────────────────────────────
+// EPIPE happens when a Python agent process dies and the server writes to the
+// closed pipe. Without this handler it kills the entire Node.js process.
+process.on("uncaughtException", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EPIPE" || err.code === "ECONNRESET") {
+    return; // Ignore broken pipe errors silently
+  }
+  console.error("[uncaughtException]", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
+
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
