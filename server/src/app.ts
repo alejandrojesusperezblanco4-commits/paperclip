@@ -399,6 +399,119 @@ TIKTOK_OPEN_ID=${openId}
     }
   });
 
+  // ── Seed growth agents in DiscontrolGrowth ──────────────────────────────────
+  // Usage: GET /api/internal/seed-growth-agents?secret=<first-16-chars>
+  app.get("/api/internal/seed-growth-agents", async (req, res) => {
+    const secret = (req.query.secret as string) ?? "";
+    const expectedSecret = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!secret || !expectedSecret || secret !== expectedSecret) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    try {
+      const [company] = await (db as any)
+        .select({ id: companiesTable.id, name: companiesTable.name })
+        .from(companiesTable)
+        .where(eq(companiesTable.issuePrefix, "DISAA"))
+        .limit(1);
+
+      if (!company) {
+        res.status(404).json({ error: "DiscontrolGrowth not found (issuePrefix DISAA)" });
+        return;
+      }
+
+      const GROWTH_AGENTS = [
+        {
+          name: "CEO Growth",
+          envVar: "GROWTH_CEO_AGENT_ID",
+          title: "Sales & Growth Orchestrator — Diskontrol",
+          role: "manager" as const,
+          adapterConfig: { command: "python3", args: ["agents/growth/ceo.py"], cwd: "/app", timeoutSec: 1800 },
+          budgetMonthlyCents: 10000,
+        },
+        {
+          name: "Lead Scout",
+          envVar: "GROWTH_LEAD_SCOUT_AGENT_ID",
+          title: "Local Business Lead Finder",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/growth/lead_scout.py"], cwd: "/app", timeoutSec: 300 },
+          budgetMonthlyCents: 5000,
+        },
+        {
+          name: "Lead Qualifier",
+          envVar: "GROWTH_LEAD_QUALIFIER_AGENT_ID",
+          title: "Lead Scoring & Prioritization",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/growth/lead_qualifier.py"], cwd: "/app", timeoutSec: 120 },
+          budgetMonthlyCents: 4000,
+        },
+        {
+          name: "Outreach Writer",
+          envVar: "GROWTH_OUTREACH_WRITER_AGENT_ID",
+          title: "Personalized Outreach Message Generator",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/growth/outreach_writer.py"], cwd: "/app", timeoutSec: 120 },
+          budgetMonthlyCents: 5000,
+        },
+        {
+          name: "Sender",
+          envVar: "GROWTH_SENDER_AGENT_ID",
+          title: "Multi-channel Message Sender",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/growth/sender.py"], cwd: "/app", timeoutSec: 120 },
+          budgetMonthlyCents: 3000,
+        },
+        {
+          name: "Tracker",
+          envVar: "GROWTH_TRACKER_AGENT_ID",
+          title: "Lead Response Tracker & Follow-up",
+          role: "engineer" as const,
+          adapterConfig: { command: "python3", args: ["agents/growth/tracker.py"], cwd: "/app", timeoutSec: 60 },
+          budgetMonthlyCents: 2000,
+        },
+      ];
+
+      const existingAgents: { id: string; name: string; status: string }[] = await (db as any)
+        .select({ id: agentsTable.id, name: agentsTable.name, status: agentsTable.status })
+        .from(agentsTable)
+        .where(eq(agentsTable.companyId, company.id));
+
+      const results: Record<string, { id: string; created: boolean }> = {};
+      let ceoId: string | null = null;
+
+      for (const spec of GROWTH_AGENTS) {
+        const existing = existingAgents.find(a => a.name.toLowerCase() === spec.name.toLowerCase());
+
+        if (existing) {
+          if (existing.status === "terminated") {
+            await (db as any).delete(agentsTable).where(eq(agentsTable.id, existing.id));
+          } else {
+            await (db as any).update(agentsTable).set({ adapterConfig: spec.adapterConfig, status: "idle" }).where(eq(agentsTable.id, existing.id));
+            results[spec.envVar] = { id: existing.id, created: false };
+            if (spec.name === "CEO Growth") ceoId = existing.id;
+            continue;
+          }
+        }
+
+        const insertValues: Record<string, unknown> = {
+          companyId: company.id, name: spec.name, role: spec.role,
+          title: spec.title, status: "idle", adapterType: "process",
+          adapterConfig: spec.adapterConfig, budgetMonthlyCents: spec.budgetMonthlyCents,
+        };
+        if (spec.name !== "CEO Growth" && ceoId) insertValues.reportsTo = ceoId;
+
+        const [created] = await (db as any).insert(agentsTable).values(insertValues).returning({ id: agentsTable.id });
+        results[spec.envVar] = { id: created.id, created: true };
+        if (spec.name === "CEO Growth") ceoId = created.id;
+      }
+
+      res.json({ ok: true, company: company.name, companyId: company.id, results,
+        envVars: Object.entries(results).map(([k,v]) => `${k}=${v.id}`).join("\n") });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
   // ── Seed dropshipping agents in DiscontrolDrops ─────────────────────────────
   // Finds company by issuePrefix and creates all dropshipping agents.
   // Usage: GET /api/internal/seed-drops-agents?secret=<first-16-chars>
