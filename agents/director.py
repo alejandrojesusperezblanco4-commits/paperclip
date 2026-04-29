@@ -1130,10 +1130,40 @@ TONO DEL GUIÓN (primeras líneas):
 
         _b1_ref  = (_b1_bold or _b1_ext or [None])[0]
 
-        # Lote 2: 8 imágenes más, usando la primera del lote 1 como referencia
+        # ── Construir prompt del lote 2 (segundo acto — diferente al lote 1) ──
+        # Lote 1 cubre apertura + setup. Lote 2 cubre tensión + clímax + resolución.
+        # Esto evita que ambos lotes generen imágenes visualmente repetitivas.
+        if _narr_matches and len(_narr_matches) > 2:
+            # Tomar la segunda mitad de las narraciones para el segundo acto
+            _half   = len(_narr_matches) // 2
+            _guion2 = " | ".join(m.strip()[:300] for m in _narr_matches[_half:] if m.strip())
+        else:
+            # Fallback: usar la segunda mitad del guión completo
+            _mid    = len(storytelling_result) // 2
+            _guion2 = storytelling_result[_mid:_mid + 800]
+
+        # Sanitizar el guión del segundo acto
+        _guion2_safe = _guion2
+        for _pat, _repl in _nsfw_map:
+            _guion2_safe = _re.sub(_pat, _repl, _guion2_safe, flags=_re.IGNORECASE)
+
+        if _pg_popcorn:
+            # Si el PG generó un prompt, crear variante de clímax para el lote 2
+            _visual_brief_2 = (_copyright_safe +
+                               f"CLIMAX AND RESOLUTION — continuation of the same story. "
+                               f"Visual style: {_pg_json.get('visual_style', '') if '_pg_json' in dir() and _pg_json else ''}\n\n"
+                               f"{_guion2_safe}")[:2000]
+        else:
+            _visual_brief_2 = (_copyright_safe +
+                               f"Visual mood: {_ambiente} — SECOND ACT: tension, climax, resolution.\n\n"
+                               f"Story visuals:\n{_guion2_safe}")[:2000]
+
+        print(f"  📝 Prompt Popcorn lote 2 ({len(_visual_brief_2)} chars): {_visual_brief_2[:80]}…", flush=True)
+
+        # Lote 2: 8 imágenes más con prompt del segundo acto
         _pop_result_2 = ""
         _task_2_data = {
-            "prompt":       _visual_brief,
+            "prompt":       _visual_brief_2,
             "num_images":   8,
             "aspect_ratio": "9:16",
             "resolution":   "720p",

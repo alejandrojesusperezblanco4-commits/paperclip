@@ -1107,10 +1107,19 @@
 
   <!-- ── RIGHT PANEL ── -->
   <div class="panel-right" id="rightPanel">
-    <div class="empty-state" id="emptyState">
-      <div class="empty-icon">✦</div>
-      <h2>Selecciona un agente y ejecuta</h2>
-      <p>Cada agente trabaja de forma independiente o juntos en el pipeline completo.</p>
+    <div id="emptyState">
+      <!-- Galería de contenido generado -->
+      <div style="margin-bottom:20px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--sub);margin-bottom:14px">
+          🎬 Últimas generaciones
+        </div>
+        <div id="galleryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px"></div>
+        <div id="galleryEmpty" class="empty-state" style="display:none">
+          <div class="empty-icon">✦</div>
+          <h2>Selecciona un agente y ejecuta</h2>
+          <p>Cada agente trabaja de forma independiente o juntos en el pipeline completo.</p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2582,6 +2591,44 @@ function updateVideoPanel(videoUrl, raw) {
   switchArtTab('videoTab', document.querySelector('[data-art="videoTab"]'));
 }
 
+/* ── Gallery styles ── */
+.gallery-card {
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s;
+  position: relative;
+}
+.gallery-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.gallery-card-thumb {
+  aspect-ratio: 9/16;
+  background: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.gallery-card-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.gallery-card-thumb video { width:100%; height:100%; object-fit:cover; display:block; }
+.gallery-card-thumb .gallery-icon { font-size:28px; opacity:0.3; }
+.gallery-card-meta {
+  padding: 6px 8px;
+  font-size: 10px;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'Barlow', sans-serif;
+}
+.gallery-card-tema {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Sound Effects ── */
 const _sfx = {
   success() {
@@ -2618,9 +2665,100 @@ function updateCharCounter(el) {
   observer.observe(sideWrap, { attributes: true, attributeFilter: ['style'] });
 })();
 
+/* ── Gallery — carga desde Supabase ── */
+const SUPABASE_URL = 'https://nuaajypknpjbsyhssclm.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_HXCYe2NDSLU284le5Lz6XA_HpUJ5gkKRQ4SbrXXNTkGxiV'; // publishable key (read-only)
+
+async function loadGallery() {
+  const grid   = document.getElementById('galleryGrid');
+  const empty  = document.getElementById('galleryEmpty');
+  if (!grid) return;
+
+  try {
+    const res  = await fetch(
+      `${SUPABASE_URL}/rest/v1/videos?select=id,created_at,tema,video_url,audio_url,image_urls,status&order=created_at.desc&limit=30`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = await res.json();
+
+    const visible = rows.filter(r => r.image_urls?.length || r.video_url || r.audio_url);
+    if (!visible.length) {
+      grid.style.display = 'none';
+      empty.style.display = 'flex';
+      return;
+    }
+
+    grid.innerHTML = visible.map(r => {
+      const imgs      = r.image_urls || [];
+      const thumb     = imgs[0] || '';
+      const hasVideo  = !!r.video_url;
+      const tema      = (r.tema || 'Sin título').slice(0, 40);
+      const date      = r.created_at ? new Date(r.created_at).toLocaleDateString('es', { day:'2-digit', month:'short' }) : '';
+      const badge     = hasVideo ? '🎬' : r.audio_url ? '🎙️' : '🖼️';
+
+      return `<div class="gallery-card" onclick="openGalleryItem(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+        <div class="gallery-card-thumb">
+          ${thumb
+            ? `<img src="${escHtml(thumb)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'gallery-icon\\'>🖼️</div>'">`
+            : `<div class="gallery-icon">${badge}</div>`}
+        </div>
+        <div style="padding:6px 8px">
+          <div class="gallery-card-tema">${escHtml(tema)}</div>
+          <div class="gallery-card-meta">${badge} ${date}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+  } catch(e) {
+    console.warn('Gallery load failed:', e);
+    grid.style.display = 'none';
+    empty.style.display = 'flex';
+  }
+}
+
+function openGalleryItem(r) {
+  if (currentIssueId) return;
+  const imgs    = r.image_urls || [];
+  const imgsHtml = imgs.length
+    ? `<div class="image-gallery">${imgs.map((u,i) => `
+        <div>
+          <div class="gallery-item">
+            <img src="${escHtml(u)}" loading="lazy" onclick="window.open('${escHtml(u)}','_blank')">
+          </div>
+          <div class="gallery-caption">E${i+1}</div>
+        </div>`).join('')}</div>`
+    : '';
+
+  const videoHtml = r.video_url
+    ? `<div class="video-wrap" style="max-width:260px;margin:0 auto 12px">
+        <video controls playsinline preload="metadata">
+          <source src="${escHtml(r.video_url)}" type="video/mp4">
+        </video>
+       </div>
+       <div style="text-align:center;margin-bottom:14px">
+         <a href="${escHtml(r.video_url)}" target="_blank" class="btn-download">⬇️ Descargar video</a>
+       </div>` : '';
+
+  const audioHtml = r.audio_url
+    ? `<audio controls src="${escHtml(r.audio_url)}" style="width:100%;margin-bottom:14px"></audio>` : '';
+
+  document.getElementById('rightPanel').innerHTML = `
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;margin-bottom:14px;letter-spacing:0.03em">
+      ${escHtml((r.tema || 'Sin título').slice(0,80))}
+    </div>
+    ${videoHtml}${audioHtml}
+    ${imgsHtml}
+    <div style="margin-top:12px">
+      <button onclick="loadGallery();document.getElementById('rightPanel').innerHTML=document.getElementById('emptyState').outerHTML"
+        class="btn-download secondary" style="font-size:11px;padding:6px 14px">← Volver a la galería</button>
+    </div>`;
+}
+
 /* ── Init ── */
 selectAgent('director');
 renderHistory();
+loadGallery();
 </script>
 </body>
 </html>
