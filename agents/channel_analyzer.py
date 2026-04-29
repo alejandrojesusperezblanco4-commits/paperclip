@@ -308,7 +308,7 @@ def main():
             api_key    = api_key,
             max_tokens = 2500,
             title      = "Paperclip - Channel Analyzer",
-            model      = "anthropic/claude-3-5-haiku",
+            model      = "anthropic/claude-sonnet-4-5",
         )
         save("channel_analyzer", task[:60], response)
 

@@ -455,7 +455,7 @@ Los reportes completos se adjuntarán al resultado final; aquí solo sintetiza l
         max_tokens=2000,
         temperature=0.6,
         title="Paperclip - Director de Contenido",
-        model="anthropic/claude-3-5-haiku",  # mejor calidad para síntesis
+        model="anthropic/claude-sonnet-4-5",  # mejor calidad para síntesis
         timeout=60,
         retries=1,
     )

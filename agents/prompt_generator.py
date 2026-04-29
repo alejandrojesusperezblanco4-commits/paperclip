@@ -148,7 +148,7 @@ Devuelve SOLO JSON válido sin markdown:
         max_tokens  = 1000,
         temperature = 0.7,
         title       = "Paperclip - Popcorn Prompt Generator",
-        model       = "anthropic/claude-3-5-haiku",
+        model       = "anthropic/claude-sonnet-4-5",
     )
 
     # Limpiar markdown
