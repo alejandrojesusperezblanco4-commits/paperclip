@@ -33,15 +33,15 @@ sys.stderr.reconfigure(encoding="utf-8")
 
 # ── Agent IDs — DiscontrolDrops ───────────────────────────────────────────────
 AGENT_IDS = {
-    "product_hunter":   "90288f23-a593-4876-82a6-56f9b4448ac7",  # Lead Scout slot usado para Product Hunter
-    "ad_spy":           "6403595f-6850-43c5-9f35-bba0a3e6a4e6",
-    "lead_qualifier":   "77839380-ef3a-4f02-aa7f-6ef5e0e42b09",
-    "web_designer":     "bc1948d9-53d9-4fc2-aafb-bfadc009332a",
-    "marketing_creator":"6fcc7a88-4b5a-4a0e-bcc3-3489e7c8a90b",
+    "product_hunter":    "01a671f6-a303-4f74-90e2-914c63a2e34d",
+    "ad_spy":            "9d3649ad-b902-495a-8330-8048d94ac20d",
+    "lead_qualifier":    "fbf55d11-03cb-4d88-9132-7a04a9091d8c",
+    "web_designer":      "e39f154b-0415-42f2-bd60-b79f66ecaca7",
+    "marketing_creator": "f6fb0f5a-ea32-4a29-aac1-95e7c3db6335",
 }
 
-CEO_AGENT_ID    = "8a58fe92-6799-42e0-81e0-d3f234dbf5cc"
-DROPS_COMPANY   = "14a23847-5215-44fc-8b2d-c45e25d3f291"
+CEO_AGENT_ID    = "60dd4b7a-4ec3-4555-8e52-807ffcf15a7b"
+DROPS_COMPANY   = "0b4751e7-24e7-4e8b-98e0-5b5ed73b6d7c"
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
