@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Db } from "@paperclipai/db";
-import { companies as companiesTable, agents as agentsTable } from "@paperclipai/db";
+import { companies as companiesTable, agents as agentsTable, companyMemberships, principalPermissionGrants } from "@paperclipai/db";
 import { eq } from "drizzle-orm";
 import type { DeploymentExposure, DeploymentMode } from "@paperclipai/shared";
 import type { StorageService } from "./storage/types.js";
@@ -149,6 +149,20 @@ export async function createApp(
     app.all("/api/auth/{*authPath}", opts.betterAuthHandler);
   }
   app.use(llmRoutes(db));
+
+  // ── Helper: grant tasks:assign to an agent ───────────────────────────────────
+  async function grantTasksAssign(companyId: string, agentId: string) {
+    // 1. Ensure membership
+    await (db as any).insert(companyMemberships).values({
+      companyId, principalType: "agent", principalId: agentId,
+      status: "active", membershipRole: "member",
+    }).onConflictDoNothing();
+    // 2. Grant tasks:assign permission
+    await (db as any).insert(principalPermissionGrants).values({
+      companyId, principalType: "agent", principalId: agentId,
+      permissionKey: "tasks:assign", scope: null, grantedByUserId: null,
+    }).onConflictDoNothing();
+  }
 
   // ── Studio sound effects ─────────────────────────────────────────────────────
   app.get("/sounds/:file", (req, res) => {
@@ -505,6 +519,8 @@ TIKTOK_OPEN_ID=${openId}
         if (spec.name === "CEO Growth") ceoId = created.id;
       }
 
+      if (ceoId) await grantTasksAssign(company.id, ceoId);
+
       res.json({ ok: true, company: company.name, companyId: company.id, results,
         envVars: Object.entries(results).map(([k,v]) => `${k}=${v.id}`).join("\n") });
     } catch (err: unknown) {
@@ -632,6 +648,9 @@ TIKTOK_OPEN_ID=${openId}
         results[spec.envVar] = { id: created.id, created: true };
         if (spec.name === "CEO") ceoId = created.id;
       }
+
+      // Grant tasks:assign to CEO so it can create + assign sub-issues
+      if (ceoId) await grantTasksAssign(company.id, ceoId);
 
       const envLines = Object.entries(results)
         .map(([k, v]) => `${k}=${v.id}`)
@@ -781,6 +800,8 @@ TIKTOK_OPEN_ID=${openId}
         if (spec.name === "CEO") ceoId = created.id;
         console.log(`  ✅ Created ${spec.name} (${created.id})`);
       }
+
+      if (ceoId) await grantTasksAssign(TRADING_COMPANY_ID, ceoId);
 
       const envLines = Object.entries(results)
         .map(([k, v]) => `${k}=${v.id}`)
