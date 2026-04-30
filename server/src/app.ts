@@ -486,7 +486,7 @@ TIKTOK_OPEN_ID=${openId}
           if (existing.status === "terminated") {
             await (db as any).delete(agentsTable).where(eq(agentsTable.id, existing.id));
           } else {
-            await (db as any).update(agentsTable).set({ adapterConfig: spec.adapterConfig, status: "idle" }).where(eq(agentsTable.id, existing.id));
+            await (db as any).update(agentsTable).set({ adapterType: "process", adapterConfig: spec.adapterConfig, status: "idle" }).where(eq(agentsTable.id, existing.id));
             results[spec.envVar] = { id: existing.id, created: false };
             if (spec.name === "CEO Growth") ceoId = existing.id;
             continue;
@@ -600,9 +600,10 @@ TIKTOK_OPEN_ID=${openId}
         );
 
         if (existing) {
+          // Forzar adapterType=process + adapterConfig correcto (fix onboarding CEO)
           await (db as any)
             .update(agentsTable)
-            .set({ adapterConfig: spec.adapterConfig, status: "idle" })
+            .set({ adapterType: "process", adapterConfig: spec.adapterConfig, status: "idle" })
             .where(eq(agentsTable.id, existing.id));
           results[spec.envVar] = { id: existing.id, created: false };
           if (spec.name === "CEO") ceoId = existing.id;
@@ -747,7 +748,7 @@ TIKTOK_OPEN_ID=${openId}
             // Restaurar status idle + actualizar adapterConfig
             await (db as any)
               .update(agentsTable)
-              .set({ adapterConfig: spec.adapterConfig, status: "idle" })
+              .set({ adapterType: "process", adapterConfig: spec.adapterConfig, status: "idle" })
               .where(eq(agentsTable.id, existing.id));
             results[spec.envVar] = { id: existing.id, created: false };
             if (spec.name === "CEO") ceoId = existing.id;
