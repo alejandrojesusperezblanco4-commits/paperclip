@@ -150,6 +150,25 @@ export async function createApp(
   }
   app.use(llmRoutes(db));
 
+  // ── Diagnostic: list all companies with IDs and issuePrefixes ───────────────
+  app.get("/api/internal/list-companies", async (req, res) => {
+    const secret = (req.query.secret as string) ?? "";
+    const expectedSecret = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!secret || !expectedSecret || secret !== expectedSecret) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    try {
+      const companies = await (db as any)
+        .select({ id: companiesTable.id, name: companiesTable.name, issuePrefix: companiesTable.issuePrefix })
+        .from(companiesTable)
+        .orderBy(companiesTable.createdAt);
+      res.json({ companies });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
   // ── Helper: grant tasks:assign to an agent ───────────────────────────────────
   async function grantTasksAssign(companyId: string, agentId: string) {
     // 1. Ensure membership
