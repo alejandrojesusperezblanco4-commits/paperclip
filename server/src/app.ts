@@ -172,6 +172,37 @@ export async function createApp(
     }
   });
 
+  // ── Debug: test issue creation in a company ──────────────────────────────────
+  app.get("/api/internal/test-issue-create", async (req, res) => {
+    const secret = (req.query.secret as string) ?? "";
+    const expectedSecret = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!secret || !expectedSecret || secret !== expectedSecret) {
+      res.status(403).json({ error: "forbidden" }); return;
+    }
+    const companyId  = (req.query.companyId as string) ?? "";
+    const projectId  = (req.query.projectId as string) ?? "";
+    if (!companyId) { res.status(400).json({ error: "companyId required" }); return; }
+    try {
+      const { issues: issuesTable } = await import("@paperclipai/db");
+      const [issue] = await (db as any)
+        .insert(issuesTable)
+        .values({
+          companyId,
+          projectId:   projectId || null,
+          title:       "Test issue from debug endpoint",
+          status:      "backlog",
+          description: "Test",
+        })
+        .returning({ id: issuesTable.id, identifier: (issuesTable as any).identifier });
+      res.json({ ok: true, issue });
+    } catch (err: unknown) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack?.slice(0, 500) : undefined,
+      });
+    }
+  });
+
   // ── Diagnostic: list all companies with IDs and issuePrefixes ───────────────
   app.get("/api/internal/list-companies", async (req, res) => {
     const secret = (req.query.secret as string) ?? "";
