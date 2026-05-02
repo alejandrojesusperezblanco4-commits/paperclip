@@ -150,6 +150,28 @@ export async function createApp(
   }
   app.use(llmRoutes(db));
 
+  // ── Diagnostic: list projects for a company ──────────────────────────────────
+  app.get("/api/internal/list-projects", async (req, res) => {
+    const secret = (req.query.secret as string) ?? "";
+    const expectedSecret = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!secret || !expectedSecret || secret !== expectedSecret) {
+      res.status(403).json({ error: "forbidden" }); return;
+    }
+    const companyId = (req.query.companyId as string) ?? "";
+    if (!companyId) { res.status(400).json({ error: "companyId required" }); return; }
+    try {
+      const { projects: projectsTable } = await import("@paperclipai/db");
+      const projects = await (db as any)
+        .select({ id: projectsTable.id, name: projectsTable.name })
+        .from(projectsTable)
+        .where(eq((projectsTable as any).companyId, companyId))
+        .limit(10);
+      res.json({ projects });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
   // ── Diagnostic: list all companies with IDs and issuePrefixes ───────────────
   app.get("/api/internal/list-companies", async (req, res) => {
     const secret = (req.query.secret as string) ?? "";

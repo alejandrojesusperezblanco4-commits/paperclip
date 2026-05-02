@@ -98,17 +98,24 @@ def create_sub_issue(title: str, description: str, agent_key: str,
     result = api("POST", f"/api/companies/{DROPS_COMPANY}/issues", payload, headers)
     issue_id = (result or {}).get("id")
 
-    # Fallback: intentar sin parentId si falla
+    # Fallback 1: sin parentId
     if not issue_id and parent_id:
-        print(f"  ⚠️  Retry sin parentId...", flush=True)
+        print(f"  ⚠️  Retry sin parentId... resultado: {result}", flush=True)
         payload.pop("parentId", None)
+        result   = api("POST", f"/api/companies/{DROPS_COMPANY}/issues", payload, headers)
+        issue_id = (result or {}).get("id")
+
+    # Fallback 2: sin assigneeAgentId (crear issue libre)
+    if not issue_id and agent_id:
+        print(f"  ⚠️  Retry sin assigneeAgentId... resultado: {result}", flush=True)
+        payload.pop("assigneeAgentId", None)
         result   = api("POST", f"/api/companies/{DROPS_COMPANY}/issues", payload, headers)
         issue_id = (result or {}).get("id")
 
     if issue_id:
         print(f"  ✅ Issue '{title}' → {issue_id}", flush=True)
     else:
-        print(f"  ❌ No se pudo crear issue '{title}': {result}", flush=True)
+        print(f"  ❌ No se pudo crear issue '{title}'. Último resultado: {result}", flush=True)
     return issue_id
 
 
