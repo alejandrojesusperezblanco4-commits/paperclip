@@ -44,12 +44,12 @@ def b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
-def make_jwt(agent_id: str, company_id: str, secret: str) -> str:
+def make_jwt(agent_id: str, company_id: str, run_id: str, secret: str) -> str:
     now     = int(time.time())
     header  = json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":"))
     payload = json.dumps({
         "sub": agent_id, "company_id": company_id,
-        "adapter_type": "process", "run_id": f"drops-ceo-{now}",
+        "adapter_type": "process", "run_id": run_id,
         "iat": now, "exp": now + 172800,
         "iss": "paperclip", "aud": "paperclip-api",
     }, separators=(",", ":"))
@@ -137,24 +137,29 @@ def main():
     api_url    = os.environ.get("PAPERCLIP_API_URL", "http://localhost:3100").rstrip("/")
     agent_id   = os.environ.get("PAPERCLIP_AGENT_ID", "")
     company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
-    run_id     = os.environ.get("PAPERCLIP_RUN_ID", "")
+    run_id     = os.environ.get("PAPERCLIP_RUN_ID", "")  # ← FK a heartbeatRuns, crítico
     issue_id   = os.environ.get("PAPERCLIP_ISSUE_ID", "")
     api_key    = os.environ.get("PAPERCLIP_API_KEY", "")
     jwt_secret = (os.environ.get("PAPERCLIP_AGENT_JWT_SECRET") or
                   os.environ.get("BETTER_AUTH_SECRET", "")).strip()
 
-    print(f"🔍 agent_id={agent_id!r} company_id={company_id!r}", flush=True)
+    print(f"🔍 agent_id={agent_id!r} company_id={company_id!r} run_id={run_id!r}", flush=True)
 
-    # Construir headers de auth
+    # Construir headers de auth — run_id debe ser el PAPERCLIP_RUN_ID real
     headers: dict = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    elif jwt_secret and agent_id:
-        token = make_jwt(agent_id, company_id, jwt_secret)
+    elif jwt_secret and agent_id and run_id:
+        token = make_jwt(agent_id, company_id, run_id, jwt_secret)
         headers["Authorization"] = f"Bearer {token}"
         print("🔑 JWT generado con BETTER_AUTH_SECRET", flush=True)
+    elif jwt_secret and agent_id:
+        # Sin run_id válido — intentar con string vacío (puede fallar en logActivity)
+        token = make_jwt(agent_id, company_id, "", jwt_secret)
+        headers["Authorization"] = f"Bearer {token}"
+        print("⚠️  JWT sin run_id válido", flush=True)
     else:
-        print("⚠️  Sin credenciales — no se podrán crear sub-issues", flush=True)
+        print("⚠️  Sin credenciales", flush=True)
 
     issue_title, issue_body = resolve_issue_context()
     raw   = issue_body if issue_body else (issue_title or "")
