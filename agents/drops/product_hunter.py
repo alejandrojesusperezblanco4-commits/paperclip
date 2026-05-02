@@ -280,7 +280,9 @@ def main():
     lines.append(json.dumps(output_json, indent=2, ensure_ascii=False))
     lines.append("```")
 
-    post_issue_result("\n".join(lines))
+    output = "\n".join(lines)
+    print(output, flush=True)
+    post_issue_result(output)
 
 
 if __name__ == "__main__":
