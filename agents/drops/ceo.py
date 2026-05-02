@@ -42,6 +42,7 @@ AGENT_IDS = {
 
 CEO_AGENT_ID    = "60dd4b7a-4ec3-4555-8e52-807ffcf15a7b"
 DROPS_COMPANY   = "0b4751e7-24e7-4e8b-98e0-5b5ed73b6d7c"
+DROPS_PROJECT   = "7bd04480-4dec-4a12-973f-5a6dd0784bee"
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -89,6 +90,7 @@ def create_sub_issue(title: str, description: str, agent_key: str,
         "title":       title,
         "description": description[:3000],
         "status":      "backlog",
+        "projectId":   DROPS_PROJECT,
     }
     if parent_id:
         payload["parentId"] = parent_id
