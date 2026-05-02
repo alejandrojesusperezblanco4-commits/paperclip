@@ -150,6 +150,41 @@ export async function createApp(
   }
   app.use(llmRoutes(db));
 
+  // ── Debug: test svc.create directly ─────────────────────────────────────────
+  app.get("/api/internal/test-svc-create", async (req, res) => {
+    const secret = (req.query.secret as string) ?? "";
+    const expectedSecret = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!secret || !expectedSecret || secret !== expectedSecret) {
+      res.status(403).json({ error: "forbidden" }); return;
+    }
+    const companyId = (req.query.companyId as string) ?? "";
+    const agentId   = (req.query.agentId as string) ?? "";
+    if (!companyId || !agentId) {
+      res.status(400).json({ error: "companyId and agentId required" }); return;
+    }
+    try {
+      // Simulate what the issues route does with an agent JWT actor
+      const { createIssuesService } = await import("./services/issues.js");
+      const { createInstanceSettingsService } = await import("./services/instance-settings.js");
+      const { createGoalsService } = await import("./services/goals.js");
+      const instanceSettings = createInstanceSettingsService(db);
+      const goals = createGoalsService(db);
+      const svc = createIssuesService(db, {} as any, instanceSettings, goals, {} as any);
+      const issue = await svc.create(companyId, {
+        title:            "Debug test issue",
+        status:           "backlog",
+        createdByAgentId: agentId,
+        createdByUserId:  null,
+      } as any);
+      res.json({ ok: true, issue: { id: issue.id, identifier: issue.identifier } });
+    } catch (err: unknown) {
+      res.status(500).json({
+        error:   err instanceof Error ? err.message : String(err),
+        stack:   err instanceof Error ? err.stack?.slice(0, 1000) : undefined,
+      });
+    }
+  });
+
   // ── Diagnostic: list projects for a company ──────────────────────────────────
   app.get("/api/internal/list-projects", async (req, res) => {
     const secret = (req.query.secret as string) ?? "";
