@@ -81,7 +81,7 @@ def create_sub_issue(title: str, description: str, agent_key: str,
     agent_id = AGENT_IDS.get(agent_key, "")
     payload  = {
         "title":    title,
-        "status":   "backlog",
+        "status":   "in_progress",  # "backlog" no dispara wakeup del agente
         "parentId": parent_id,
     }
     if description:
