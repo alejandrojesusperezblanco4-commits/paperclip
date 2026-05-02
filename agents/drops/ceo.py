@@ -85,18 +85,30 @@ def api(method: str, path: str, payload, headers: dict):
 def create_sub_issue(title: str, description: str, agent_key: str,
                      parent_id: str, headers: dict) -> str | None:
     agent_id = AGENT_IDS.get(agent_key, "")
-    payload  = {
+    payload: dict = {
         "title":       title,
-        "description": description[:4000],
+        "description": description[:3000],
         "status":      "backlog",
-        "parentId":    parent_id,
     }
+    if parent_id:
+        payload["parentId"] = parent_id
     if agent_id:
         payload["assigneeAgentId"] = agent_id
+
     result = api("POST", f"/api/companies/{DROPS_COMPANY}/issues", payload, headers)
     issue_id = (result or {}).get("id")
+
+    # Fallback: intentar sin parentId si falla
+    if not issue_id and parent_id:
+        print(f"  ⚠️  Retry sin parentId...", flush=True)
+        payload.pop("parentId", None)
+        result   = api("POST", f"/api/companies/{DROPS_COMPANY}/issues", payload, headers)
+        issue_id = (result or {}).get("id")
+
     if issue_id:
-        print(f"  ✅ Sub-issue '{title}' → {issue_id}", flush=True)
+        print(f"  ✅ Issue '{title}' → {issue_id}", flush=True)
+    else:
+        print(f"  ❌ No se pudo crear issue '{title}': {result}", flush=True)
     return issue_id
 
 
