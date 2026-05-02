@@ -16,6 +16,28 @@ import subprocess
 import re
 from pathlib import Path
 
+
+def extract_json_block(text: str) -> str:
+    """Extrae el primer bloque JSON válido de un texto markdown."""
+    # Intentar ```json block primero
+    if "```json" in text:
+        for block in text.split("```json")[1:]:
+            candidate = block.split("```")[0].strip()
+            try:
+                json.loads(candidate)
+                return candidate
+            except Exception:
+                continue
+    # Intentar JSON inline
+    m = re.search(r'\{[\s\S]*?"(?:products|candidates|leads|qualified)"[\s\S]*?\}(?:\s*$)', text)
+    if m:
+        try:
+            json.loads(m.group(0))
+            return m.group(0)
+        except Exception:
+            pass
+    return text
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from api_client import post_issue_result, post_issue_comment, resolve_issue_context
 
@@ -99,7 +121,19 @@ def main():
 
     # ── PASO 3: Lead Qualifier ────────────────────────────────────────────────
     post_issue_comment("🎯 **Paso 3/5** — Calificando y puntuando productos...")
-    combined         = f"{hunter_result}\n\n---AD SPY---\n{spy_result}"
+    # Extraer solo el JSON de cada output para el qualifier
+    hunter_json = extract_json_block(hunter_result)
+    spy_json    = extract_json_block(spy_result) if spy_result else ""
+    try:
+        h_data = json.loads(hunter_json)
+        s_data = json.loads(spy_json) if spy_json else {}
+        combined = json.dumps({
+            "products":   h_data.get("products", []),
+            "ad_results": s_data.get("results", []),
+            "niche":      h_data.get("niche", niche),
+        }, ensure_ascii=False)
+    except Exception:
+        combined = hunter_json
     qualifier_result = run_agent("lead_qualifier.py", combined, timeout=180)
 
     if not qualifier_result:
@@ -114,12 +148,12 @@ def main():
 
     # ── PASO 4: Web Designer ──────────────────────────────────────────────────
     post_issue_comment("🎨 **Paso 4/5** — Generando estructura landing Shopify...")
-    web_result = run_agent("web_designer.py", qualifier_result, timeout=180)
+    qualifier_json = extract_json_block(qualifier_result)
+    web_result     = run_agent("web_designer.py", qualifier_json, timeout=180)
 
     # ── PASO 5: Marketing Creator ─────────────────────────────────────────────
     post_issue_comment("📣 **Paso 5/5** — Generando copy, scripts y emails...")
-    marketing_input  = f"{qualifier_result}\n\n---WEB---\n{web_result or ''}"
-    marketing_result = run_agent("marketing_creator.py", marketing_input, timeout=180)
+    marketing_result = run_agent("marketing_creator.py", qualifier_json, timeout=180)
 
     # ── Resumen final ─────────────────────────────────────────────────────────
     # Extraer top producto
