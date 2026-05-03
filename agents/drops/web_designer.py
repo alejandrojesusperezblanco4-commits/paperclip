@@ -95,9 +95,12 @@ def main():
 
     issue_title, issue_body = resolve_issue_context()
     raw     = issue_body if issue_body else (issue_title or "")
-    print(f"  📥 Raw input ({len(raw)} chars): {raw[:200]}...", flush=True)
+    print(f"  📥 Raw input ({len(raw)} chars): {raw[:300]}...", flush=True)
+    print(f"  📥 Starts with {{: {raw.strip().startswith('{')}", flush=True)
+    print(f"  📥 Has ```json: {'```json' in raw}", flush=True)
 
     product = extract_top_product(raw)
+    print(f"  📥 Product extracted: name='{product.get('name','?')[:60]}' score={product.get('score','?')}", flush=True)
     name    = product.get("name", "")
 
     # Si no hay datos del producto, generarlos con LLM a partir del nicho
@@ -194,7 +197,7 @@ Devuelve SOLO el HTML completo, sin explicaciones."""
                 {"role": "system", "content": HTML_SYSTEM},
                 {"role": "user", "content": html_prompt}
             ],
-            api_key=api_key, max_tokens=4000, temperature=0.5,
+            api_key=api_key, max_tokens=8000, temperature=0.5,
             title="DiscontrolDrops - Web Designer (HTML)",
             model="anthropic/claude-sonnet-4-5", timeout=60, retries=1,
         )
