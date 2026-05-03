@@ -95,54 +95,52 @@ def check_youtube(keyword: str) -> dict:
 # ── Amazon ────────────────────────────────────────────────────────────────────
 
 def check_amazon(keyword: str) -> dict:
-    """Busca el producto en Amazon ES para ver competencia y demanda."""
-    try:
-        query = urllib.parse.quote(keyword)
-        url   = f"https://www.amazon.es/s?k={query}&ref=nb_sb_noss"
-        req   = urllib.request.Request(url, headers={
-            **BROWSER_HEADERS,
-            "Accept-Language": "es-ES,es;q=0.9",
-        }, method="GET")
-        with urllib.request.urlopen(req, timeout=12) as r:
-            html = r.read().decode("utf-8", errors="replace")
+    """Busca el producto en Amazon ES. Fallback a Amazon.com si ES falla."""
+    urls = [
+        f"https://www.amazon.es/s?k={urllib.parse.quote(keyword)}",
+        f"https://www.amazon.com/s?k={urllib.parse.quote(keyword)}",
+    ]
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={
+                **BROWSER_HEADERS,
+                "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+                "Cache-Control": "no-cache",
+            }, method="GET")
+            with urllib.request.urlopen(req, timeout=15) as r:
+                html = r.read().decode("utf-8", errors="replace")
 
-        # Contar resultados
-        results_m = re.search(r'(\d[\d\.,]+)\s+results\s+for|(\d[\d\.,]+)\s+resultado', html, re.IGNORECASE)
-        result_count = 0
-        if results_m:
-            num_str = (results_m.group(1) or results_m.group(2) or "0").replace(",", "").replace(".", "")
-            try: result_count = int(num_str)
-            except Exception: pass
+            # Contar resultados
+            result_count = 0
+            results_m = re.search(r'(\d[\d\.,]+)\s+results?\s+for|(\d[\d\.,]+)\s+resultado', html, re.IGNORECASE)
+            if results_m:
+                num_str = (results_m.group(1) or results_m.group(2) or "0").replace(",", "").replace(".", "")
+                try: result_count = int(num_str[:8])
+                except Exception: pass
 
-        # Extraer ratings
-        ratings = re.findall(r'(\d\.\d)\s+out of 5 stars|(\d\.\d)\s+de 5 estrellas', html)[:5]
-        avg_rating = 0.0
-        if ratings:
+            # Si no hay count pero hay productos listados, estimar
+            if result_count == 0:
+                product_hits = len(re.findall(r'data-asin="[A-Z0-9]{10}"', html))
+                result_count = product_hits * 10 if product_hits > 0 else 0
+
+            # Ratings
+            ratings = re.findall(r'(\d\.\d)\s+out of 5|(\d\.\d)\s+de 5', html)[:5]
             vals = [float(r[0] or r[1]) for r in ratings if (r[0] or r[1])]
             avg_rating = round(sum(vals) / len(vals), 1) if vals else 0.0
 
-        # Extraer precios para validar margen
-        prices = re.findall(r'(\d+[,\.]\d+)\s*€|€\s*(\d+[,\.]\d+)', html)[:5]
-        price_vals = []
-        for p in prices:
-            try:
-                price_vals.append(float((p[0] or p[1]).replace(",", ".")))
-            except Exception:
-                pass
-        avg_price = round(sum(price_vals) / len(price_vals), 2) if price_vals else 0.0
+            competition = "High" if result_count > 5000 else "Med" if result_count > 500 else "Low"
+            return {
+                "result_count": result_count,
+                "avg_rating":   avg_rating,
+                "competition":  competition,
+                "has_market":   result_count > 30 or len(vals) > 0,
+                "available":    True,
+            }
+        except Exception as e:
+            print(f"  ⚠️  Amazon error ({url[:30]}): {e}", flush=True)
+            continue
 
-        competition = "High" if result_count > 5000 else "Med" if result_count > 500 else "Low"
-
-        return {
-            "result_count":  result_count,
-            "avg_rating":    avg_rating,
-            "avg_price_eur": avg_price,
-            "competition":   competition,
-            "has_market":    result_count > 50,
-        }
-    except Exception as e:
-        print(f"  ⚠️  Amazon error: {e}", flush=True)
-        return {"result_count": 0, "avg_rating": 0, "avg_price_eur": 0, "competition": "Unknown", "has_market": False}
+    return {"result_count": 0, "avg_rating": 0, "competition": "Unknown", "has_market": False, "available": False}
 
 
 # ── Google Shopping ───────────────────────────────────────────────────────────
@@ -176,16 +174,32 @@ def check_google_shopping(keyword: str) -> dict:
 
 def calculate_evidence_score(trends: dict, youtube: dict,
                               amazon: dict, shopping: dict) -> int:
-    """Score 0-100 basado en evidencia de demanda real."""
+    """Score 0-100 basado en evidencia de demanda real.
+    Si Amazon no está disponible, redistribuye su peso a otras fuentes."""
     score = 0
-    if trends.get("trending"):           score += 15
-    if youtube.get("has_demand"):        score += 25
-    if youtube.get("relevant_videos", 0) >= 5: score += 10
-    if amazon.get("has_market"):         score += 20
-    if amazon.get("avg_rating", 0) >= 4.0: score += 10
-    if amazon.get("competition") == "Low":  score += 10
-    elif amazon.get("competition") == "Med": score += 5
-    if shopping.get("validated"):        score += 10
+    amazon_available = amazon.get("available", True)
+
+    # YouTube — señal más fiable (demanda orgánica real)
+    if youtube.get("has_demand"):             score += 30
+    if youtube.get("relevant_videos", 0) >= 5: score += 15
+
+    # Google Trends
+    if trends.get("trending"):                score += 20
+
+    # Amazon (si está disponible)
+    if amazon_available:
+        if amazon.get("has_market"):          score += 15
+        if amazon.get("avg_rating", 0) >= 4.0: score += 5
+        if amazon.get("competition") == "Low":  score += 10
+        elif amazon.get("competition") == "Med": score += 5
+    else:
+        # Sin Amazon: Shopping vale más
+        if shopping.get("validated"):          score += 10
+
+    # Google Shopping
+    if shopping.get("validated"):             score += 15
+    if shopping.get("has_paid_ads"):          score += 5
+
     return min(score, 100)
 
 
