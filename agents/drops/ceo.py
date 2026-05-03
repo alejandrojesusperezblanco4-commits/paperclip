@@ -22,6 +22,29 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
+
+def extract_json_block(text: str, key: str = "") -> str:
+    """Extrae el primer bloque JSON válido de un texto markdown."""
+    if "```json" in text:
+        for block in text.split("```json")[1:]:
+            candidate = block.split("```")[0].strip()
+            try:
+                data = json.loads(candidate)
+                if not key or key in data:
+                    return candidate
+            except Exception:
+                continue
+    # Buscar JSON con la clave buscada
+    pattern = r'\{[\s\S]*?"' + (key or r'\w+') + r'"[\s\S]*?\}'
+    m = re.search(pattern, text)
+    if m:
+        try:
+            json.loads(m.group(0))
+            return m.group(0)
+        except Exception:
+            pass
+    return text[:3000]
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from api_client import post_issue_result, post_issue_comment, resolve_issue_context
 
@@ -186,19 +209,35 @@ def main():
         post_issue_result("❌ Product Hunter no completó.")
         return
 
+    # Extraer JSON del Product Hunter para pasar a los siguientes agentes
+    hunter_json = extract_json_block(hunter_result, "products")
+    print(f"  📦 hunter_json: {hunter_json[:100]}...", flush=True)
+
     # ── PASO 2: Ad Spy ────────────────────────────────────────────────────────
     post_issue_comment("🕵️ **Paso 2/5** — Validando demanda en Facebook Ads...")
     spy_id = create_sub_issue(
-        f"Ad Spy: {niche}", hunter_result[:4000],
+        f"Ad Spy: {niche}", hunter_json,
         "ad_spy", issue_id, api_url, company_id, headers
     )
-    spy_result = wait_for_issue(spy_id, api_url, headers, max_wait=180) if spy_id else ""
+    spy_result     = wait_for_issue(spy_id, api_url, headers, max_wait=180) if spy_id else ""
+    spy_json       = extract_json_block(spy_result, "results") if spy_result else ""
+
+    # Combinar hunter + spy para el qualifier
+    try:
+        h = json.loads(hunter_json)
+        s = json.loads(spy_json) if spy_json else {}
+        combined_json = json.dumps({
+            "products":   h.get("products", []),
+            "ad_results": s.get("results", []),
+            "niche":      h.get("niche", niche),
+        }, ensure_ascii=False)
+    except Exception:
+        combined_json = hunter_json
 
     # ── PASO 3: Lead Qualifier ────────────────────────────────────────────────
     post_issue_comment("🎯 **Paso 3/5** — Calificando productos...")
-    qualifier_desc = hunter_result[:4000]
-    qualifier_id   = create_sub_issue(
-        f"Qualify: {niche}", qualifier_desc,
+    qualifier_id = create_sub_issue(
+        f"Qualify: {niche}", combined_json,
         "lead_qualifier", issue_id, api_url, company_id, headers
     )
     if not qualifier_id:
@@ -208,11 +247,12 @@ def main():
     if not qualifier_result:
         post_issue_result("❌ Lead Qualifier no completó.")
         return
+    qualifier_json = extract_json_block(qualifier_result, "qualified")
 
     # ── PASO 4: Web Designer ──────────────────────────────────────────────────
     post_issue_comment("🎨 **Paso 4/5** — Generando landing Shopify...")
     web_id     = create_sub_issue(
-        f"Web Design: {niche}", qualifier_result[:4000],
+        f"Web Design: {niche}", qualifier_json,
         "web_designer", issue_id, api_url, company_id, headers
     )
     web_result = wait_for_issue(web_id, api_url, headers, max_wait=180) if web_id else ""
@@ -220,7 +260,7 @@ def main():
     # ── PASO 5: Marketing Creator ─────────────────────────────────────────────
     post_issue_comment("📣 **Paso 5/5** — Generando copy y assets...")
     mkt_id     = create_sub_issue(
-        f"Marketing: {niche}", qualifier_result[:4000],
+        f"Marketing: {niche}", qualifier_json,
         "marketing_creator", issue_id, api_url, company_id, headers
     )
     mkt_result = wait_for_issue(mkt_id, api_url, headers, max_wait=180) if mkt_id else ""
