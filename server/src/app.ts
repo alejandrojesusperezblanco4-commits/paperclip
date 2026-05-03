@@ -277,6 +277,35 @@ export async function createApp(
     }).onConflictDoNothing();
   }
 
+  // ── Landing page previews ────────────────────────────────────────────────────
+  // POST /preview  → saves HTML, returns {id, url}
+  // GET  /preview/:id → serves the HTML
+  const previewStore = new Map<string, string>();
+
+  app.post("/preview", express.text({ type: "text/html", limit: "2mb" }), (req, res) => {
+    const apiKey = process.env.PAPERCLIP_API_KEY ?? "";
+    const auth   = req.headers.authorization ?? "";
+    // Allow internal calls with BETTER_AUTH_SECRET prefix or API key
+    const secret16 = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!auth.includes(secret16) && !auth.includes(apiKey) && apiKey) {
+      res.status(403).json({ error: "forbidden" }); return;
+    }
+    const id  = Math.random().toString(36).slice(2, 10);
+    const html = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
+    previewStore.set(id, html);
+    // Auto-cleanup after 24h
+    setTimeout(() => previewStore.delete(id), 24 * 60 * 60 * 1000);
+    const baseUrl = (process.env.PAPERCLIP_API_URL ?? "https://spirited-charm-production.up.railway.app").replace(/\/$/, "");
+    res.json({ id, url: `${baseUrl}/preview/${id}` });
+  });
+
+  app.get("/preview/:id", (req, res) => {
+    const html = previewStore.get(req.params.id);
+    if (!html) { res.status(404).send("<h1>Preview not found or expired</h1>"); return; }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+  });
+
   // ── Studio sound effects ─────────────────────────────────────────────────────
   app.get("/sounds/:file", (req, res) => {
     const allowed = ["success.m4a", "error.m4a"];
