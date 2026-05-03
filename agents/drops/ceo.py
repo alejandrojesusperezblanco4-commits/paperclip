@@ -98,15 +98,31 @@ def api_request(method: str, url: str, payload, headers: dict):
         return None
 
 
+def get_project_id(api_url: str, company_id: str, headers: dict,
+                   name: str = "product 1") -> str:
+    """Busca el ID de un proyecto por nombre."""
+    try:
+        result = api_request("GET", f"{api_url}/api/companies/{company_id}/projects", None, headers)
+        projects = result if isinstance(result, list) else (result or {}).get("projects", [])
+        for p in projects:
+            if isinstance(p, dict) and name.lower() in p.get("name", "").lower():
+                return p.get("id", "")
+    except Exception as e:
+        print(f"  ⚠️  get_project_id error: {e}", flush=True)
+    return ""
+
+
 def create_sub_issue(title: str, description: str, agent_key: str,
                      parent_id: str, api_url: str, company_id: str,
-                     headers: dict) -> str | None:
+                     headers: dict, project_id: str = "") -> str | None:
     agent_id = AGENT_IDS.get(agent_key, "")
-    payload  = {
+    payload: dict  = {
         "title":    title,
-        "status":   "todo",  # "backlog" no dispara wakeup, "in_progress" causa 409 checkout conflict
+        "status":   "todo",
         "parentId": parent_id,
     }
+    if project_id:
+        payload["projectId"] = project_id
     if description:
         payload["description"] = description[:4000]
     if agent_id:
@@ -188,6 +204,13 @@ def main():
     raw   = issue_body if issue_body else (issue_title or "")
     niche = parse_niche(raw)
 
+    # Buscar proyecto "product 1"
+    project_id = get_project_id(api_url, company_id, headers, "product 1")
+    if project_id:
+        print(f"  📁 Proyecto: product 1 → {project_id}", flush=True)
+    else:
+        print("  ⚠️  Proyecto 'product 1' no encontrado — sin projectId", flush=True)
+
     print(f"🚀 CEO DROPS — Nicho: {niche}", flush=True)
     post_issue_comment(
         f"🚀 **CEO DiscontrolDrops** iniciando para: **{niche}**\n\n"
@@ -199,7 +222,7 @@ def main():
     hunter_desc = json.dumps({"niche": niche, "region": "ES", "limit": 15})
     hunter_id   = create_sub_issue(
         f"Product Hunt: {niche}", hunter_desc,
-        "product_hunter", issue_id, api_url, company_id, headers
+        "product_hunter", issue_id, api_url, company_id, headers, project_id
     )
     if not hunter_id:
         post_issue_result("❌ No se pudo crear issue de Product Hunter.")
@@ -217,7 +240,7 @@ def main():
     post_issue_comment("🕵️ **Paso 2/5** — Validando demanda en Facebook Ads...")
     spy_id = create_sub_issue(
         f"Ad Spy: {niche}", hunter_json,
-        "ad_spy", issue_id, api_url, company_id, headers
+        "ad_spy", issue_id, api_url, company_id, headers, project_id
     )
     spy_result     = wait_for_issue(spy_id, api_url, headers, max_wait=180) if spy_id else ""
     spy_json       = extract_json_block(spy_result, "results") if spy_result else ""
@@ -238,7 +261,7 @@ def main():
     post_issue_comment("🎯 **Paso 3/5** — Calificando productos...")
     qualifier_id = create_sub_issue(
         f"Qualify: {niche}", combined_json,
-        "lead_qualifier", issue_id, api_url, company_id, headers
+        "lead_qualifier", issue_id, api_url, company_id, headers, project_id
     )
     if not qualifier_id:
         post_issue_result("❌ No se pudo crear issue de Lead Qualifier.")
@@ -253,7 +276,7 @@ def main():
     post_issue_comment("🎨 **Paso 4/5** — Generando landing Shopify...")
     web_id     = create_sub_issue(
         f"Web Design: {niche}", qualifier_json,
-        "web_designer", issue_id, api_url, company_id, headers
+        "web_designer", issue_id, api_url, company_id, headers, project_id
     )
     web_result = wait_for_issue(web_id, api_url, headers, max_wait=180) if web_id else ""
 
@@ -261,7 +284,7 @@ def main():
     post_issue_comment("📣 **Paso 5/5** — Generando copy y assets...")
     mkt_id     = create_sub_issue(
         f"Marketing: {niche}", qualifier_json,
-        "marketing_creator", issue_id, api_url, company_id, headers
+        "marketing_creator", issue_id, api_url, company_id, headers, project_id
     )
     mkt_result = wait_for_issue(mkt_id, api_url, headers, max_wait=180) if mkt_id else ""
 

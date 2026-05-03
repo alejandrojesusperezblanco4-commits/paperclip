@@ -61,7 +61,12 @@ def upload_preview(html: str, api_url: str, secret: str) -> str:
 
 def main():
     api_key    = os.environ.get("OPENROUTER_API_KEY", "").strip()
-    api_url    = os.environ.get("PAPERCLIP_API_URL", "http://localhost:3100")
+    # Usar PUBLIC_URL para el preview (no localhost)
+    api_url    = (os.environ.get("PUBLIC_URL") or
+                  os.environ.get("PAPERCLIP_API_URL", "http://localhost:3100")).rstrip("/")
+    # Si sigue siendo localhost, usar la URL pública conocida
+    if "localhost" in api_url or "127.0.0.1" in api_url:
+        api_url = "https://spirited-charm-production.up.railway.app"
     jwt_secret = (os.environ.get("PAPERCLIP_AGENT_JWT_SECRET") or
                   os.environ.get("BETTER_AUTH_SECRET", "")).strip()
 

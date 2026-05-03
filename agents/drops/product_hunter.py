@@ -122,11 +122,15 @@ def enrich_with_llm(raw_products: list, niche: str, api_key: str) -> list:
 
 Analiza estos productos encontrados en tendencias y bestsellers para el nicho: "{niche}"
 
-PRODUCTOS:
+IMPORTANTE: Solo incluye productos DIRECTAMENTE relacionados con el nicho "{niche}".
+Descarta cualquier producto que no encaje con ese nicho aunque aparezca en los datos.
+Si los productos encontrados no son relevantes, genera tú mismo 8 productos ideales para ese nicho.
+
+PRODUCTOS ENCONTRADOS:
 {products_text}
 
-Para cada producto que tenga potencial real de dropshipping, devuelve un análisis.
-Selecciona los 8-10 mejores. Ignora los que no apliquen para dropshipping.
+Para cada producto relevante, devuelve un análisis.
+Selecciona los 8-10 mejores para el nicho "{niche}". Ignora los que no apliquen.
 
 Responde SOLO con JSON válido (sin markdown):
 {{
@@ -203,15 +207,27 @@ def main():
     )
     print(f"🔍 Nicho: '{niche}' | Región: {region}", flush=True)
 
-    # Detectar categoría Amazon del nicho
+    # Detectar categoría Amazon del nicho (incluye términos en español)
     category_map = {
+        # Tech
         "gadget": "gadgets", "electronic": "electronics", "tech": "electronics",
-        "home": "home", "kitchen": "home", "sport": "sports", "fitness": "sports",
-        "pet": "pets", "office": "office", "beauty": "beauty", "cosmetic": "beauty",
-        "toy": "toys", "kid": "toys", "child": "toys",
+        "tecnolog": "electronics",
+        # Home
+        "home": "home", "kitchen": "home", "cocina": "home", "hogar": "home",
+        "oficina": "office", "office": "office",
+        # Sports/Fitness
+        "sport": "sports", "fitness": "sports", "deporte": "sports", "gym": "sports",
+        # Pets
+        "pet": "pets", "mascota": "pets", "perro": "pets", "gato": "pets", "animal": "pets",
+        # Beauty/Personal care
+        "beauty": "beauty", "cosmetic": "beauty", "cuidado": "beauty",
+        "personal care": "beauty", "skincare": "beauty", "makeup": "beauty",
+        "belleza": "beauty", "piel": "beauty", "cabello": "beauty",
+        # Toys/Kids
+        "toy": "toys", "kid": "toys", "child": "toys", "niño": "toys", "juguete": "toys",
     }
     niche_lower = niche.lower()
-    amazon_cat  = next((v for k, v in category_map.items() if k in niche_lower), "electronics")
+    amazon_cat  = next((v for k, v in category_map.items() if k in niche_lower), "beauty")
 
     # Recopilar productos de fuentes
     all_products = []
