@@ -150,6 +150,76 @@ export async function createApp(
   }
   app.use(llmRoutes(db));
 
+  // ── Debug: read comments from a specific issue ───────────────────────────────
+  app.get("/api/internal/read-issue-comments", async (req, res) => {
+    const secret = (req.query.secret as string) ?? "";
+    const expectedSecret = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!secret || !expectedSecret || secret !== expectedSecret) {
+      res.status(403).json({ error: "forbidden" }); return;
+    }
+    const issueId = (req.query.issueId as string) ?? "";
+    if (!issueId) { res.status(400).json({ error: "issueId required" }); return; }
+    try {
+      const { issues: issuesTable, issueComments } = await import("@paperclipai/db");
+      const issue = await (db as any)
+        .select({ id: issuesTable.id, status: issuesTable.status, title: issuesTable.title })
+        .from(issuesTable)
+        .where(eq(issuesTable.id, issueId))
+        .limit(1)
+        .then((r: any[]) => r[0] ?? null);
+
+      const comments = await (db as any)
+        .select()
+        .from(issueComments)
+        .where(eq((issueComments as any).issueId, issueId))
+        .orderBy((issueComments as any).createdAt)
+        .limit(10);
+
+      res.json({
+        issue,
+        commentCount: comments.length,
+        comments: comments.map((c: any) => ({
+          id: c.id,
+          bodyLength: (c.body || "").length,
+          bodyPreview: (c.body || "").slice(0, 200),
+          createdAt: c.createdAt,
+        })),
+        rawFirstComment: comments[0] ? Object.keys(comments[0]) : [],
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // ── Debug: list recent issues in a company ────────────────────────────────────
+  app.get("/api/internal/list-recent-issues", async (req, res) => {
+    const secret = (req.query.secret as string) ?? "";
+    const expectedSecret = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
+    if (!secret || !expectedSecret || secret !== expectedSecret) {
+      res.status(403).json({ error: "forbidden" }); return;
+    }
+    const companyId = (req.query.companyId as string) ?? "";
+    if (!companyId) { res.status(400).json({ error: "companyId required" }); return; }
+    try {
+      const { issues: issuesTable } = await import("@paperclipai/db");
+      const issues = await (db as any)
+        .select({
+          id: issuesTable.id,
+          title: issuesTable.title,
+          status: issuesTable.status,
+          identifier: (issuesTable as any).identifier,
+          createdAt: issuesTable.createdAt,
+        })
+        .from(issuesTable)
+        .where(eq(issuesTable.companyId, companyId))
+        .orderBy((issuesTable as any).createdAt)
+        .limit(20);
+      res.json({ issues: issues.reverse() });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
   // ── Debug: test issue counter + insert transaction ───────────────────────────
   app.get("/api/internal/test-issue-tx", async (req, res) => {
     const secret = (req.query.secret as string) ?? "";
