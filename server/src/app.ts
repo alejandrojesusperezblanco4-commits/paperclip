@@ -282,21 +282,21 @@ export async function createApp(
   // GET  /preview/:id → serves the HTML
   const previewStore = new Map<string, string>();
 
-  app.post("/preview", express.text({ type: "text/html", limit: "2mb" }), (req, res) => {
-    const apiKey = process.env.PAPERCLIP_API_KEY ?? "";
-    const auth   = req.headers.authorization ?? "";
-    // Allow internal calls with BETTER_AUTH_SECRET prefix or API key
-    const secret16 = (process.env.BETTER_AUTH_SECRET ?? "").slice(0, 16);
-    if (!auth.includes(secret16) && !auth.includes(apiKey) && apiKey) {
-      res.status(403).json({ error: "forbidden" }); return;
-    }
-    const id  = Math.random().toString(36).slice(2, 10);
-    const html = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
-    previewStore.set(id, html);
-    // Auto-cleanup after 24h
-    setTimeout(() => previewStore.delete(id), 24 * 60 * 60 * 1000);
-    const baseUrl = (process.env.PAPERCLIP_API_URL ?? "https://spirited-charm-production.up.railway.app").replace(/\/$/, "");
-    res.json({ id, url: `${baseUrl}/preview/${id}` });
+  app.post("/preview", (req, res) => {
+    let html = "";
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      html = Buffer.concat(chunks).toString("utf-8");
+      if (!html) { res.status(400).json({ error: "empty body" }); return; }
+      const id = Math.random().toString(36).slice(2, 10);
+      previewStore.set(id, html);
+      setTimeout(() => previewStore.delete(id), 24 * 60 * 60 * 1000);
+      // Siempre usar la URL pública de Railway, no PAPERCLIP_API_URL (que puede ser localhost)
+      const baseUrl = "https://spirited-charm-production.up.railway.app";
+      res.json({ id, url: `${baseUrl}/preview/${id}` });
+    });
+    req.on("error", (err) => res.status(500).json({ error: String(err) }));
   });
 
   app.get("/preview/:id", (req, res) => {

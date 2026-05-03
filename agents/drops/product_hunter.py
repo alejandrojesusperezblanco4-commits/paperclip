@@ -153,7 +153,7 @@ Responde SOLO con JSON válido (sin markdown):
         response = call_llm(
             messages=[{"role": "user", "content": prompt}],
             api_key     = api_key,
-            max_tokens  = 1500,
+            max_tokens  = 3000,
             temperature = 0.4,
             title       = "DiscontrolDrops - Product Hunter",
             model       = "anthropic/claude-sonnet-4-5",
@@ -237,11 +237,22 @@ def main():
     all_products.extend(amazon_products)
     print(f"  → {len(amazon_products)} productos", flush=True)
 
+    # Google Trends — solo si tiene palabras relevantes al nicho
+    # (evita traer resultados de fútbol, política, etc.)
     print(f"  📈 Google Trends ({region})...", flush=True)
     keywords = niche.split()[:3]
-    trends   = fetch_google_trends(keywords, region)
-    all_products.extend(trends)
-    print(f"  → {len(trends)} tendencias", flush=True)
+    raw_trends = fetch_google_trends(keywords, region)
+    niche_words = set(niche.lower().split())
+    # Filtrar: solo términos que comparten palabras con el nicho o son nombres de productos
+    relevant_trends = [
+        t for t in raw_trends
+        if any(w in t.get("term", "").lower() for w in niche_words)
+        or any(w in t.get("term", "").lower() for w in ["serum", "cream", "gel", "oil", "mask",
+               "shampoo", "conditioner", "lotion", "moisturizer", "cleanser",
+               "mascara", "foundation", "lipstick", "perfume", "fragrance"])
+    ]
+    all_products.extend(relevant_trends)
+    print(f"  → {len(relevant_trends)} tendencias relevantes (de {len(raw_trends)} totales)", flush=True)
 
     if not all_products:
         # Fallback: solo LLM sin datos externos
