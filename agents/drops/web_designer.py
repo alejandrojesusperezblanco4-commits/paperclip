@@ -27,14 +27,33 @@ REGLAS:
 
 
 def extract_top_product(raw: str) -> dict:
-    try:
+    """Extrae el mejor producto del output del Lead Qualifier."""
+    candidates = []
+
+    # 1. Buscar en bloques ```json
+    if "```json" in raw:
         for block in reversed(raw.split("```json")[1:]):
-            try:
-                data = json.loads(block.split("```")[0].strip())
-                if data.get("top_pick"): return data["top_pick"]
-                if data.get("qualified"): return data["qualified"][0]
-            except Exception: continue
-    except Exception: pass
+            candidates.append(block.split("```")[0].strip())
+
+    # 2. Si empieza con { (JSON crudo sin markdown)
+    stripped = raw.strip()
+    if stripped.startswith("{"):
+        candidates.append(stripped)
+
+    # 3. Buscar primer { ... } que contenga "qualified" o "top_pick"
+    import re as _re
+    for m in _re.finditer(r'\{[\s\S]*?"(?:qualified|top_pick)"[\s\S]*?\}(?=\s*$|\s*```)', raw):
+        candidates.append(m.group(0))
+
+    for candidate in candidates:
+        try:
+            data = json.loads(candidate)
+            if data.get("top_pick"):       return data["top_pick"]
+            if data.get("qualified"):      return data["qualified"][0]
+            if data.get("name"):           return data  # ya es un producto directo
+        except Exception:
+            continue
+
     return {"name": raw[:100]}
 
 
