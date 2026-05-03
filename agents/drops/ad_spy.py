@@ -172,33 +172,22 @@ def check_google_shopping(keyword: str) -> dict:
 
 # ── Puntuación de evidencia ───────────────────────────────────────────────────
 
-def calculate_evidence_score(trends: dict, youtube: dict,
-                              amazon: dict, shopping: dict) -> int:
-    """Score 0-100 basado en evidencia de demanda real.
-    Si Amazon no está disponible, redistribuye su peso a otras fuentes."""
+def calculate_evidence_score(trends: dict, youtube: dict, shopping: dict) -> int:
+    """Score 0-100 basado en 3 fuentes fiables (Amazon bloqueado sistemáticamente)."""
     score = 0
-    amazon_available = amazon.get("available", True)
 
-    # YouTube — señal más fiable (demanda orgánica real)
-    if youtube.get("has_demand"):             score += 30
-    if youtube.get("relevant_videos", 0) >= 5: score += 15
+    # YouTube — señal más fuerte (demanda orgánica real)
+    yt_videos = youtube.get("relevant_videos", 0)
+    if youtube.get("has_demand"):   score += 35
+    if yt_videos >= 5:              score += 15
+    elif yt_videos >= 3:            score += 8
 
-    # Google Trends
-    if trends.get("trending"):                score += 20
+    # Google Trends — tendencia de búsqueda
+    if trends.get("trending"):      score += 25
 
-    # Amazon (si está disponible)
-    if amazon_available:
-        if amazon.get("has_market"):          score += 15
-        if amazon.get("avg_rating", 0) >= 4.0: score += 5
-        if amazon.get("competition") == "Low":  score += 10
-        elif amazon.get("competition") == "Med": score += 5
-    else:
-        # Sin Amazon: Shopping vale más
-        if shopping.get("validated"):          score += 10
-
-    # Google Shopping
-    if shopping.get("validated"):             score += 15
-    if shopping.get("has_paid_ads"):          score += 5
+    # Google Shopping — anunciantes activos = producto rentable
+    if shopping.get("validated"):   score += 20
+    if shopping.get("has_paid_ads"): score += 5
 
     return min(score, 100)
 
@@ -238,7 +227,7 @@ def main():
 
     post_issue_comment(
         f"🕵️ Ad Spy validando demanda de **{len(products)} productos**...\n\n"
-        f"Fuentes: Google Trends · YouTube · Amazon ES · Google Shopping"
+        f"Fuentes: Google Trends · YouTube · Google Shopping"
     )
     print(f"🕵️ {len(products)} productos | nicho: {niche}", flush=True)
 
@@ -249,18 +238,16 @@ def main():
 
         trends   = check_google_trends(name)
         youtube  = check_youtube(name)
-        amazon   = check_amazon(name)
         shopping = check_google_shopping(name)
-        score    = calculate_evidence_score(trends, youtube, amazon, shopping)
+        score    = calculate_evidence_score(trends, youtube, shopping)
 
         result = {
             "product":        name,
             "evidence_score": score,
             "validated":      score >= 40,
             "sources": {
-                "google_trends": trends,
-                "youtube":       youtube,
-                "amazon":        amazon,
+                "google_trends":   trends,
+                "youtube":         youtube,
                 "google_shopping": shopping,
             },
         }
@@ -270,7 +257,7 @@ def main():
     results.sort(key=lambda r: r["evidence_score"], reverse=True)
 
     lines = [f"# 🕵️ AD SPY — Validación Multi-Fuente\n"]
-    lines.append(f"**{len(results)} productos analizados** · Fuentes: Google Trends + YouTube + Amazon + Google Shopping\n")
+    lines.append(f"**{len(results)} productos analizados** · Fuentes: Google Trends + YouTube + Google Shopping\n")
 
     for r in results:
         score = r["evidence_score"]
@@ -284,7 +271,6 @@ def main():
         lines.append(f"|---|---|")
         lines.append(f"| 📈 Google Trends | {'🔥 Trending' if s['google_trends']['trending'] else '➡️ Estable'} |")
         lines.append(f"| 📺 YouTube | {s['youtube']['relevant_videos']} videos relevantes {'✅' if s['youtube']['has_demand'] else '⚠️'} |")
-        lines.append(f"| 🛒 Amazon ES | {s['amazon']['result_count']:,} resultados · {s['amazon']['avg_rating']}⭐ · Competencia: {s['amazon']['competition']} |")
         lines.append(f"| 🛍️ Google Shopping | {'✅ Anunciantes activos' if s['google_shopping']['validated'] else '⚠️ Sin anunciantes'} |")
 
         if s['youtube']['sample_titles']:
