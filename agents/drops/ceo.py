@@ -297,19 +297,24 @@ def main():
         post_issue_result("❌ Lead Qualifier no completó.")
         return
     qualifier_json = extract_json_block(qualifier_result, "qualified")
+    print(f"  📦 qualifier_json ({len(qualifier_json)} chars) starts_with_{{: {qualifier_json.strip().startswith('{')}", flush=True)
+
+    # Pasar el resultado completo del qualifier (markdown + JSON) para que
+    # extract_top_product encuentre el producto aunque el JSON esté parcialmente en markdown
+    qualifier_for_agents = qualifier_result[:8000]
 
     # ── PASO 4: Web Designer ──────────────────────────────────────────────────
     post_issue_comment("🎨 **Paso 4/5** — Generando landing Shopify...")
     web_id     = create_sub_issue(
-        f"Web Design: {niche}", qualifier_json,
+        f"Web Design: {niche}", qualifier_for_agents,
         "web_designer", issue_id, api_url, company_id, headers, project_id
     )
-    web_result = wait_for_issue(web_id, api_url, headers, max_wait=180) if web_id else ""
+    web_result = wait_for_issue(web_id, api_url, headers, max_wait=300) if web_id else ""
 
     # ── PASO 5: Marketing Creator ─────────────────────────────────────────────
     post_issue_comment("📣 **Paso 5/5** — Generando copy y assets...")
     mkt_id     = create_sub_issue(
-        f"Marketing: {niche}", qualifier_json,
+        f"Marketing: {niche}", qualifier_for_agents,
         "marketing_creator", issue_id, api_url, company_id, headers, project_id
     )
     mkt_result = wait_for_issue(mkt_id, api_url, headers, max_wait=180) if mkt_id else ""

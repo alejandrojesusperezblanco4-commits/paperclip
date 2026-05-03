@@ -103,6 +103,34 @@ def main():
     print(f"  📥 Product extracted: name='{product.get('name','?')[:60]}' score={product.get('score','?')}", flush=True)
     name    = product.get("name", "")
 
+    # Si no hay JSON pero hay markdown del qualifier, extraer del texto
+    if (not name or name == raw[:100]) and "LAUNCH" in raw or "Score:" in raw:
+        import re as _re2
+        # Buscar nombre del primer producto LAUNCH o TEST en el markdown
+        m_name = _re2.search(r'###\s*🟢.*?(?:LAUNCH.*?)?\s*([\w][\w\s\(\)/áéíóúüñÁÉÍÓÚÜÑ,\-\.]+?)\s*—\s*Score:', raw)
+        if not m_name:
+            m_name = _re2.search(r'###\s*🟡.*?\s*([\w][\w\s\(\)/áéíóúüñÁÉÍÓÚÜÑ,\-\.]+?)\s*—\s*Score:', raw)
+        if m_name:
+            name = m_name.group(1).strip()
+            # Extraer score
+            m_score = _re2.search(r'Score:\s*\*\*(\d+)/100\*\*', raw)
+            if m_score:
+                product["score"] = int(m_score.group(1))
+            # Extraer fortaleza
+            m_str = _re2.search(r'\*\*Fortaleza:\*\*\s*([^\n]+)', raw)
+            if m_str:
+                product["key_strength"] = m_str.group(1).strip()
+            # Extraer hook
+            m_hook = _re2.search(r'\*\*Hook:\*\*\s*["\*]*([^\n"*]+)', raw)
+            if m_hook:
+                product["suggested_hook"] = m_hook.group(1).strip()
+            # Extraer revenue
+            m_rev = _re2.search(r'€([\d,\.]+)', raw)
+            if m_rev:
+                product["suggested_price_eur"] = m_rev.group(1).replace(",", "")
+            product["name"] = name
+            print(f"  📥 Producto extraído del markdown: {name}", flush=True)
+
     # Si no hay datos del producto, generarlos con LLM a partir del nicho
     if not name or name == raw[:100]:
         print("  ⚠️  Sin datos de producto — generando con LLM desde nicho...", flush=True)
