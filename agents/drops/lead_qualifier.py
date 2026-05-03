@@ -101,7 +101,7 @@ Responde SOLO con JSON:
                 {"role": "user",   "content": prompt},
             ],
             api_key     = api_key,
-            max_tokens  = 2000,
+            max_tokens  = 4000,
             temperature = 0.3,
             title       = "DiscontrolDrops - Lead Qualifier",
             model       = "anthropic/claude-sonnet-4-5",
