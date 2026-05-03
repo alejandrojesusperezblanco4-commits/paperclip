@@ -148,13 +148,19 @@ def wait_for_issue(sub_id: str, api_url: str, headers: dict,
         status = (data or {}).get("status", "")
         print(f"  ⏳ {sub_id[:8]}… → {status}", flush=True)
         if status == "done":
-            comments = api_request("GET", f"{api_url}/api/issues/{sub_id}/comments", None, headers)
+            # Pequeña pausa para asegurar que el comentario ya fue escrito
+            time.sleep(2)
+            comments = api_request("GET", f"{api_url}/api/issues/{sub_id}/comments?limit=20", None, headers)
+            print(f"  📨 Comments type: {type(comments).__name__} | value: {str(comments)[:200]}", flush=True)
             if comments:
                 items = (comments if isinstance(comments, list)
                          else comments.get("comments") or comments.get("items") or [])
+                print(f"  📨 {len(items)} comentarios encontrados", flush=True)
                 if items:
                     best = max(items, key=lambda c: len(c.get("body", "") or ""))
-                    return best.get("body", "") or ""
+                    body = best.get("body", "") or ""
+                    print(f"  📨 Mejor comentario: {len(body)} chars — {body[:100]}", flush=True)
+                    return body
             return ""
         if status in ("cancelled", "failed"):
             return ""
