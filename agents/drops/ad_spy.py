@@ -1,15 +1,18 @@
 """
 Agente: Ad Spy — DiscontrolDrops
-Analiza anuncios activos en Facebook Ads Library (completamente público, sin auth).
-Si hay anuncios corriendo durante semanas = el producto está vendiendo.
+Valida demanda de productos usando múltiples fuentes públicas:
+- Google Trends RSS (tendencia de búsqueda)
+- YouTube Search (reviews y unboxings = demanda orgánica)
+- Amazon Search (reseñas, ratings, competencia)
+- Google Shopping (anunciantes activos)
 
-Input (JSON del Product Hunter o texto libre):
+Input (JSON del Product Hunter):
 {
   "products": [...],
-  "niche": "tactical gadgets"
+  "niche": "accesorios bebés"
 }
 
-Output: datos de anuncios activos por producto + insights de copy y creative.
+Output: validación de demanda por producto con score de evidencia.
 """
 import os
 import sys
@@ -17,131 +20,178 @@ import json
 import re
 import urllib.request
 import urllib.parse
+import urllib.error
+import xml.etree.ElementTree as ET
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent))
 from api_client import post_issue_result, post_issue_comment, resolve_issue_context, call_llm
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-FB_ADS_LIBRARY_URL = "https://www.facebook.com/ads/library/api/"
+BROWSER_HEADERS = {
+    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept":          "text/html,application/xhtml+xml,*/*;q=0.9",
+    "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+}
 
 
-def search_fb_ads(query: str, country: str = "ES") -> dict:
-    """
-    Consulta la Facebook Ads Library API (pública, sin auth para datos básicos).
-    Devuelve número de anuncios activos y metadata.
-    """
-    params = {
-        "ad_type":        "ALL",
-        "countries[]":    country,
-        "q":              query,
-        "search_type":    "KEYWORD_UNORDERED",
-        "active_status":  "ACTIVE",
-        "limit":          "20",
-        "fields":         "id,ad_creative_bodies,ad_creative_link_captions,ad_delivery_start_time,page_name,spend",
-    }
-    url = f"{FB_ADS_LIBRARY_URL}?{urllib.parse.urlencode(params, doseq=True)}"
-    headers = {
-        "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept":          "application/json",
-        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-        "Referer":         "https://www.facebook.com/ads/library/",
-    }
-    req = urllib.request.Request(url, headers=headers, method="GET")
+# ── Google Trends ─────────────────────────────────────────────────────────────
+
+def check_google_trends(keyword: str, geo: str = "ES") -> dict:
+    """Comprueba si el keyword está en trending searches."""
     try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            return json.loads(r.read().decode("utf-8"))
+        url = f"https://trends.google.com/trending/rss?geo={geo}"
+        req = urllib.request.Request(url, headers=BROWSER_HEADERS, method="GET")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            xml = r.read().decode("utf-8", errors="replace")
+        root = ET.fromstring(xml)
+        ch   = root.find("channel")
+        terms = []
+        if ch:
+            for item in list(ch.findall("item"))[:20]:
+                title = item.findtext("title", "").strip().lower()
+                terms.append(title)
+        kw_lower = keyword.lower()
+        is_trending = any(
+            any(w in term for w in kw_lower.split() if len(w) > 3)
+            for term in terms
+        )
+        return {"trending": is_trending, "terms_checked": len(terms)}
     except Exception as e:
-        print(f"  ⚠️  FB Ads API error ({query}): {e}", flush=True)
-        return {}
+        print(f"  ⚠️  Google Trends error: {e}", flush=True)
+        return {"trending": False, "terms_checked": 0}
 
 
-def scrape_fb_ads_page(query: str, country: str = "ES") -> dict:
-    """
-    Alternativa: scrape básico de la página web de Ads Library.
-    Extrae número de resultados y anunciantes activos.
-    """
-    url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country={country}&q={urllib.parse.quote(query)}&search_type=keyword_unordered"
-    headers = {
-        "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept":          "text/html,application/xhtml+xml,*/*",
-        "Accept-Language": "es-ES,es;q=0.9",
-    }
-    req = urllib.request.Request(url, headers=headers, method="GET")
+# ── YouTube ───────────────────────────────────────────────────────────────────
+
+def check_youtube(keyword: str) -> dict:
+    """Busca reviews y unboxings en YouTube. Resultados = demanda orgánica."""
     try:
-        with urllib.request.urlopen(req, timeout=15) as r:
+        query   = urllib.parse.quote(f"{keyword} review unboxing opinión")
+        url     = f"https://www.youtube.com/results?search_query={query}&sp=CAISAhAB"  # sorted by upload date
+        req     = urllib.request.Request(url, headers=BROWSER_HEADERS, method="GET")
+        with urllib.request.urlopen(req, timeout=12) as r:
             html = r.read().decode("utf-8", errors="replace")
 
-        # Extraer número de resultados
-        count_match = re.search(r'"total_count":(\d+)', html)
-        count = int(count_match.group(1)) if count_match else 0
+        # Extraer títulos de videos y view counts
+        titles      = re.findall(r'"title":\{"runs":\[{"text":"([^"]{5,80})"', html)[:10]
+        view_counts = re.findall(r'"viewCountText":\{"simpleText":"([^"]+)"', html)[:10]
 
-        # Extraer nombres de páginas anunciantes
-        page_names = re.findall(r'"page_name":"([^"]{2,50})"', html)[:10]
-
-        # Extraer fragmentos de copy
-        bodies = re.findall(r'"ad_creative_bodies":\["([^"]{10,200})"', html)[:5]
-
-        # Extraer fechas de inicio
-        dates = re.findall(r'"ad_delivery_start_time":"([^"]+)"', html)[:5]
+        # Filtrar relevantes al producto
+        kw_words  = [w.lower() for w in keyword.split() if len(w) > 3]
+        relevant  = [t for t in titles if any(w in t.lower() for w in kw_words)]
 
         return {
-            "total_ads": count,
-            "advertisers": list(set(page_names))[:8],
-            "copy_samples": bodies[:3],
-            "oldest_ad_date": min(dates) if dates else "",
+            "total_results":   len(titles),
+            "relevant_videos": len(relevant),
+            "sample_titles":   relevant[:3],
+            "has_demand":      len(relevant) >= 2,
         }
     except Exception as e:
-        print(f"  ⚠️  FB scraping error ({query}): {e}", flush=True)
-        return {"total_ads": 0, "advertisers": [], "copy_samples": [], "oldest_ad_date": ""}
+        print(f"  ⚠️  YouTube error: {e}", flush=True)
+        return {"total_results": 0, "relevant_videos": 0, "sample_titles": [], "has_demand": False}
 
 
-def analyze_ad_signals(product_name: str, ad_data: dict, api_key: str) -> dict:
-    """Usa LLM para interpretar los datos de anuncios y extraer insights."""
-    if not api_key or not ad_data.get("total_ads", 0):
-        return {}
+# ── Amazon ────────────────────────────────────────────────────────────────────
 
-    prompt = f"""Analiza estos datos de Facebook Ads Library para el producto: "{product_name}"
-
-Datos:
-- Anuncios activos: {ad_data.get('total_ads', 0)}
-- Anunciantes: {', '.join(ad_data.get('advertisers', [])[:5]) or 'N/A'}
-- Muestras de copy: {' | '.join(ad_data.get('copy_samples', [])[:2]) or 'N/A'}
-- Anuncio más antiguo activo: {ad_data.get('oldest_ad_date', 'N/A')}
-
-Evalúa:
-1. ¿Está validado este producto? (muchos anuncios activos = alguien está ganando dinero)
-2. ¿Qué ángulo de copy están usando?
-3. ¿Hay oportunidad de diferenciarse?
-
-Responde SOLO con JSON:
-{{
-  "validated": true,
-  "competition_level": "Low|Med|High",
-  "dominant_angle": "el ángulo de copy más común en 1 frase",
-  "differentiation_opportunity": "cómo diferenciarse en 1 frase",
-  "ad_signal": "Strong|Medium|Weak"
-}}"""
-
+def check_amazon(keyword: str) -> dict:
+    """Busca el producto en Amazon ES para ver competencia y demanda."""
     try:
-        response = call_llm(
-            messages=[{"role": "user", "content": prompt}],
-            api_key=api_key, max_tokens=300, temperature=0.3,
-            title="DiscontrolDrops - Ad Spy Analysis",
-            model="anthropic/claude-3-5-haiku", timeout=15, retries=0,
-        )
-        clean = response.strip()
-        if "```json" in clean:
-            clean = clean.split("```json")[1].split("```")[0].strip()
-        elif "```" in clean:
-            clean = clean.split("```")[1].split("```")[0].strip()
-        return json.loads(clean)
-    except Exception:
-        return {}
+        query = urllib.parse.quote(keyword)
+        url   = f"https://www.amazon.es/s?k={query}&ref=nb_sb_noss"
+        req   = urllib.request.Request(url, headers={
+            **BROWSER_HEADERS,
+            "Accept-Language": "es-ES,es;q=0.9",
+        }, method="GET")
+        with urllib.request.urlopen(req, timeout=12) as r:
+            html = r.read().decode("utf-8", errors="replace")
 
+        # Contar resultados
+        results_m = re.search(r'(\d[\d\.,]+)\s+results\s+for|(\d[\d\.,]+)\s+resultado', html, re.IGNORECASE)
+        result_count = 0
+        if results_m:
+            num_str = (results_m.group(1) or results_m.group(2) or "0").replace(",", "").replace(".", "")
+            try: result_count = int(num_str)
+            except Exception: pass
+
+        # Extraer ratings
+        ratings = re.findall(r'(\d\.\d)\s+out of 5 stars|(\d\.\d)\s+de 5 estrellas', html)[:5]
+        avg_rating = 0.0
+        if ratings:
+            vals = [float(r[0] or r[1]) for r in ratings if (r[0] or r[1])]
+            avg_rating = round(sum(vals) / len(vals), 1) if vals else 0.0
+
+        # Extraer precios para validar margen
+        prices = re.findall(r'(\d+[,\.]\d+)\s*€|€\s*(\d+[,\.]\d+)', html)[:5]
+        price_vals = []
+        for p in prices:
+            try:
+                price_vals.append(float((p[0] or p[1]).replace(",", ".")))
+            except Exception:
+                pass
+        avg_price = round(sum(price_vals) / len(price_vals), 2) if price_vals else 0.0
+
+        competition = "High" if result_count > 5000 else "Med" if result_count > 500 else "Low"
+
+        return {
+            "result_count":  result_count,
+            "avg_rating":    avg_rating,
+            "avg_price_eur": avg_price,
+            "competition":   competition,
+            "has_market":    result_count > 50,
+        }
+    except Exception as e:
+        print(f"  ⚠️  Amazon error: {e}", flush=True)
+        return {"result_count": 0, "avg_rating": 0, "avg_price_eur": 0, "competition": "Unknown", "has_market": False}
+
+
+# ── Google Shopping ───────────────────────────────────────────────────────────
+
+def check_google_shopping(keyword: str) -> dict:
+    """Verifica si hay anunciantes en Google Shopping (= producto rentable)."""
+    try:
+        query = urllib.parse.quote(keyword)
+        url   = f"https://www.google.es/search?q={query}&tbm=shop&hl=es"
+        req   = urllib.request.Request(url, headers=BROWSER_HEADERS, method="GET")
+        with urllib.request.urlopen(req, timeout=12) as r:
+            html = r.read().decode("utf-8", errors="replace")
+
+        # Buscar resultados de shopping
+        shop_results  = len(re.findall(r'class="[^"]*sh-dgr__grid-result[^"]*"', html))
+        has_ads       = 'aria-label="Anuncio"' in html or 'aria-label="Ad"' in html or "Patrocinado" in html
+        merchant_count = len(set(re.findall(r'"merchant":"([^"]{2,50})"', html)))
+
+        return {
+            "shopping_results": shop_results,
+            "has_paid_ads":     has_ads,
+            "merchants":        merchant_count,
+            "validated":        shop_results > 3 or has_ads,
+        }
+    except Exception as e:
+        print(f"  ⚠️  Google Shopping error: {e}", flush=True)
+        return {"shopping_results": 0, "has_paid_ads": False, "merchants": 0, "validated": False}
+
+
+# ── Puntuación de evidencia ───────────────────────────────────────────────────
+
+def calculate_evidence_score(trends: dict, youtube: dict,
+                              amazon: dict, shopping: dict) -> int:
+    """Score 0-100 basado en evidencia de demanda real."""
+    score = 0
+    if trends.get("trending"):           score += 15
+    if youtube.get("has_demand"):        score += 25
+    if youtube.get("relevant_videos", 0) >= 5: score += 10
+    if amazon.get("has_market"):         score += 20
+    if amazon.get("avg_rating", 0) >= 4.0: score += 10
+    if amazon.get("competition") == "Low":  score += 10
+    elif amazon.get("competition") == "Med": score += 5
+    if shopping.get("validated"):        score += 10
+    return min(score, 100)
+
+
+# ── Input/Output ──────────────────────────────────────────────────────────────
 
 def extract_input(raw: str) -> tuple:
-    """Extrae productos y nicho del input."""
     json_str = None
     if "```json" in raw:
         json_str = raw.split("```json")[1].split("```")[0].strip()
@@ -149,18 +199,13 @@ def extract_input(raw: str) -> tuple:
         json_str = raw.strip()
     else:
         m = re.search(r'\{[\s\S]*?"products"[\s\S]*?\}', raw)
-        if m:
-            json_str = m.group(0)
-
+        if m: json_str = m.group(0)
     if json_str:
         try:
-            data     = json.loads(json_str)
-            products = data.get("products", [])
-            niche    = data.get("niche", "products")
-            return products, niche
+            data = json.loads(json_str)
+            return data.get("products", []), data.get("niche", "products")
         except Exception:
             pass
-    # Fallback: tratar el texto como query directa
     return [{"name": raw.strip()[:100]}], raw.strip()
 
 
@@ -172,78 +217,75 @@ def main():
     if len(sys.argv) > 1:
         raw = " ".join(sys.argv[1:])
     if not raw:
-        raw = "tactical gadgets dropshipping"
+        raw = "accesorios bebé"
 
     products, niche = extract_input(raw)
-    products = products[:8]  # máximo 8 para no tardar demasiado
+    products = products[:6]  # máximo 6 para no tardar demasiado
 
     post_issue_comment(
-        f"🕵️ Ad Spy analizando **{len(products)} productos** en Facebook Ads Library...\n\n"
-        f"Buscando anuncios activos para validar demanda real."
+        f"🕵️ Ad Spy validando demanda de **{len(products)} productos**...\n\n"
+        f"Fuentes: Google Trends · YouTube · Amazon ES · Google Shopping"
     )
-    print(f"🕵️ Analizando {len(products)} productos en FB Ads Library", flush=True)
+    print(f"🕵️ {len(products)} productos | nicho: {niche}", flush=True)
 
     results = []
     for i, product in enumerate(products):
         name = product.get("name", product.get("term", f"Product {i+1}"))
         print(f"\n  [{i+1}/{len(products)}] {name[:50]}...", flush=True)
 
-        ad_data = scrape_fb_ads_page(name, "ES")
-        insights = analyze_ad_signals(name, ad_data, api_key) if ad_data.get("total_ads", 0) > 0 else {}
+        trends   = check_google_trends(name)
+        youtube  = check_youtube(name)
+        amazon   = check_amazon(name)
+        shopping = check_google_shopping(name)
+        score    = calculate_evidence_score(trends, youtube, amazon, shopping)
 
         result = {
-            "product":      name,
-            "total_ads":    ad_data.get("total_ads", 0),
-            "advertisers":  ad_data.get("advertisers", []),
-            "copy_samples": ad_data.get("copy_samples", []),
-            "oldest_ad":    ad_data.get("oldest_ad_date", ""),
-            "insights":     insights,
-            "validated":    ad_data.get("total_ads", 0) > 5,
+            "product":        name,
+            "evidence_score": score,
+            "validated":      score >= 40,
+            "sources": {
+                "google_trends": trends,
+                "youtube":       youtube,
+                "amazon":        amazon,
+                "google_shopping": shopping,
+            },
         }
         results.append(result)
-        print(f"    → {ad_data.get('total_ads', 0)} anuncios activos | validated: {result['validated']}", flush=True)
+        print(f"    Evidence score: {score}/100 | validated: {result['validated']}", flush=True)
 
-    # Ordenar: más validados primero
-    results.sort(key=lambda r: r["total_ads"], reverse=True)
+    results.sort(key=lambda r: r["evidence_score"], reverse=True)
 
-    lines = [f"# 🕵️ AD SPY — Facebook Ads Library\n"]
-    lines.append(f"**{len(results)} productos analizados** · País: España\n")
+    lines = [f"# 🕵️ AD SPY — Validación Multi-Fuente\n"]
+    lines.append(f"**{len(results)} productos analizados** · Fuentes: Google Trends + YouTube + Amazon + Google Shopping\n")
 
     for r in results:
-        ads = r["total_ads"]
-        signal = r["insights"].get("ad_signal", "Unknown")
-        validated = r["validated"]
+        score = r["evidence_score"]
+        emoji = "🟢" if score >= 60 else "🟡" if score >= 40 else "🔴"
+        badge = "✅ VALIDADO" if r["validated"] else "⚠️ DÉBIL"
+        s     = r["sources"]
 
-        signal_emoji = "🟢" if signal == "Strong" or ads > 20 else "🟡" if signal == "Medium" or ads > 5 else "🔴"
-        valid_badge  = "✅ VALIDADO" if validated else "⚠️ POCO TRÁFICO"
+        lines.append(f"---\n## {emoji} {r['product']}")
+        lines.append(f"**Evidence Score: {score}/100** · {badge}\n")
+        lines.append(f"| Fuente | Resultado |")
+        lines.append(f"|---|---|")
+        lines.append(f"| 📈 Google Trends | {'🔥 Trending' if s['google_trends']['trending'] else '➡️ Estable'} |")
+        lines.append(f"| 📺 YouTube | {s['youtube']['relevant_videos']} videos relevantes {'✅' if s['youtube']['has_demand'] else '⚠️'} |")
+        lines.append(f"| 🛒 Amazon ES | {s['amazon']['result_count']:,} resultados · {s['amazon']['avg_rating']}⭐ · Competencia: {s['amazon']['competition']} |")
+        lines.append(f"| 🛍️ Google Shopping | {'✅ Anunciantes activos' if s['google_shopping']['validated'] else '⚠️ Sin anunciantes'} |")
 
-        lines.append(f"---\n## {signal_emoji} {r['product']}")
-        lines.append(f"**{ads} anuncios activos** · {valid_badge}")
-
-        if r["advertisers"]:
-            lines.append(f"**Anunciantes:** {', '.join(r['advertisers'][:4])}")
-
-        if r["copy_samples"]:
-            lines.append(f"**Copy samples:**")
-            for cs in r["copy_samples"][:2]:
-                lines.append(f"> {cs[:120]}")
-
-        if r["insights"]:
-            ins = r["insights"]
-            if ins.get("dominant_angle"):
-                lines.append(f"**Ángulo dominante:** {ins['dominant_angle']}")
-            if ins.get("differentiation_opportunity"):
-                lines.append(f"**Oportunidad:** {ins['differentiation_opportunity']}")
-
+        if s['youtube']['sample_titles']:
+            lines.append(f"\n**Videos encontrados:**")
+            for t in s['youtube']['sample_titles'][:2]:
+                lines.append(f"- {t}")
         lines.append("")
 
-    output_json = {"results": results, "niche": niche, "total_analyzed": len(results)}
+    output_json = {"results": results, "niche": niche, "total": len(results)}
     lines.append("```json")
     lines.append(json.dumps(output_json, indent=2, ensure_ascii=False))
     lines.append("```")
 
     output = "\n".join(lines)
-    print(output, flush=True)
+    print(output[:300], flush=True)
     post_issue_result(output)
 
 
