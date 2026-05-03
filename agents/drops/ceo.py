@@ -124,7 +124,7 @@ def create_sub_issue(title: str, description: str, agent_key: str,
     if project_id:
         payload["projectId"] = project_id
     if description:
-        payload["description"] = description[:4000]
+        payload["description"] = description[:8000]
     if agent_id:
         payload["assigneeAgentId"] = agent_id
 
@@ -251,16 +251,32 @@ def main():
     spy_result     = wait_for_issue(spy_id, api_url, headers, max_wait=180) if spy_id else ""
     spy_json       = extract_json_block(spy_result, "results") if spy_result else ""
 
-    # Combinar hunter + spy para el qualifier
+    # Combinar hunter + spy — reducir a campos esenciales para caber en 4000 chars
     try:
         h = json.loads(hunter_json)
         s = json.loads(spy_json) if spy_json else {}
+        # Reducir cada producto a campos clave solamente
+        slim_products = [
+            {
+                "name":               p.get("name", ""),
+                "score":              p.get("score", 0),
+                "est_margin_pct":     p.get("est_margin_pct", 0),
+                "competition":        p.get("competition", ""),
+                "suggested_price_eur": p.get("suggested_price_eur", 0),
+                "supplier_est_cost_eur": p.get("supplier_est_cost_eur", 0),
+                "why":                p.get("why", "")[:80],
+                "target_audience":    p.get("target_audience", "")[:60],
+            }
+            for p in h.get("products", [])[:10]
+        ]
         combined_json = json.dumps({
-            "products":   h.get("products", []),
-            "ad_results": s.get("results", []),
+            "products":   slim_products,
+            "ad_results": s.get("results", [])[:3],
             "niche":      h.get("niche", niche),
         }, ensure_ascii=False)
-    except Exception:
+        print(f"  📦 combined_json: {len(combined_json)} chars", flush=True)
+    except Exception as e:
+        print(f"  ⚠️  combine error: {e}", flush=True)
         combined_json = hunter_json
 
     # ── PASO 3: Lead Qualifier ────────────────────────────────────────────────
