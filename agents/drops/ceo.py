@@ -157,7 +157,11 @@ def wait_for_issue(sub_id: str, api_url: str, headers: dict,
                          else comments.get("comments") or comments.get("items") or [])
                 print(f"  📨 {len(items)} comentarios encontrados", flush=True)
                 if items:
-                    best = max(items, key=lambda c: len(c.get("body", "") or ""))
+                    # Tomar el comentario más reciente que sea resultado real (no solo progreso)
+                    # Los comentarios vienen en desc order (más reciente primero)
+                    # Filtrar el que tenga más contenido útil
+                    result_comments = [c for c in items if len(c.get("body", "") or "") > 200]
+                    best = result_comments[0] if result_comments else max(items, key=lambda c: len(c.get("body", "") or ""))
                     body = best.get("body", "") or ""
                     print(f"  📨 Mejor comentario: {len(body)} chars — {body[:100]}", flush=True)
                     return body

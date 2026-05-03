@@ -105,7 +105,7 @@ Responde SOLO con JSON:
             temperature = 0.3,
             title       = "DiscontrolDrops - Lead Qualifier",
             model       = "anthropic/claude-sonnet-4-5",
-            timeout     = 30,
+            timeout     = 90,
             retries     = 1,
         )
         clean = response.strip()
@@ -119,7 +119,8 @@ Responde SOLO con JSON:
         qualified.sort(key=lambda x: x.get("final_score", 0), reverse=True)
         return qualified
     except Exception as e:
-        print(f"  ⚠️  Qualification error: {e}", flush=True)
+        print(f"  ⚠️  Qualification error: {type(e).__name__}: {e}", flush=True)
+        print(f"  ⚠️  LLM response was ({len(response) if 'response' in dir() else 0} chars): {response[:200] if 'response' in dir() else 'N/A'}", flush=True)
         return []
 
 
