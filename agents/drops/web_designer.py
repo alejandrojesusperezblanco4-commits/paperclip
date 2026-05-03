@@ -76,14 +76,38 @@ def main():
 
     issue_title, issue_body = resolve_issue_context()
     raw     = issue_body if issue_body else (issue_title or "")
+    print(f"  📥 Raw input ({len(raw)} chars): {raw[:200]}...", flush=True)
+
     product = extract_top_product(raw)
-    name    = product.get("name", "el producto")
-    score   = product.get("score", "?")
-    price   = product.get("suggested_price_eur", "?")
-    margin  = product.get("est_margin_pct", "?")
-    hook    = product.get("suggested_hook", "")
+    name    = product.get("name", "")
+
+    # Si no hay datos del producto, generarlos con LLM a partir del nicho
+    if not name or name == raw[:100]:
+        print("  ⚠️  Sin datos de producto — generando con LLM desde nicho...", flush=True)
+        niche_hint = issue_title or raw[:100] or "producto de dropshipping"
+        try:
+            gen = call_llm(
+                messages=[{"role": "user", "content": f"""Para el nicho "{niche_hint}", genera un producto ganador de dropshipping en España.
+Responde SOLO con JSON:
+{{"name":"nombre exacto","score":78,"suggested_price_eur":29.90,"est_margin_pct":65,"key_strength":"ventaja principal","main_risk":"objeción principal","suggested_hook":"hook en español max 8 palabras","target_audience":"descripción audiencia"}}"""}],
+                api_key=api_key, max_tokens=300, temperature=0.5,
+                title="Web Designer - product gen", model="anthropic/claude-3-5-haiku", timeout=15,
+            )
+            clean = gen.strip()
+            if "```" in clean: clean = clean.split("```")[1].split("```")[0].strip()
+            product = json.loads(clean)
+            name = product.get("name", niche_hint)
+            print(f"  ✅ Producto generado: {name}", flush=True)
+        except Exception as e:
+            print(f"  ⚠️  Product gen error: {e}", flush=True)
+            name = niche_hint
+
+    score    = product.get("score", "?")
+    price    = product.get("suggested_price_eur", "?")
+    margin   = product.get("est_margin_pct", "?")
+    hook     = product.get("suggested_hook", "")
     strength = product.get("key_strength", "")
-    risk    = product.get("main_risk", "")
+    risk     = product.get("main_risk", "")
     audience = product.get("target_audience", "adultos 25-45")
 
     post_issue_comment(
