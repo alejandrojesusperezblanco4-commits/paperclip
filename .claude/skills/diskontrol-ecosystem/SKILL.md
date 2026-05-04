@@ -238,18 +238,18 @@ def make_jwt(agent_id, company_id, run_id, secret):
 
 ## APIs externas activas
 
-| Servicio | Variable | Uso | Estado |
-|---|---|---|---|
-| OpenRouter | OPENROUTER_API_KEY | LLM (Haiku/Sonnet/Perplexity) | ✅ |
-| Higgsfield | HIGGSFIELD_API_KEY | Popcorn + DoP Lite | ✅ |
-| ElevenLabs | ELEVENLABS_API_KEY | TTS narración | ✅ |
-| YouTube Data API | YOUTUBE_API_KEY_DEEP_SEARCH | Trends + canal stats | ✅ (3 keys) |
-| YouTube Data API | YOUTUBE_API_KEY_CHANNEL_ANALYZER | Canal analysis | ✅ |
-| YouTube Data API | YOUTUBE_API_KEY_DIRECTOR | Viral titles | ✅ |
-| Google Maps | GOOGLE_MAPS_API_KEY | Lead Scout | ✅ |
-| TikTok Content | TIKTOK_CLIENT_KEY / SECRET | Auto-publisher | ⏳ App review |
-| TikTok Research | TIKTOK_RESEARCH_CLIENT_KEY | Video data | ⏳ Pendiente |
-| Supabase | SUPABASE_URL / KEY | Content DB | ✅ |
+| Servicio | Uso | Estado |
+|---|---|---|
+| OpenRouter | LLM (Haiku/Sonnet/Perplexity) | ✅ |
+| Higgsfield | Popcorn + DoP Lite | ✅ |
+| ElevenLabs | TTS narración | ✅ |
+| YouTube Data API | Trends + canal stats (3 keys) | ✅ |
+| Google Maps | Lead Scout | ✅ |
+| TikTok Content Posting | Auto-publisher | ⏳ App review |
+| TikTok Research | Video data real | ⏳ Pendiente |
+| Supabase | Content DB | ✅ |
+
+Las variables de entorno están en Railway — no se documentan aquí.
 
 ---
 
