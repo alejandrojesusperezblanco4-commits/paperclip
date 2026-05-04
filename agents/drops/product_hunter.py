@@ -1,16 +1,21 @@
 """
 Agente: Product Hunter — DiscontrolDrops
-Busca productos ganadores para dropshipping usando fuentes públicas:
-- Google Trends RSS (trending searches)
-- Amazon Best Sellers (público, sin auth)
-- AliExpress trending (público)
+Busca productos ganadores para dropshipping usando:
+- YouTube Data API  → videos de reviews/unboxing del nicho (señal de demanda real)
+- Perplexity LLM    → búsqueda web en tiempo real de trending products
+- Google Trends RSS → validación de tendencia por región
+- Amazon.es         → bestsellers como referencia de mercado
 
-Input (desde issue):
+Variables de entorno:
+  OPENROUTER_API_KEY          (LLM + Perplexity)
+  YOUTUBE_API_KEY_DEEP_SEARCH (YouTube Data API v3)
+
+Input (desde issue o CEO):
   "tactical gadgets"
   "home office accessories"
   {"niche": "pet accessories", "region": "ES", "limit": 15}
 
-Output: lista de productos con métricas de tendencia y potencial.
+Output: lista de productos con score, margen estimado y señales de demanda.
 """
 import os
 import sys
@@ -26,138 +31,300 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 BROWSER_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml,*/*",
+    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept":          "text/html,application/xhtml+xml,application/xml,*/*",
     "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
 }
 
+YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3"
 
-def fetch_google_trends(keywords: list, geo: str = "US") -> list:
-    """Obtiene tendencias de Google Trends RSS para validar demanda."""
+
+# ── YouTube Data API ──────────────────────────────────────────────────────────
+
+def fetch_youtube_products(niche: str, yt_key: str, max_results: int = 20) -> list:
+    """
+    Busca videos de reviews/unboxing del nicho en YouTube.
+    Extrae señales de producto de los títulos más vistos.
+    Quota: ~100 units por llamada (search) + 1 unit por video (statistics).
+    """
+    if not yt_key:
+        print("  ⚠️  YOUTUBE_API_KEY_DEEP_SEARCH no configurada", flush=True)
+        return []
+
     results = []
-    for kw in keywords[:3]:
+    queries = [
+        f"{niche} product review",
+        f"{niche} unboxing 2024",
+        f"best {niche} dropshipping",
+        f"{niche} aliexpress find",
+    ]
+
+    seen_titles = set()
+    for query in queries[:2]:  # 2 queries = ~200 units de quota
         try:
-            url = f"https://trends.google.com/trends/explore?q={urllib.parse.quote(kw)}&geo={geo}"
-            # Usar el RSS de trending para contexto
-            rss_url = f"https://trends.google.com/trending/rss?geo={geo}"
-            req     = urllib.request.Request(rss_url, headers=BROWSER_HEADERS, method="GET")
-            with urllib.request.urlopen(req, timeout=10) as r:
-                xml = r.read().decode("utf-8", errors="replace")
-            root = ET.fromstring(xml)
-            ch   = root.find("channel")
-            if ch:
-                for item in list(ch.findall("item"))[:5]:
-                    title = item.findtext("title", "").strip()
-                    if title:
-                        results.append({"term": title, "source": "google_trends", "geo": geo})
+            params = urllib.parse.urlencode({
+                "part":       "snippet",
+                "q":          query,
+                "type":       "video",
+                "order":      "viewCount",
+                "maxResults": max_results // 2,
+                "relevanceLanguage": "es",
+                "key":        yt_key,
+            })
+            url = f"{YOUTUBE_API_URL}/search?{params}"
+            req = urllib.request.Request(url, headers={"Accept": "application/json"}, method="GET")
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read().decode("utf-8"))
+
+            video_ids = [i["id"]["videoId"] for i in data.get("items", []) if i.get("id", {}).get("videoId")]
+
+            # Obtener estadísticas de los videos
+            stats = {}
+            if video_ids:
+                stats_params = urllib.parse.urlencode({
+                    "part": "statistics",
+                    "id":   ",".join(video_ids),
+                    "key":  yt_key,
+                })
+                stats_url = f"{YOUTUBE_API_URL}/videos?{stats_params}"
+                stats_req = urllib.request.Request(stats_url, headers={"Accept": "application/json"}, method="GET")
+                with urllib.request.urlopen(stats_req, timeout=15) as r:
+                    stats_data = json.loads(r.read().decode("utf-8"))
+                for v in stats_data.get("items", []):
+                    stats[v["id"]] = int(v.get("statistics", {}).get("viewCount", 0))
+
+            for item in data.get("items", []):
+                vid_id  = item.get("id", {}).get("videoId", "")
+                snippet = item.get("snippet", {})
+                title   = snippet.get("title", "").strip()
+                channel = snippet.get("channelTitle", "")
+                views   = stats.get(vid_id, 0)
+
+                if title in seen_titles or not title:
+                    continue
+                seen_titles.add(title)
+
+                # Extraer nombre de producto del título (limpiar "review", "unboxing", etc.)
+                product_name = re.sub(
+                    r'\b(review|unboxing|haul|test|vs|2024|2025|amazon|aliexpress|'
+                    r'dropshipping|best|top|cheap|cheap|compra|análisis|opinión)\b',
+                    '', title, flags=re.IGNORECASE
+                ).strip(" -|·:")
+                product_name = re.sub(r'\s+', ' ', product_name).strip()
+
+                if len(product_name) < 5:
+                    product_name = title
+
+                results.append({
+                    "name":        product_name,
+                    "yt_title":    title,
+                    "yt_views":    views,
+                    "yt_channel":  channel,
+                    "source":      "youtube",
+                    "demand_signal": "high" if views > 100_000 else "medium" if views > 10_000 else "low",
+                })
+
         except Exception as e:
-            print(f"  ⚠️  Google Trends error ({kw}): {e}", flush=True)
-    return results
+            print(f"  ⚠️  YouTube API error ({query}): {e}", flush=True)
+
+    # Ordenar por views
+    results.sort(key=lambda x: x.get("yt_views", 0), reverse=True)
+    print(f"  → {len(results)} señales de YouTube", flush=True)
+    return results[:15]
 
 
-def fetch_amazon_bestsellers(category: str = "electronics") -> list:
-    """Scraping básico de Amazon Best Sellers (página pública)."""
-    category_urls = {
-        "electronics":    "https://www.amazon.com/Best-Sellers-Electronics/zgbs/electronics",
-        "gadgets":        "https://www.amazon.com/Best-Sellers-Electronics-Gadgets/zgbs/electronics/9967794011",
-        "home":           "https://www.amazon.com/Best-Sellers-Home-Kitchen/zgbs/kitchen",
-        "sports":         "https://www.amazon.com/Best-Sellers-Sports-Outdoors/zgbs/sporting-goods",
-        "pets":           "https://www.amazon.com/Best-Sellers-Pet-Supplies/zgbs/pet-supplies",
-        "office":         "https://www.amazon.com/Best-Sellers-Office-Products/zgbs/office-products",
-        "beauty":         "https://www.amazon.com/Best-Sellers-Beauty/zgbs/beauty",
-        "toys":           "https://www.amazon.com/Best-Sellers-Toys-Games/zgbs/toys-and-games",
-    }
-    url = category_urls.get(category.lower(), category_urls["electronics"])
-    headers = {**BROWSER_HEADERS, "Accept-Language": "en-US,en;q=0.9"}
+# ── Perplexity research ───────────────────────────────────────────────────────
+
+def fetch_perplexity_products(niche: str, region: str, api_key: str) -> list:
+    """
+    Usa Perplexity via OpenRouter para buscar trending products en tiempo real.
+    Devuelve lista de productos con contexto de mercado actual.
+    """
+    if not api_key:
+        return []
+
+    prompt = f"""Busca los productos más vendidos y con mayor tendencia para dropshipping en el nicho: "{niche}"
+Enfócate en el mercado {region} / Europa.
+
+Criterios:
+- Productos físicos, no digitales
+- Precio de venta entre €15-€150
+- Disponibles en AliExpress o CJ Dropshipping
+- Alta demanda demostrable (reviews, búsquedas, viral en redes)
+- Margen potencial >50%
+
+Lista los 8 mejores productos con:
+- Nombre específico del producto
+- Por qué está en tendencia ahora
+- Precio estimado proveedor y venta
+- Nivel de competencia (bajo/medio/alto)
+
+Sé específico con nombres de productos reales, no categorías generales."""
+
     try:
-        req = urllib.request.Request(url, headers=headers, method="GET")
-        with urllib.request.urlopen(req, timeout=15) as r:
-            html = r.read().decode("utf-8", errors="replace")
-
-        # Extraer nombres de productos del HTML
+        response = call_llm(
+            messages=[{"role": "user", "content": prompt}],
+            api_key     = api_key,
+            max_tokens  = 1500,
+            temperature = 0.3,
+            title       = "ProductHunter-Perplexity",
+            model       = "perplexity/sonar",
+            timeout     = 30,
+            retries     = 1,
+        )
+        # Extraer nombres de productos del texto
         products = []
-        # Amazon usa data-component-type="s-search-result" o similar
-        patterns = [
-            r'<span class="a-size-medium[^"]*"[^>]*>([^<]{10,80})</span>',
-            r'<span class="a-size-base-plus[^"]*"[^>]*>([^<]{10,80})</span>',
-            r'"title":"([^"]{10,80})"',
-            r'<div class="_cDEzb_p13n-sc-css-line-clamp[^>]*>([^<]{10,80})<',
-        ]
-        seen = set()
-        for pat in patterns:
-            for m in re.findall(pat, html):
-                clean = m.strip()
-                if clean and clean not in seen and len(clean) > 10:
-                    seen.add(clean)
-                    products.append({"name": clean, "source": "amazon_bestsellers", "category": category})
-                if len(products) >= 15:
-                    break
-            if len(products) >= 15:
-                break
-
-        return products[:15]
+        lines = response.split("\n")
+        for line in lines:
+            line = line.strip()
+            # Detectar líneas que parecen nombres de producto (numeradas o con bullet)
+            m = re.match(r'^[\d\-\*•·]+\.?\s*\*{0,2}([^:*\n]{8,60})\*{0,2}', line)
+            if m:
+                name = m.group(1).strip()
+                if name and not any(w in name.lower() for w in ["por qué", "precio", "margen", "competencia", "conclusión"]):
+                    products.append({"name": name, "source": "perplexity", "raw_context": response[:500]})
+        print(f"  → {len(products)} productos de Perplexity", flush=True)
+        return products[:8]
     except Exception as e:
-        print(f"  ⚠️  Amazon scraping error: {e}", flush=True)
+        print(f"  ⚠️  Perplexity error: {e}", flush=True)
         return []
 
 
-def enrich_with_llm(raw_products: list, niche: str, api_key: str) -> list:
+# ── Google Trends RSS ─────────────────────────────────────────────────────────
+
+def fetch_google_trends(geo: str = "ES") -> list:
+    """Obtiene trending searches de Google para contexto de mercado."""
+    try:
+        rss_url = f"https://trends.google.com/trending/rss?geo={geo}"
+        req     = urllib.request.Request(rss_url, headers=BROWSER_HEADERS, method="GET")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            xml = r.read().decode("utf-8", errors="replace")
+        root = ET.fromstring(xml)
+        ch   = root.find("channel")
+        results = []
+        if ch:
+            for item in list(ch.findall("item"))[:10]:
+                title = item.findtext("title", "").strip()
+                if title:
+                    results.append({"term": title, "source": "google_trends_rss"})
+        print(f"  → {len(results)} trending searches", flush=True)
+        return results
+    except Exception as e:
+        print(f"  ⚠️  Google Trends error: {e}", flush=True)
+        return []
+
+
+# ── Amazon.es scraping ────────────────────────────────────────────────────────
+
+def fetch_amazon_es(category: str = "electronics") -> list:
+    """Scraping Amazon.es Best Sellers (más permisivo que .com para España)."""
+    category_urls = {
+        "electronics": "https://www.amazon.es/gp/bestsellers/electronics",
+        "gadgets":     "https://www.amazon.es/gp/bestsellers/electronics/937757031",
+        "home":        "https://www.amazon.es/gp/bestsellers/kitchen",
+        "sports":      "https://www.amazon.es/gp/bestsellers/sports",
+        "pets":        "https://www.amazon.es/gp/bestsellers/pet-supplies",
+        "beauty":      "https://www.amazon.es/gp/bestsellers/beauty",
+        "office":      "https://www.amazon.es/gp/bestsellers/office-products",
+        "toys":        "https://www.amazon.es/gp/bestsellers/toys",
+    }
+    url = category_urls.get(category.lower(), category_urls["electronics"])
+    try:
+        req = urllib.request.Request(url, headers=BROWSER_HEADERS, method="GET")
+        with urllib.request.urlopen(req, timeout=15) as r:
+            html = r.read().decode("utf-8", errors="replace")
+
+        products = []
+        seen     = set()
+        patterns = [
+            r'<span class="_cDEzb_p13n-sc-css-line-clamp[^>]*>([^<]{10,80})<',
+            r'"title":"([^"]{10,80})"',
+            r'<span class="a-size-base-plus[^"]*"[^>]*>([^<]{10,80})</span>',
+            r'<span class="a-size-medium[^"]*"[^>]*>([^<]{10,80})</span>',
+        ]
+        for pat in patterns:
+            for m in re.findall(pat, html):
+                clean = m.strip()
+                if clean and clean not in seen and len(clean) > 8:
+                    seen.add(clean)
+                    products.append({"name": clean, "source": "amazon_es", "category": category})
+                if len(products) >= 12:
+                    break
+            if len(products) >= 12:
+                break
+
+        print(f"  → {len(products)} productos Amazon.es", flush=True)
+        return products
+    except Exception as e:
+        print(f"  ⚠️  Amazon.es error: {e}", flush=True)
+        return []
+
+
+# ── LLM enrichment ───────────────────────────────────────────────────────────
+
+def enrich_with_llm(raw_products: list, niche: str, yt_signals: list, api_key: str) -> list:
     """
-    Usa LLM para analizar los productos encontrados y estimar:
-    - Potencial de dropshipping (1-10)
-    - Margen estimado (%)
-    - Competencia (Low/Med/High)
-    - Precio de venta sugerido
-    - Por qué podría funcionar
+    Analiza todos los productos y señales de YouTube para generar el ranking final.
+    Devuelve los 8-10 mejores con métricas de dropshipping.
     """
-    if not raw_products or not api_key:
+    if not api_key:
         return raw_products
 
+    # Preparar contexto de YouTube (los más vistos)
+    yt_context = ""
+    if yt_signals:
+        top_yt = yt_signals[:5]
+        yt_context = "\nSEÑALES DE YOUTUBE (productos con más visualizaciones):\n" + "\n".join(
+            f"- {p['name']} ({p.get('yt_views', 0):,} views, demanda: {p.get('demand_signal', '?')})"
+            for p in top_yt
+        )
+
     products_text = "\n".join(
-        f"- {p.get('name', p.get('term', '?'))} ({p.get('source', '')})"
-        for p in raw_products[:20]
+        f"- {p.get('name', p.get('term', '?'))} [{p.get('source', '')}]"
+        for p in raw_products[:25]
     )
 
-    prompt = f"""Eres un experto en dropshipping con Shopify y conocimiento profundo del mercado español/europeo.
+    prompt = f"""Eres un experto en dropshipping con Shopify, especialista en el mercado español y europeo.
 
-Analiza estos productos encontrados en tendencias y bestsellers para el nicho: "{niche}"
+NICHO OBJETIVO: "{niche}"
+{yt_context}
 
-IMPORTANTE: Solo incluye productos DIRECTAMENTE relacionados con el nicho "{niche}".
-Descarta cualquier producto que no encaje con ese nicho aunque aparezca en los datos.
-Si los productos encontrados no son relevantes, genera tú mismo 8 productos ideales para ese nicho.
-
-PRODUCTOS ENCONTRADOS:
+PRODUCTOS ENCONTRADOS EN FUENTES:
 {products_text}
 
-Para cada producto relevante, devuelve un análisis.
-Selecciona los 8-10 mejores para el nicho "{niche}". Ignora los que no apliquen.
+TAREA: Selecciona y analiza los 8 mejores productos para dropshipping en este nicho.
+Prioriza productos con señales fuertes de YouTube (alta demanda demostrada).
+Si los datos no son relevantes al nicho, genera tú mismo los 8 mejores productos para "{niche}".
+
+Para cada producto devuelve métricas realistas basadas en el mercado ES/EU 2024-2025.
 
 Responde SOLO con JSON válido (sin markdown):
 {{
   "products": [
     {{
-      "name": "nombre del producto",
+      "name": "nombre específico del producto",
       "score": 85,
       "est_margin_pct": 65,
       "competition": "Low|Med|High",
       "suggested_price_eur": 39.99,
       "supplier_est_cost_eur": 8.50,
-      "why": "razón concisa de por qué funciona (1 frase)",
-      "target_audience": "descripción del comprador",
-      "source": "amazon_bestsellers|google_trends|manual"
+      "why": "razón concisa de por qué funciona en España/EU ahora (1 frase)",
+      "target_audience": "descripción del comprador ideal",
+      "yt_demand": "high|medium|low|unknown",
+      "source": "youtube|amazon_es|perplexity|manual"
     }}
   ]
 }}"""
 
     try:
         response = call_llm(
-            messages=[{"role": "user", "content": prompt}],
+            messages    = [{"role": "user", "content": prompt}],
             api_key     = api_key,
             max_tokens  = 3000,
             temperature = 0.4,
-            title       = "DiscontrolDrops - Product Hunter",
-            model       = "anthropic/claude-sonnet-4-5",
-            timeout     = 30,
+            title       = "DiscontrolDrops-ProductHunter",
+            model       = "anthropic/claude-3-5-haiku",
+            timeout     = 45,
             retries     = 1,
         )
         clean = response.strip()
@@ -171,6 +338,8 @@ Responde SOLO con JSON válido (sin markdown):
         print(f"  ⚠️  LLM enrichment error: {e}", flush=True)
         return raw_products
 
+
+# ── Input parser ──────────────────────────────────────────────────────────────
 
 def parse_input(raw: str) -> dict:
     m = re.search(r'\{[\s\S]*?\}', raw)
@@ -187,8 +356,27 @@ def parse_input(raw: str) -> dict:
     return {"niche": raw.strip() or "trending products", "region": "ES", "limit": 15}
 
 
+def get_amazon_category(niche: str) -> str:
+    niche_lower = niche.lower()
+    category_map = {
+        "gadget": "gadgets", "electronic": "electronics", "tech": "electronics",
+        "tecnolog": "electronics",
+        "home": "home", "kitchen": "home", "cocina": "home", "hogar": "home",
+        "oficina": "office", "office": "office",
+        "sport": "sports", "fitness": "sports", "deporte": "sports", "gym": "sports",
+        "pet": "pets", "mascota": "pets", "perro": "pets", "gato": "pets",
+        "beauty": "beauty", "cosmetic": "beauty", "belleza": "beauty",
+        "piel": "beauty", "skincare": "beauty", "cabello": "beauty",
+        "toy": "toys", "kid": "toys", "niño": "toys", "juguete": "toys",
+    }
+    return next((v for k, v in category_map.items() if k in niche_lower), "electronics")
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
 def main():
     api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    yt_key  = os.environ.get("YOUTUBE_API_KEY_DEEP_SEARCH", "").strip()
 
     issue_title, issue_body = resolve_issue_context()
     raw = issue_body if issue_body else (issue_title or "")
@@ -201,66 +389,51 @@ def main():
     niche  = params["niche"]
     region = params["region"]
 
+    sources = []
+    if yt_key:  sources.append("YouTube API")
+    sources += ["Perplexity", "Google Trends", "Amazon.es"]
+
     post_issue_comment(
-        f"🔍 Product Hunter buscando en nicho: **{niche}**\n\n"
-        f"Consultando Amazon Best Sellers + Google Trends + análisis LLM..."
+        f"🔍 **Product Hunter** buscando en nicho: **{niche}**\n\n"
+        f"Fuentes: {' · '.join(sources)}"
     )
     print(f"🔍 Nicho: '{niche}' | Región: {region}", flush=True)
 
-    # Detectar categoría Amazon del nicho (incluye términos en español)
-    category_map = {
-        # Tech
-        "gadget": "gadgets", "electronic": "electronics", "tech": "electronics",
-        "tecnolog": "electronics",
-        # Home
-        "home": "home", "kitchen": "home", "cocina": "home", "hogar": "home",
-        "oficina": "office", "office": "office",
-        # Sports/Fitness
-        "sport": "sports", "fitness": "sports", "deporte": "sports", "gym": "sports",
-        # Pets
-        "pet": "pets", "mascota": "pets", "perro": "pets", "gato": "pets", "animal": "pets",
-        # Beauty/Personal care
-        "beauty": "beauty", "cosmetic": "beauty", "cuidado": "beauty",
-        "personal care": "beauty", "skincare": "beauty", "makeup": "beauty",
-        "belleza": "beauty", "piel": "beauty", "cabello": "beauty",
-        # Toys/Kids
-        "toy": "toys", "kid": "toys", "child": "toys", "niño": "toys", "juguete": "toys",
-    }
-    niche_lower = niche.lower()
-    amazon_cat  = next((v for k, v in category_map.items() if k in niche_lower), "beauty")
+    # ── Recopilar señales de todas las fuentes ────────────────────────────────
 
-    # Recopilar productos de fuentes
-    all_products = []
+    # 1. YouTube (mejor señal de demanda real)
+    print("\n📺 YouTube Data API...", flush=True)
+    yt_signals = fetch_youtube_products(niche, yt_key) if yt_key else []
 
-    print(f"  📦 Amazon Best Sellers ({amazon_cat})...", flush=True)
-    amazon_products = fetch_amazon_bestsellers(amazon_cat)
-    all_products.extend(amazon_products)
-    print(f"  → {len(amazon_products)} productos", flush=True)
+    # 2. Perplexity (trending en tiempo real)
+    print("\n🔎 Perplexity research...", flush=True)
+    perplexity_products = fetch_perplexity_products(niche, region, api_key)
 
-    # Google Trends — solo si tiene palabras relevantes al nicho
-    # (evita traer resultados de fútbol, política, etc.)
-    print(f"  📈 Google Trends ({region})...", flush=True)
-    keywords = niche.split()[:3]
-    raw_trends = fetch_google_trends(keywords, region)
+    # 3. Google Trends (contexto de búsquedas)
+    print(f"\n📈 Google Trends ({region})...", flush=True)
+    trends = fetch_google_trends(region)
     niche_words = set(niche.lower().split())
-    # Filtrar: solo términos que comparten palabras con el nicho o son nombres de productos
     relevant_trends = [
-        t for t in raw_trends
+        t for t in trends
         if any(w in t.get("term", "").lower() for w in niche_words)
-        or any(w in t.get("term", "").lower() for w in ["serum", "cream", "gel", "oil", "mask",
-               "shampoo", "conditioner", "lotion", "moisturizer", "cleanser",
-               "mascara", "foundation", "lipstick", "perfume", "fragrance"])
     ]
+
+    # 4. Amazon.es
+    print(f"\n🛒 Amazon.es ({get_amazon_category(niche)})...", flush=True)
+    amazon_products = fetch_amazon_es(get_amazon_category(niche))
+
+    # ── Combinar todas las fuentes ────────────────────────────────────────────
+    all_products = []
+    all_products.extend(yt_signals)
+    all_products.extend(perplexity_products)
     all_products.extend(relevant_trends)
-    print(f"  → {len(relevant_trends)} tendencias relevantes (de {len(raw_trends)} totales)", flush=True)
+    all_products.extend(amazon_products)
 
     if not all_products:
-        # Fallback: solo LLM sin datos externos
         all_products = [{"name": niche, "source": "manual"}]
 
-    # Enriquecer con LLM
-    print(f"  🤖 Analizando {len(all_products)} productos con LLM...", flush=True)
-    products = enrich_with_llm(all_products, niche, api_key) if api_key else all_products
+    print(f"\n🤖 Analizando {len(all_products)} señales con LLM...", flush=True)
+    products = enrich_with_llm(all_products, niche, yt_signals, api_key) if api_key else all_products
 
     # Ordenar por score
     if products and isinstance(products[0], dict) and "score" in products[0]:
@@ -268,47 +441,65 @@ def main():
 
     print(f"\n✅ {len(products)} productos analizados", flush=True)
 
-    # Formatear output
+    # ── Formatear output ──────────────────────────────────────────────────────
     lines = [f"# 🔍 PRODUCT HUNTER — {niche.title()}\n"]
-    lines.append(f"**{len(products)} productos encontrados y analizados**\n")
+    lines.append(f"**{len(products)} productos encontrados** | Fuentes: {', '.join(sources)}\n")
 
-    for i, p in enumerate(products[:15], 1):
-        name      = p.get("name", p.get("term", "?"))
-        score     = p.get("score", "?")
-        margin    = p.get("est_margin_pct", "?")
-        comp      = p.get("competition", "?")
-        price     = p.get("suggested_price_eur", "?")
-        cost      = p.get("supplier_est_cost_eur", "?")
-        why       = p.get("why", "")
-        audience  = p.get("target_audience", "")
+    for i, p in enumerate(products[:10], 1):
+        name     = p.get("name", p.get("term", "?"))
+        score    = p.get("score", "?")
+        margin   = p.get("est_margin_pct", "?")
+        comp     = p.get("competition", "?")
+        price    = p.get("suggested_price_eur", "?")
+        cost     = p.get("supplier_est_cost_eur", "?")
+        why      = p.get("why", "")
+        audience = p.get("target_audience", "")
+        yt_dem   = p.get("yt_demand", "unknown")
 
-        score_emoji = "🟢" if isinstance(score, (int,float)) and score >= 75 else "🟡" if isinstance(score, (int,float)) and score >= 50 else "🔴"
-        comp_emoji  = {"Low": "🟢", "Med": "🟡", "High": "🔴"}.get(comp, "⚪")
+        score_emoji = "🟢" if isinstance(score, (int, float)) and score >= 75 else "🟡" if isinstance(score, (int, float)) and score >= 50 else "🔴"
+        comp_emoji  = {"Low": "🟢", "Med": "🟡", "High": "🔴"}.get(str(comp), "⚪")
+        yt_emoji    = {"high": "🔥", "medium": "📈", "low": "📉"}.get(yt_dem, "")
 
         lines.append(f"## {i}. {name}")
-        lines.append(f"- {score_emoji} AI Score: **{score}** | Margen estimado: **{margin}%**")
-        lines.append(f"- {comp_emoji} Competencia: {comp}")
+        lines.append(f"- {score_emoji} Score: **{score}** | Margen: **{margin}%** | {comp_emoji} Competencia: {comp}")
+        if yt_dem != "unknown":
+            lines.append(f"- {yt_emoji} Demanda YouTube: **{yt_dem}**")
         if isinstance(price, (int, float)):
-            lines.append(f"- 💶 Precio venta: €{price} | Coste supplier: €{cost}")
+            lines.append(f"- 💶 Venta: €{price} | Coste: €{cost}")
         if why:
             lines.append(f"- 💡 {why}")
         if audience:
             lines.append(f"- 🎯 {audience}")
         lines.append("")
 
+    # JSON slim para el siguiente agente (Ad Spy / Lead Qualifier)
+    slim_products = [
+        {
+            "name":                p.get("name", ""),
+            "score":               p.get("score", 0),
+            "est_margin_pct":      p.get("est_margin_pct", 0),
+            "competition":         p.get("competition", "Med"),
+            "suggested_price_eur": p.get("suggested_price_eur", 0),
+            "supplier_est_cost_eur": p.get("supplier_est_cost_eur", 0),
+            "why":                 p.get("why", "")[:120],
+            "yt_demand":           p.get("yt_demand", "unknown"),
+        }
+        for p in products[:10]
+    ]
+
     output_json = {
-        "products": products[:15],
+        "products": slim_products,
         "niche":    niche,
         "region":   region,
         "total":    len(products),
-        "source":   "amazon_bestsellers+google_trends+llm",
+        "sources":  sources,
     }
     lines.append("```json")
     lines.append(json.dumps(output_json, indent=2, ensure_ascii=False))
     lines.append("```")
 
     output = "\n".join(lines)
-    print(output, flush=True)
+    print(output[:300], flush=True)
     post_issue_result(output)
 
 
