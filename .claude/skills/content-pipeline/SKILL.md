@@ -1,11 +1,11 @@
 ---
 name: content-pipeline
 description: >
-  Pipeline de generación de contenido viral de Paperclip (Discontrol Historys / historias.en.sombra).
-  Úsala cuando trabajes con los agentes Python, el frontend Studio, el Director,
-  o cualquier integración con Higgsfield / ElevenLabs / OpenRouter.
-  Cubre: arquitectura del pipeline, archivos clave, APIs, patrones de código,
-  despliegue en Railway, problemas conocidos y fixes aplicados.
+  Ecosistema completo de Paperclip en Railway (3 empresas: Discontrol Historys, DiscontrolsBags, DiscontrolDrops).
+  Úsala cuando trabajes con cualquier agente Python, el frontend Studio, el Director,
+  integraciones con Higgsfield/ElevenLabs/OpenRouter/Polymarket, o gestión de empresas en Paperclip.
+  Cubre: arquitectura del pipeline de contenido, sistema de trading Polymarket, agentes de dropshipping,
+  patrones de código, despliegue en Railway, endpoints internos y problemas conocidos.
 ---
 
 # Content Pipeline — Paperclip (Discontrol Historys)
