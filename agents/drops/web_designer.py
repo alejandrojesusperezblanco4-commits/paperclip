@@ -10,7 +10,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 STRUCTURE_SYSTEM = """Eres experto en CRO para Shopify en el mercado español.
 Generas landing pages de alto rendimiento para dropshipping.
-Todo en español, orientado al consumidor español: directo, garantías claras, sin exageraciones."""
+Todo en español, orientado al consumidor español: directo, garantías claras, sin exageraciones.
+Cuando se te proporcionan datos de competidores reales, úsalos como base — replica lo que ya convierte
+y mejóralo con mejor copy y estructura más clara."""
 
 HTML_SYSTEM = """Eres un desarrollador frontend experto en landing pages de Shopify para el mercado español.
 Generas HTML/CSS completo, limpio y visual de una landing page de dropshipping.
@@ -24,6 +26,95 @@ REGLAS:
 - Incluir sección hero, beneficios, reseñas, garantía y CTA final
 - Usar los textos exactos que se te proporcionen
 - Todo en español"""
+
+
+def scrape_competitor_landings(product_name: str, max_pages: int = 3) -> str:
+    """
+    Busca en Google tiendas Shopify que venden el producto y scrapea sus landings.
+    Extrae: headline, estructura, CTAs, precio, badges.
+    Devuelve un resumen de patrones de conversión detectados.
+    """
+    HEADERS = {
+        "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "es-ES,es;q=0.9",
+        "Accept":          "text/html,*/*",
+    }
+
+    # Buscar tiendas Shopify del producto en Google
+    queries = [
+        f'"{product_name}" comprar tienda online España site:*.myshopify.com',
+        f'"{product_name}" comprar "añadir al carrito" -amazon -aliexpress',
+        f'{product_name} dropshipping tienda online "envío gratis"',
+    ]
+
+    competitor_urls = []
+    for query in queries[:2]:
+        try:
+            url = f"https://www.google.es/search?q={urllib.parse.quote(query)}&num=5&hl=es"
+            req = urllib.request.Request(url, headers=HEADERS, method="GET")
+            with urllib.request.urlopen(req, timeout=12) as r:
+                html = r.read().decode("utf-8", errors="replace")
+
+            # Extraer URLs de resultados
+            for m in re.finditer(r'href="(https?://(?!google|youtube|amazon|aliexpress|facebook)[^"]{10,80})"', html):
+                u = m.group(1)
+                if u not in competitor_urls and not any(x in u for x in ["google", "cache:", "translate"]):
+                    competitor_urls.append(u)
+                if len(competitor_urls) >= max_pages * 2:
+                    break
+        except Exception as e:
+            print(f"  ⚠️  Google search error: {e}", flush=True)
+
+    if not competitor_urls:
+        return ""
+
+    print(f"  🌐 Scrapeando {min(len(competitor_urls), max_pages)} páginas de competidores...", flush=True)
+
+    insights = []
+    for url in competitor_urls[:max_pages]:
+        try:
+            req = urllib.request.Request(url, headers=HEADERS, method="GET")
+            with urllib.request.urlopen(req, timeout=10) as r:
+                html = r.read().decode("utf-8", errors="replace")
+
+            # Extraer elementos clave de conversión
+            # 1. Headlines (h1, h2)
+            headlines = re.findall(r'<h[12][^>]*>([^<]{5,120})</h[12]>', html)
+            headlines = [re.sub(r'<[^>]+>', '', h).strip() for h in headlines[:4]]
+
+            # 2. CTAs (botones de compra)
+            ctas = re.findall(r'(?:value|aria-label|class)[^>]*(?:cart|comprar|añadir|buy|checkout)[^>]*>([^<]{3,40})<', html, re.IGNORECASE)
+            ctas += re.findall(r'<button[^>]*>([^<]{3,40})</button>', html)
+            ctas = list(set([c.strip() for c in ctas if len(c.strip()) > 2]))[:5]
+
+            # 3. Precio
+            prices = re.findall(r'(?:€|EUR)\s*(\d+[,.]?\d*)', html)[:3]
+
+            # 4. Badges de confianza
+            trust = re.findall(r'(?:garantía|devolución|envío gratis|pago seguro|días|24h|48h)[^<]{0,60}', html, re.IGNORECASE)[:4]
+
+            # 5. Título de la página
+            title_m = re.search(r'<title>([^<]{5,100})</title>', html)
+            page_title = title_m.group(1).strip() if title_m else ""
+
+            domain = urllib.parse.urlparse(url).netloc
+            insight = f"**{domain}**\n"
+            if page_title:   insight += f"- Título: {page_title[:80]}\n"
+            if headlines:    insight += f"- Headlines: {' | '.join(headlines[:2])}\n"
+            if prices:       insight += f"- Precio: €{prices[0]}\n"
+            if ctas:         insight += f"- CTAs: {', '.join(ctas[:3])}\n"
+            if trust:        insight += f"- Confianza: {' | '.join(trust[:2])}\n"
+
+            insights.append(insight)
+            print(f"  ✅ Scrapeado: {domain}", flush=True)
+
+        except Exception as e:
+            print(f"  ⚠️  Scraping {url[:40]}: {e}", flush=True)
+
+    if not insights:
+        return ""
+
+    return "\n\nCOMPETIDORES REALES ANALIZADOS:\n" + "\n".join(insights)
 
 
 def extract_top_product(raw: str) -> dict:
@@ -161,9 +252,17 @@ Responde SOLO con JSON:
     audience = product.get("target_audience", "adultos 25-45")
 
     post_issue_comment(
-        f"🎨 Web Designer generando landing para: **{name}**\n\n"
-        f"Primero estructura → luego HTML preview visual..."
+        f"🎨 Web Designer analizando competidores y generando landing para: **{name}**\n\n"
+        f"Paso 0: Scraping competidores → Paso 1: Estructura copy → Paso 2: HTML preview"
     )
+
+    # ── PASO 0: Scraping de competidores ─────────────────────────────────────
+    print(f"\n🔍 Buscando competidores para: {name}", flush=True)
+    competitor_context = scrape_competitor_landings(name, max_pages=3)
+    if competitor_context:
+        print(f"  ✅ Contexto de competidores: {len(competitor_context)} chars", flush=True)
+    else:
+        print(f"  ⚠️  Sin datos de competidores — generando desde cero", flush=True)
 
     # ── PASO 1: Generar estructura de copy ────────────────────────────────────
     structure_prompt = f"""Genera la estructura completa de copy para una landing page Shopify:
@@ -174,6 +273,12 @@ Audiencia: {audience}
 Fortaleza: {strength}
 Riesgo a superar: {risk}
 Hook: {hook}
+{competitor_context}
+
+INSTRUCCIONES:
+- Si hay datos de competidores, analiza qué está funcionando (precios, CTAs, headlines)
+- Replica la estructura que ya convierte y mejora el copy
+- Si no hay competidores, usa los frameworks PAS/AIDA
 
 Genera estas secciones con copy real en español:
 1. HERO — headline (máx 8 palabras), subheadline, CTA text, 3 badges de confianza
