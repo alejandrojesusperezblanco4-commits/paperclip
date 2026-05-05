@@ -8,7 +8,19 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent))
 from api_client import post_issue_result, post_issue_comment, resolve_issue_context, call_llm, fetch_skill
 sys.stdout.reconfigure(encoding="utf-8")
 
-DROPS_COMPANY = "0b4751e7-24e7-4e8b-98e0-5b5ed73b6d7c"
+DROPS_COMPANY    = "0b4751e7-24e7-4e8b-98e0-5b5ed73b6d7c"
+REFERENCE_FILE   = __import__("pathlib").Path(__file__).parent / "reference_landings.md"
+
+
+def load_reference_landings() -> str:
+    """Carga el archivo de referencia de landings de alta conversión."""
+    try:
+        content = REFERENCE_FILE.read_text(encoding="utf-8")
+        print(f"  ✅ Reference landings cargado ({len(content)} chars)", flush=True)
+        return content
+    except Exception as e:
+        print(f"  ⚠️  No se pudo cargar reference_landings.md: {e}", flush=True)
+        return ""
 
 STRUCTURE_SYSTEM = """Eres experto en CRO para Shopify en el mercado español.
 Generas landing pages de alto rendimiento para dropshipping.
@@ -258,6 +270,10 @@ Responde SOLO con JSON:
         f"Paso 0: Skills + Competidores → Paso 1: Estructura copy → Paso 2: HTML preview"
     )
 
+    # ── Cargar referencia de landings ─────────────────────────────────────────
+    print("📖 Cargando referencia de landings...", flush=True)
+    reference_context = load_reference_landings()
+
     # ── Fetch skills desde Paperclip ──────────────────────────────────────────
     print("📚 Cargando skills desde Paperclip...", flush=True)
     skill_lp  = fetch_skill("landing-page-copywriter", company_id=DROPS_COMPANY)
@@ -298,6 +314,9 @@ Riesgo a superar: {risk}
 Hook: {hook}
 {competitor_context}
 {skill_context}
+
+--- REFERENCIA DE LANDINGS DE ALTA CONVERSIÓN ($4M-$150M revenue) ---
+{reference_context[:3000]}
 
 INSTRUCCIONES:
 - Si hay datos de competidores, analiza qué está funcionando (precios, CTAs, headlines)
