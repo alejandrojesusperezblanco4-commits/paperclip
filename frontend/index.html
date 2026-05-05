@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Historias en Sombra — Studio</title>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -654,16 +655,262 @@
     }
     .card:hover { border-color: rgba(255,255,255,0.1); }
     .running-log { border-color: rgba(168,85,247,0.2); }
+
+    /* ══════════════════════════════════════
+       DISCONTROLCREATOR — Visual Upgrade v2
+    ══════════════════════════════════════ */
+
+    /* ── Header nav ── */
+    .header-brand {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 900;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+    .header-brand span { color: var(--accent); }
+    .header-nav {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .header-nav-link {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--sub);
+      text-decoration: none;
+      padding: 5px 12px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .header-nav-link:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .header-nav-link.active { color: var(--accent); background: rgba(168,85,247,0.1); }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .header-icon {
+      font-size: 18px !important;
+      color: var(--sub);
+      cursor: pointer;
+      transition: color 0.15s;
+      font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+    }
+    .header-icon:hover { color: var(--text); }
+
+    /* ── Material Symbols in agent tabs ── */
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+    }
+    .tab-msym {
+      font-size: 17px;
+      color: var(--sub);
+      transition: color 0.15s;
+    }
+    .agent-tab.active .tab-msym { color: var(--accent); }
+    .agent-tab:hover .tab-msym  { color: var(--text); }
+
+    /* ── Sidebar header ── */
+    .sidebar-brand {
+      padding: 14px 12px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-brand-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+    .sidebar-brand-sub {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── Ambient background blobs ── */
+    .bg-blobs {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+      overflow: hidden;
+    }
+    .bg-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.5;
+    }
+    .bg-blob-1 {
+      width: 600px; height: 600px;
+      background: rgba(120, 40, 220, 0.07);
+      top: -100px; left: -100px;
+      animation: blobDrift 18s ease-in-out infinite alternate;
+    }
+    .bg-blob-2 {
+      width: 500px; height: 500px;
+      background: rgba(80, 20, 180, 0.05);
+      bottom: -80px; right: -80px;
+      animation: blobDrift 22s ease-in-out infinite alternate-reverse;
+    }
+    .bg-blob-3 {
+      width: 300px; height: 300px;
+      background: rgba(60, 220, 200, 0.03);
+      top: 40%; left: 50%;
+      animation: blobDrift 14s ease-in-out infinite alternate;
+    }
+    @keyframes blobDrift {
+      0%   { transform: translate(0, 0) scale(1); }
+      50%  { transform: translate(30px, -20px) scale(1.06); }
+      100% { transform: translate(-20px, 30px) scale(0.96); }
+    }
+
+    /* ── Horizontal pipeline stepper ── */
+    .h-pipeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 14px 20px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      background: rgba(13,13,15,0.6);
+      backdrop-filter: blur(8px);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .h-pipeline::-webkit-scrollbar { display: none; }
+    .h-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .h-node-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+      border: 2px solid var(--border);
+      transition: background 0.4s, border-color 0.4s, box-shadow 0.4s;
+    }
+    .h-node-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+      transition: color 0.4s;
+    }
+    .h-node.active .h-node-dot {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(168,85,247,0.25), 0 0 12px rgba(168,85,247,0.4);
+      animation: nodePulse 1.4s ease-in-out infinite;
+    }
+    .h-node.active .h-node-label { color: var(--accent); }
+    .h-node.done .h-node-dot {
+      background: var(--green);
+      border-color: var(--green);
+    }
+    .h-node.done .h-node-label { color: #4ade80; }
+    .h-node.error .h-node-dot { background: var(--red); border-color: var(--red); }
+    .h-node.error .h-node-label { color: #f87171; }
+    @keyframes nodePulse {
+      0%,100% { box-shadow: 0 0 0 3px rgba(168,85,247,0.25), 0 0 8px rgba(168,85,247,0.3); }
+      50%      { box-shadow: 0 0 0 5px rgba(168,85,247,0.15), 0 0 18px rgba(168,85,247,0.5); }
+    }
+    .h-connector {
+      flex: 1;
+      height: 1px;
+      min-width: 18px;
+      max-width: 48px;
+      background: var(--border);
+      margin-bottom: 13px;
+      transition: background 0.4s;
+    }
+    .h-connector.lit { background: rgba(168,85,247,0.4); }
+
+    /* ── Terminal log upgrade ── */
+    .running-log {
+      background: rgba(10,10,13,0.8);
+      border: 1px solid rgba(168,85,247,0.2);
+      border-radius: 10px;
+      backdrop-filter: blur(12px);
+    }
+    .log-header {
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 8px 14px;
+    }
+    .log-lines { max-height: 220px; padding: 10px 14px; }
+    .log-ts {
+      color: var(--tertiary, #3cddc7);
+      font-family: 'DM Mono', monospace;
+      font-size: 10.5px;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    .log-line-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0;
+    }
+    .log-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 14px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      background: rgba(0,0,0,0.3);
+      border-radius: 0 0 10px 10px;
+    }
+    .log-status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: logDotPulse 2s ease-in-out infinite;
+    }
+    @keyframes logDotPulse {
+      0%,100% { opacity: 1; } 50% { opacity: 0.3; }
+    }
+    .log-latency {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
 
+<!-- Ambient background blobs -->
+<div class="bg-blobs" aria-hidden="true">
+  <div class="bg-blob bg-blob-1"></div>
+  <div class="bg-blob bg-blob-2"></div>
+  <div class="bg-blob bg-blob-3"></div>
+</div>
+
 <header style="position:relative">
-  <div class="logo">
+  <div class="logo" style="gap:14px">
     <div class="logo-dot"></div>
-    historias.en.sombra — Studio
+    <span class="header-brand">DISCONTROL<span>CREATOR</span></span>
   </div>
-  <div class="badge">Pipeline IA</div>
+  <nav class="header-nav">
+    <a class="header-nav-link active" href="#">Studio</a>
+    <a class="header-nav-link" href="#" onclick="return false">Biblioteca</a>
+    <a class="header-nav-link" href="#" onclick="return false">Agentes</a>
+    <a class="header-nav-link" href="#" onclick="return false">Métricas</a>
+  </nav>
+  <div class="header-right">
+    <span class="material-symbols-outlined header-icon">notifications</span>
+    <span class="material-symbols-outlined header-icon">settings</span>
+    <div class="badge">V.04.2</div>
+  </div>
   <div class="header-progress">
     <div class="header-progress-bar" id="headerProgressBar"></div>
   </div>
@@ -675,46 +922,52 @@
   <div class="panel-left">
     <div class="panel-left-scroll">
 
+      <!-- Sidebar brand -->
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-title">historias.en.sombra</div>
+        <div class="sidebar-brand-sub">V.04.2 · Control Engine</div>
+      </div>
+
       <!-- Agent selector -->
-      <div class="agent-tabs" id="agentTabs">
+      <div class="agent-tabs" id="agentTabs" style="margin-top:8px">
         <div class="agent-tab active" data-agent="director" onclick="selectAgent('director')">
-          <div class="tab-icon">🎬</div>
+          <div class="tab-icon"><span class="material-symbols-outlined tab-msym">movie</span></div>
           <div class="tab-name">Director</div>
         </div>
         <div class="agent-tab" data-agent="search" onclick="selectAgent('search')">
-          <div class="tab-icon">🔍</div>
+          <div class="tab-icon"><span class="material-symbols-outlined tab-msym">travel_explore</span></div>
           <div class="tab-name">Deep Search</div>
         </div>
         <div class="agent-tab" data-agent="analyzer" onclick="selectAgent('analyzer')">
-          <div class="tab-icon">📊</div>
-          <div class="tab-name">Channel Analyzer</div>
+          <div class="tab-icon"><span class="material-symbols-outlined tab-msym">bar_chart</span></div>
+          <div class="tab-name">Analyzer</div>
         </div>
         <div class="agent-tab" data-agent="story" onclick="selectAgent('story')">
-          <div class="tab-icon">✍️</div>
+          <div class="tab-icon"><span class="material-symbols-outlined tab-msym">edit_note</span></div>
           <div class="tab-name">Storytelling</div>
         </div>
         <div class="agent-tab" data-agent="prompt" onclick="selectAgent('prompt')">
-          <div class="tab-icon">🎨</div>
+          <div class="tab-icon"><span class="material-symbols-outlined tab-msym">palette</span></div>
           <div class="tab-name">Prompt Gen</div>
         </div>
         <div class="agent-tab" data-agent="imagen" onclick="selectAgent('imagen')">
-          <div class="tab-icon">🖼️</div>
+          <div class="tab-icon"><span class="material-symbols-outlined tab-msym">image</span></div>
           <div class="tab-name">Imagen AI</div>
         </div>
         <div class="agent-tab" data-agent="video_prompt" onclick="selectAgent('video_prompt')">
-          <div class="tab-icon">🎞️</div>
+          <div class="tab-icon"><span class="material-symbols-outlined tab-msym">slideshow</span></div>
           <div class="tab-name">Video Prompt</div>
         </div>
         <div class="agent-tab" data-agent="imagen_video" onclick="selectAgent('imagen_video')">
-          <div class="tab-icon">🎬</div>
+          <div class="tab-icon"><span class="material-symbols-outlined tab-msym">movie_creation</span></div>
           <div class="tab-name">Img → Video</div>
         </div>
         <div class="agent-tab" data-agent="tts" onclick="selectAgent('tts')">
-          <div class="tab-icon">🎙️</div>
+          <div class="tab-icon"><span class="material-symbols-outlined tab-msym">mic</span></div>
           <div class="tab-name">TTS Voz</div>
         </div>
         <div class="agent-tab" data-agent="video" onclick="selectAgent('video')">
-          <div class="tab-icon">📱</div>
+          <div class="tab-icon"><span class="material-symbols-outlined tab-msym">smartphone</span></div>
           <div class="tab-name">Assembler</div>
         </div>
       </div>
@@ -1302,12 +1555,28 @@ function getAgentDesc(key) {
 const STAGE_IDS = ['director','search','analyzer','story','tts','prompt','imagen','imagen_video','video'];
 
 function setStage(id, state) {
+  // Vertical stage in sidebar
   const el = document.getElementById(`stage-${id}`);
-  if (!el) return;
-  el.className = `stage ${state}`;
-  const badge = el.querySelector('.stage-badge');
-  const labels = { waiting:'En espera', active:'Procesando…', done:'Listo ✓', error:'Error' };
-  if (badge) badge.textContent = labels[state] || state;
+  if (el) {
+    el.className = `stage ${state}`;
+    const badge = el.querySelector('.stage-badge');
+    const labels = { waiting:'En espera', active:'Procesando…', done:'Listo ✓', error:'Error' };
+    if (badge) badge.textContent = labels[state] || state;
+  }
+  // Horizontal node in right panel
+  const hNode = document.getElementById(`h-node-${id}`);
+  if (hNode) {
+    hNode.className = `h-node ${state}`;
+    // Light up the connector before this node when done/active
+    const stageOrder = ['director','search','analyzer','story','tts','prompt','imagen','imagen_video','video'];
+    const idx = stageOrder.indexOf(id);
+    if (idx > 0) {
+      const prevId  = stageOrder[idx - 1];
+      const conn    = document.getElementById(`h-conn-${prevId}`);
+      if (conn && (state === 'done' || state === 'active')) conn.classList.add('lit');
+      else if (conn && state === 'waiting') conn.classList.remove('lit');
+    }
+  }
 }
 function setAllDone()    { STAGE_IDS.forEach(id => setStage(id, 'done')); }
 function setAllWaiting() { STAGE_IDS.forEach(id => setStage(id, 'waiting')); }
@@ -2188,16 +2457,74 @@ function buildImagenVideoResult(raw) {
 /* ────────────────────────────────────────
    RUNNING UI
 ──────────────────────────────────────── */
+function _hPipelineHTML() {
+  const nodes = [
+    { id:'director',    label:'DIRECTOR' },
+    { id:'search',      label:'SEARCH'   },
+    { id:'analyzer',    label:'ANALIZ'   },
+    { id:'story',       label:'STORY'    },
+    { id:'tts',         label:'TTS'      },
+    { id:'prompt',      label:'PROMPTS'  },
+    { id:'imagen',      label:'POPCORN'  },
+    { id:'imagen_video',label:'IMG-VID'  },
+    { id:'video',       label:'OUTPUT'   },
+  ];
+  return `<div class="h-pipeline" id="hPipeline">${
+    nodes.map((n, i) => `
+      <div class="h-node waiting" id="h-node-${n.id}">
+        <div class="h-node-dot"></div>
+        <span class="h-node-label">${n.label}</span>
+      </div>${i < nodes.length - 1 ? '<div class="h-connector" id="h-conn-' + n.id + '"></div>' : ''}`
+    ).join('')
+  }</div>`;
+}
+
 function showRunningPanel(cfg, topic) {
+  const now = new Date();
+  const ts  = now.toTimeString().slice(0,8);
+  const pipelineBlock = cfg.showPipeline ? _hPipelineHTML() : '';
   document.getElementById('rightPanel').innerHTML = `
-    <div style="font-size:16px;font-weight:700;margin-bottom:2px;">${cfg.icon} Ejecutando ${cfg.name}…</div>
-    <div style="font-size:12px;color:var(--sub);margin-bottom:18px;">"${escHtml(topic.slice(0,80))}"</div>
+    ${pipelineBlock}
+    <div style="padding:${cfg.showPipeline ? '16px 20px 4px' : '0 0 4px'}">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;letter-spacing:0.03em;margin-bottom:2px;">
+        Ejecutando ${cfg.name}…
+      </div>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:16px;">"${escHtml(topic.slice(0,80))}"</div>
+    </div>
     <div class="running-log">
-      <div class="log-header"><span class="dot-pulse"><span></span><span></span><span></span></span>&nbsp;En vivo</div>
+      <div class="log-header">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="log-status-dot"></div>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.1em;color:var(--sub)">EXECUTION_LOG</span>
+        </div>
+        <div style="display:flex;gap:4px">
+          <div style="width:7px;height:7px;border-radius:50%;background:rgba(239,68,68,0.5)"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:rgba(234,179,8,0.5)"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:rgba(34,197,94,0.5)"></div>
+        </div>
+      </div>
       <div class="log-lines" id="logLines">
-        <div class="log-line accent">▸ Iniciando ${cfg.name}…</div>
+        <div class="log-line-row">
+          <span class="log-ts">${ts}</span>
+          <span class="log-line accent">▸ Iniciando ${cfg.name}…</span>
+        </div>
+      </div>
+      <div class="log-footer">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="log-status-dot"></div>
+          <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--accent)">SYSTEM ACTIVE</span>
+        </div>
+        <span class="log-latency" id="logElapsed">00:00</span>
       </div>
     </div>`;
+  // Start elapsed timer
+  const t0 = Date.now();
+  const elTimer = setInterval(() => {
+    const el = document.getElementById('logElapsed');
+    if (!el) { clearInterval(elTimer); return; }
+    const s = Math.floor((Date.now() - t0) / 1000);
+    el.textContent = String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+  }, 1000);
 }
 
 function showError(msg) {
@@ -2213,10 +2540,11 @@ function showError(msg) {
 function addLog(msg, cls='') {
   const el = document.getElementById('logLines');
   if (!el) return;
-  const line = document.createElement('div');
-  line.className = `log-line ${cls}`;
-  line.textContent = msg;
-  el.appendChild(line);
+  const ts  = new Date().toTimeString().slice(0,8);
+  const row = document.createElement('div');
+  row.className = 'log-line-row';
+  row.innerHTML = `<span class="log-ts">${ts}</span><span class="log-line ${cls}">${escHtml(msg)}</span>`;
+  el.appendChild(row);
   el.scrollTop = el.scrollHeight;
 }
 
