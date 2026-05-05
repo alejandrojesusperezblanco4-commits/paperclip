@@ -66,8 +66,15 @@ def qualify_products(products: list, ad_results: list, niche: str, api_key: str)
         }
         products_context.append(entry)
 
-    prompt = f"""Califica estos productos para dropshipping en el nicho "{niche}" para el mercado español:
+    niche_core = niche.split("(")[0].split("—")[0].split("\n")[0].strip()
 
+    prompt = f"""Califica estos productos para dropshipping en el nicho "{niche_core}" para el mercado español.
+
+⚠️ REGLA DE VALIDACIÓN: Antes de calificar, verifica que cada producto pertenece al nicho "{niche_core}".
+Si un producto NO es del nicho (ej: nicho=mascotas pero el producto es un ventilador de cuello), asígnale score=0, recommendation=SKIP y key_strength="Producto fuera del nicho".
+Solo califica productos directamente relacionados con "{niche_core}".
+
+PRODUCTOS A CALIFICAR:
 {json.dumps(products_context, indent=2, ensure_ascii=False)}
 
 Para cada producto devuelve un score detallado y recomendación.

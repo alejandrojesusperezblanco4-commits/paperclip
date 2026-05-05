@@ -284,25 +284,33 @@ def enrich_with_llm(raw_products: list, niche: str, yt_signals: list, api_key: s
         for p in raw_products[:25]
     )
 
+    # Extraer la parte principal del nicho (antes de cualquier explicación adicional)
+    niche_core = niche.split("(")[0].split("—")[0].split("\n")[0].strip()
+
     prompt = f"""Eres un experto en dropshipping con Shopify, especialista en el mercado español y europeo.
 
-NICHO OBJETIVO: "{niche}"
+NICHO OBJETIVO EXACTO: "{niche_core}"
+
+⚠️ REGLA CRÍTICA: TODOS los productos que devuelvas DEBEN ser del nicho "{niche_core}".
+Si un producto no pertenece DIRECTAMENTE a este nicho, DESCÁRTALO sin excepción.
+NO generes productos de otros nichos aunque los datos de fuentes no sean relevantes.
+Si las fuentes no tienen datos útiles, inventa 8 productos específicos del nicho "{niche_core}".
 {yt_context}
 
-PRODUCTOS ENCONTRADOS EN FUENTES:
+PRODUCTOS ENCONTRADOS EN FUENTES (filtra solo los del nicho):
 {products_text}
 
-TAREA: Selecciona y analiza los 8 mejores productos para dropshipping en este nicho.
-Prioriza productos con señales fuertes de YouTube (alta demanda demostrada).
-Si los datos no son relevantes al nicho, genera tú mismo los 8 mejores productos para "{niche}".
-
-Para cada producto devuelve métricas realistas basadas en el mercado ES/EU 2024-2025.
+TAREA:
+1. Descarta cualquier producto que NO sea del nicho "{niche_core}"
+2. De los relevantes, selecciona los 8 mejores para dropshipping en España
+3. Si hay pocos relevantes, completa con productos del nicho que conozcas
+4. Prioriza productos con señales de YouTube (alta demanda demostrada)
 
 Responde SOLO con JSON válido (sin markdown):
 {{
   "products": [
     {{
-      "name": "nombre específico del producto",
+      "name": "nombre específico del producto (debe ser del nicho {niche_core})",
       "score": 85,
       "est_margin_pct": 65,
       "competition": "Low|Med|High",
