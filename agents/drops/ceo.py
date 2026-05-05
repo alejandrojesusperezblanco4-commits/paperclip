@@ -344,7 +344,25 @@ def main():
                     val = fm.group(1).strip().strip('*"')
                     winner[field] = int(val) if field == "score" and val.isdigit() else val
 
-    print(f"  🏆 Producto ganador: {winner.get('name','?')[:60]} (score={winner.get('score','?')})", flush=True)
+    # Rechazar productos fuera del nicho (SKIP con score=0)
+    rec   = str(winner.get("recommendation", winner.get("final_score", ""))).upper()
+    score = int(winner.get("score", winner.get("final_score", 0)) or 0)
+
+    if rec == "SKIP" or score == 0:
+        post_issue_result(
+            f"# ⚠️ Sin producto ganador para: {niche}\n\n"
+            f"El Lead Qualifier descartó todos los productos del nicho.\n"
+            f"**Causa probable:** Las fuentes externas (Amazon, Perplexity) no devolvieron "
+            f"productos relevantes para **{niche}**.\n\n"
+            f"**Solución:** Reformula el nicho con términos más específicos, por ejemplo:\n"
+            f"- ✅ `pelador de verduras eléctrico`\n"
+            f"- ✅ `dispensador de agua fría portátil`\n"
+            f"- ❌ `gadgets de cocina viral` (demasiado genérico)\n\n"
+            f"Calificación recibida: `{rec}` score={score}"
+        )
+        return
+
+    print(f"  🏆 Producto ganador: {winner.get('name','?')[:60]} (score={score}, rec={rec})", flush=True)
 
     # JSON limpio para Web Designer y Marketing Creator
     winner_json = json.dumps(winner, ensure_ascii=False)

@@ -287,6 +287,15 @@ def enrich_with_llm(raw_products: list, niche: str, yt_signals: list, api_key: s
     # Extraer la parte principal del nicho (antes de cualquier explicación adicional)
     niche_core = niche.split("(")[0].split("—")[0].split("\n")[0].strip()
 
+    # Filtrar productos digitales/servicios antes de pasar al LLM
+    digital_keywords = ["curso", "online", "digital", "ebook", "software", "app",
+                        "suscripción", "servicio", "consultoría", "oposición",
+                        "formación", "academia", "clases", "taller", "webinar"]
+    raw_products = [
+        p for p in raw_products
+        if not any(kw in p.get("name", "").lower() for kw in digital_keywords)
+    ]
+
     prompt = f"""Eres un experto en dropshipping con Shopify, especialista en el mercado español y europeo.
 
 NICHO OBJETIVO EXACTO: "{niche_core}"
