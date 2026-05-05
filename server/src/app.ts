@@ -1168,15 +1168,16 @@ TIKTOK_OPEN_ID=${openId}
     res.status(404).json({ error: "API route not found" });
   });
 
-  // Studio frontend — servido sin auth desde /studio
-  app.get("/studio", (_req, res) => {
-    const studioPath = path.resolve(process.cwd(), "frontend", "index.html");
-    if (fs.existsSync(studioPath)) {
-      res.sendFile(studioPath);
-    } else {
-      res.status(404).send("Studio not found.");
-    }
-  });
+  // DiscontrolCreator frontend — todas las pantallas sin auth
+  const serveCreatorPage = (file: string) => (_req: any, res: any) => {
+    const p = path.resolve(process.cwd(), "frontend", file);
+    if (fs.existsSync(p)) res.sendFile(p);
+    else res.status(404).send(`${file} not found.`);
+  };
+  app.get("/studio",       serveCreatorPage("index.html"));
+  app.get("/agentes",      serveCreatorPage("agentes.html"));
+  app.get("/estadisticas", serveCreatorPage("estadisticas.html"));
+  app.get("/biblioteca",   serveCreatorPage("biblioteca.html"));
   app.use(pluginUiStaticRoutes(db, {
     localPluginDir: opts.localPluginDir ?? DEFAULT_LOCAL_PLUGIN_DIR,
   }));

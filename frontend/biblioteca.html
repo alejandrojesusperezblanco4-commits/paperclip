@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Barlow:wght@400;700&amp;family=DM+Mono&amp;family=Space+Grotesk:wght@300;400;500;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            backdrop-filter: blur(12px) brightness(0.8);
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .active-glow {
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);
+        }
+        ::-webkit-scrollbar {
+            width: 2px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #a855f7;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#353437",
+                        "primary": "#ddb7ff",
+                        "on-error": "#690005",
+                        "tertiary-container": "#00a392",
+                        "surface-container-high": "#2a2a2c",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary-container": "#b6b4b9",
+                        "secondary-fixed": "#e4e1e7",
+                        "surface-container-lowest": "#0e0e10",
+                        "outline": "#988d9f",
+                        "on-surface": "#e5e1e4",
+                        "outline-variant": "#4d4354",
+                        "on-primary-fixed": "#2c0051",
+                        "on-primary-container": "#400071",
+                        "on-primary-fixed-variant": "#6900b3",
+                        "on-secondary-fixed-variant": "#47464b",
+                        "inverse-primary": "#842bd2",
+                        "secondary-container": "#47464b",
+                        "inverse-surface": "#e5e1e4",
+                        "tertiary-fixed": "#62fae3",
+                        "on-surface-variant": "#cfc2d6",
+                        "inverse-on-surface": "#313032",
+                        "tertiary": "#3cddc7",
+                        "primary-fixed-dim": "#ddb7ff",
+                        "on-tertiary": "#003731",
+                        "on-tertiary-container": "#00302a",
+                        "on-secondary": "#303034",
+                        "on-secondary-fixed": "#1b1b1f",
+                        "on-tertiary-fixed-variant": "#005047",
+                        "error": "#ffb4ab",
+                        "error-container": "#93000a",
+                        "surface-variant": "#353437",
+                        "surface-container-low": "#1b1b1d",
+                        "secondary-fixed-dim": "#c8c5cb",
+                        "secondary": "#c8c5cb",
+                        "on-background": "#e5e1e4",
+                        "surface-bright": "#39393b",
+                        "tertiary-fixed-dim": "#3cddc7",
+                        "surface-dim": "#131315",
+                        "primary-container": "#b76dff",
+                        "surface": "#131315",
+                        "primary-fixed": "#f0dbff",
+                        "surface-tint": "#ddb7ff",
+                        "surface-container": "#201f21",
+                        "on-tertiary-fixed": "#00201c",
+                        "on-primary": "#490080",
+                        "background": "#131315"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline-xl": ["Barlow Condensed"],
+                        "body-lg": ["Barlow"],
+                        "label-caps": ["Barlow Condensed"],
+                        "code-sm": ["DM Mono"],
+                        "headline-md": ["Barlow Condensed"],
+                        "body-md": ["Barlow"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 z-50 w-full h-16 flex justify-between items-center px-8 bg-zinc-950/80 backdrop-blur-xl border-b border-white/10 font-['Space_Grotesk'] tracking-tight">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-bold tracking-tighter text-white uppercase">DiscontrolCreator</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-zinc-500 hover:text-zinc-300 transition-colors uppercase text-sm tracking-widest" href="/studio">Studio</a>
+<a class="text-purple-400 border-b-2 border-purple-500 pb-1 uppercase text-sm tracking-widest" href="/biblioteca">Library</a>
+<a class="text-zinc-500 hover:text-zinc-300 transition-colors uppercase text-sm tracking-widest" href="/agentes">Agents</a>
+<a class="text-zinc-500 hover:text-zinc-300 transition-colors uppercase text-sm tracking-widest" href="/estadisticas">Metrics</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-zinc-500 hover:bg-white/5 transition-all duration-300 active:scale-95">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-zinc-500 hover:bg-white/5 transition-all duration-300 active:scale-95">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden border border-white/10">
+<img alt="Director Profile" data-alt="A professional close-up portrait of a digital creator in a dimly lit, high-tech studio environment. The lighting is cinematic with subtle purple rim light, emphasizing a sharp, authoritative presence. The background features blurred interface elements and glowing server racks, maintaining a sophisticated cinematic technical aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBflX8-FfrrNn4_INiq3F9xak5Olv9HiF9coZfeAxZ3Ug4TcSCahzOQtlr-kchUYNgoaWjs9LnmGtWTFoOAqa91SSeRlVe1-_xQsnbVOILx-crtQ0QYDBdyC5ERfclB_uxBpgFLO8WfQAB4kOWOykoGQ34q0NzE_pt45kYAXZ6SpFGKQ5Dy_Gujc9jm7wH5pYjC5smNMbdEzp1kDURVl6aLusigWRa-BibIWAy_o_c7oGloevefNRnWQptT_0W8G4okz-KQv2u162dp"/>
+</div>
+</div>
+</header>
+<div class="flex h-screen pt-16">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 bottom-0 w-64 bg-zinc-950/90 backdrop-blur-md border-r border-white/10 flex flex-col py-6 z-40">
+<div class="px-6 mb-8">
+<div class="flex items-center gap-3 mb-1">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="font-['Space_Grotesk'] text-sm uppercase tracking-widest text-purple-500 font-black">Agent Tools</span>
+</div>
+<span class="text-[10px] text-zinc-500 uppercase tracking-tighter">V.04.2 Online</span>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 font-['Space_Grotesk'] text-sm uppercase tracking-widest hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span>Visualizer</span>
+</a>
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 font-['Space_Grotesk'] text-sm uppercase tracking-widest hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="mic">mic</span>
+<span>Voice Synth</span>
+</a>
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 font-['Space_Grotesk'] text-sm uppercase tracking-widest hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span>Pipeline</span>
+</a>
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 font-['Space_Grotesk'] text-sm uppercase tracking-widest hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span>Logic Flow</span>
+</a>
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 font-['Space_Grotesk'] text-sm uppercase tracking-widest hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="rocket_launch">rocket_launch</span>
+<span>Deploy</span>
+</a>
+</nav>
+<div class="px-4 mt-auto space-y-4">
+<button class="w-full bg-purple-500 text-zinc-950 font-bold py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-purple-400 transition-colors">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+<span>New Pipeline</span>
+</button>
+<div class="pt-4 border-t border-white/5">
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-2 font-['Space_Grotesk'] text-xs uppercase tracking-widest hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="help">help</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-2 font-['Space_Grotesk'] text-xs uppercase tracking-widest hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span>
+<span>Logs</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 flex-1 overflow-y-auto bg-surface p-8">
+<!-- Header & Filter Bar -->
+<div class="mb-10">
+<div class="flex justify-between items-end mb-8">
+<div>
+<h1 class="font-headline-xl text-headline-xl text-primary uppercase">Biblioteca</h1>
+<p class="font-body-md text-zinc-500 max-w-xl mt-2">Gestión centralizada de activos multimedia generados. Monitoreo de producción y despliegue multiplataforma.</p>
+</div>
+<div class="flex gap-4">
+<div class="glass-panel px-4 py-2 rounded-lg flex items-center gap-3">
+<span class="text-purple-500 font-bold">248</span>
+<span class="text-xs uppercase tracking-widest text-zinc-400">Total Shorts</span>
+</div>
+<div class="glass-panel px-4 py-2 rounded-lg flex items-center gap-3 border-tertiary/20">
+<span class="text-tertiary font-bold">12</span>
+<span class="text-xs uppercase tracking-widest text-zinc-400">Rendering</span>
+</div>
+</div>
+</div>
+<!-- Filters -->
+<div class="glass-panel p-4 rounded-xl flex flex-wrap gap-6 items-center">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-zinc-500" data-icon="filter_list">filter_list</span>
+<span class="font-label-caps text-label-caps text-zinc-400">Filtrar por:</span>
+</div>
+<div class="flex items-center gap-2">
+<select class="bg-transparent border-b border-white/20 text-sm text-on-surface focus:border-primary outline-none py-1 px-2 appearance-none cursor-pointer font-['Space_Grotesk']">
+<option>Todos los Agentes</option>
+<option>Nexus Prime</option>
+<option>Void Echo</option>
+<option>Synthetix</option>
+</select>
+<span class="material-symbols-outlined text-xs text-zinc-500" data-icon="expand_more">expand_more</span>
+</div>
+<div class="flex items-center gap-2">
+<select class="bg-transparent border-b border-white/20 text-sm text-on-surface focus:border-primary outline-none py-1 px-2 appearance-none cursor-pointer font-['Space_Grotesk']">
+<option>Cualquier fecha</option>
+<option>Hoy</option>
+<option>Última semana</option>
+<option>Último mes</option>
+</select>
+<span class="material-symbols-outlined text-xs text-zinc-500" data-icon="calendar_today">calendar_today</span>
+</div>
+<div class="flex items-center gap-2 ml-auto glass-panel px-4 py-1.5 rounded-full border-white/5 bg-white/5">
+<span class="material-symbols-outlined text-zinc-400 text-sm" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm text-zinc-300 w-48 font-body-md" placeholder="Buscar proyecto..." type="text"/>
+</div>
+</div>
+</div>
+<!-- Content Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+<!-- Video Card 1 -->
+<div class="glass-panel rounded-xl overflow-hidden group hover:border-purple-500/50 transition-all duration-300 relative">
+<div class="aspect-[9/16] relative bg-zinc-900">
+<img alt="Cyberpunk Aesthetic Video Thumbnail" class="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700" data-alt="A vertical 9:16 video thumbnail showcasing a high-contrast cyberpunk cityscape. Vivid neon signs in purple and cyan reflect off wet asphalt streets. The scene is shrouded in a cinematic mist with deep, crushed blacks and glowing volumetric lighting, creating a futuristic, moody atmosphere typical of advanced AI-generated short-form content." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDJfNFnvuFHdiXtGZTVG-ApDnXzSacMdiu5iHG0pBzgKWWn8ZdN0fz4aKxBYi5TaxalarPYEj-GH0-btO6ggwU-ZNfZjHIlUa6z79Vg9j7ohE-YoN5JkKuvOJkem8jdX_Xy0gL_A-Aq-vof5X9YAxjzFR5uPstcKUgQVA51U_ameUqmf9EN9b10zBVV94VzQLXChpzdzbm4sUrh4vvsxDLz3dYvPiKvXcNmtoyTuZArMYXQ33hqowOXG-2PYAJLvbQ7fJlw1aza3CK"/>
+<div class="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80"></div>
+<!-- Card Badge -->
+<div class="absolute top-4 left-4 glass-panel px-2 py-1 rounded text-[10px] uppercase font-bold tracking-tighter text-primary border-primary/30">
+                            Nexus-01
+                        </div>
+<!-- Hover Play Action -->
+<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-purple-950/20 backdrop-blur-[2px]">
+<button class="w-14 h-14 rounded-full bg-primary text-zinc-950 flex items-center justify-center shadow-lg transform group-hover:scale-100 scale-75 transition-transform duration-300">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<div class="p-4 bg-zinc-950/40">
+<h3 class="font-headline-md text-sm text-on-surface truncate mb-1">CYBERPUNK_DREAM_SQ_04</h3>
+<div class="flex justify-between items-center">
+<span class="text-[10px] text-zinc-500 uppercase tracking-widest font-['Space_Grotesk']">Oct 24, 2023</span>
+<span class="text-[10px] text-tertiary font-code-sm">1080x1920</span>
+</div>
+<div class="mt-4 flex gap-2">
+<button class="flex-1 py-2 glass-panel hover:bg-white/10 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
+                                Reproducir
+                            </button>
+<button class="flex-1 py-2 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
+                                Descargar
+                            </button>
+</div>
+</div>
+</div>
+<!-- Video Card 2 -->
+<div class="glass-panel rounded-xl overflow-hidden group hover:border-purple-500/50 transition-all duration-300 relative">
+<div class="aspect-[9/16] relative bg-zinc-900">
+<img alt="Abstract Liquid Metal Visualization" class="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700" data-alt="A vertical video thumbnail featuring abstract liquid metal flows in a dark, infinite void. The fluid surfaces ripple with iridescent purple and silver highlights, catching a dramatic spotlight from above. The aesthetic is ultra-modern and technical, reflecting high-fidelity procedural generation with sharp details and smooth gradients." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSM-VxA9OvAkyG6bDsFze6sqQ0hUJjsZvOxR2CvsxaPc8QFqWAHPRIj3vuf8_W90LC6tKxYL9AuiYCq2IKMbkfWggvX3LpLDdIici7bjTxP8VmQH-dBoNeApRTqksjj9YNXJgSiTRY_LcreSYLs9wtlLBBJjywKejuQ7xWwoLtLv15a_rviFt6HHUEcW-pzPCnGD0PLj9tHPuV8d3DhxdZyr1XbjeYzdhRODswtF0KqbO3NvWLvgFu0yxLDNw5Lr8vlnx8hUI-SUiL"/>
+<div class="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80"></div>
+<div class="absolute top-4 left-4 glass-panel px-2 py-1 rounded text-[10px] uppercase font-bold tracking-tighter text-primary border-primary/30">
+                            Echo-V
+                        </div>
+<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-purple-950/20 backdrop-blur-[2px]">
+<button class="w-14 h-14 rounded-full bg-primary text-zinc-950 flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<div class="p-4 bg-zinc-950/40">
+<h3 class="font-headline-md text-sm text-on-surface truncate mb-1">LIQUID_DYNAMICS_012</h3>
+<div class="flex justify-between items-center">
+<span class="text-[10px] text-zinc-500 uppercase tracking-widest font-['Space_Grotesk']">Oct 23, 2023</span>
+<span class="text-[10px] text-tertiary font-code-sm">1080x1920</span>
+</div>
+<div class="mt-4 flex gap-2">
+<button class="flex-1 py-2 glass-panel hover:bg-white/10 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
+                                Reproducir
+                            </button>
+<button class="flex-1 py-2 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
+                                Descargar
+                            </button>
+</div>
+</div>
+</div>
+<!-- Video Card 3 (Status: Rendering) -->
+<div class="glass-panel rounded-xl overflow-hidden group border-tertiary/20 relative">
+<div class="aspect-[9/16] relative bg-zinc-900/50 flex flex-col items-center justify-center gap-4">
+<div class="w-16 h-16 rounded-full border-2 border-dashed border-tertiary/40 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary animate-pulse" data-icon="data_exploration">data_exploration</span>
+</div>
+<div class="text-center">
+<div class="text-xs uppercase tracking-widest font-bold text-tertiary mb-1">Procesando</div>
+<div class="w-32 h-1 bg-white/5 rounded-full overflow-hidden">
+<div class="w-2/3 h-full bg-tertiary"></div>
+</div>
+<div class="text-[10px] text-zinc-500 mt-2 font-code-sm">67% COMPLETADO</div>
+</div>
+</div>
+<div class="p-4 bg-zinc-950/40">
+<h3 class="font-headline-md text-sm text-zinc-500 truncate mb-1">URBAN_EXPLORER_X</h3>
+<div class="flex justify-between items-center">
+<span class="text-[10px] text-zinc-600 uppercase tracking-widest font-['Space_Grotesk']">Oct 24, 2023</span>
+<span class="text-[10px] text-zinc-600 font-code-sm">QUEUE: #4</span>
+</div>
+<div class="mt-4 flex gap-2">
+<button class="flex-1 py-2 glass-panel opacity-20 rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2 cursor-not-allowed" disabled="">
+<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
+                                Reproducir
+                            </button>
+<button class="flex-1 py-2 border border-white/5 text-zinc-500 hover:bg-white/5 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="cancel">cancel</span>
+                                Cancelar
+                            </button>
+</div>
+</div>
+</div>
+<!-- Video Card 4 -->
+<div class="glass-panel rounded-xl overflow-hidden group hover:border-purple-500/50 transition-all duration-300 relative">
+<div class="aspect-[9/16] relative bg-zinc-900">
+<img alt="Glitch Art Visual" class="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700" data-alt="A vertical video frame showing a distorted, glitch-art portrait of a digital avatar. The image is fragmented with scanlines, chromatic aberration, and digital noise in shades of purple, magenta, and deep black. The overall look is aggressive and high-energy, designed for high-impact social media short videos in a dark, technological visual style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvsFtozMepC5X8N_zMoTGjQeaZGn4qQ3rcPUIJbSu2f44FDPzPabgKhrE7Ei83KUCFsA563OB2yAzza_P_ApCQZUDk5vOXmI42uiNqIzcRp50EkdCuppmdf1C-PcIzoBKLQ_cpFrdWNFUCCOXBKhRd5RjzIDC0Ckp_DXTcYz8EiEq6sxrPjBIvYALo-SXXYXrQNpv8INvdaB4dD07rWlgUg4U4ZhMCigQkug2A6hQEL5AaOJuh4hQBpeLZg3AtbodTWQ5HPA3GeifZ"/>
+<div class="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80"></div>
+<div class="absolute top-4 left-4 glass-panel px-2 py-1 rounded text-[10px] uppercase font-bold tracking-tighter text-primary border-primary/30">
+                            Synth-M
+                        </div>
+<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-purple-950/20 backdrop-blur-[2px]">
+<button class="w-14 h-14 rounded-full bg-primary text-zinc-950 flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<div class="p-4 bg-zinc-950/40">
+<h3 class="font-headline-md text-sm text-on-surface truncate mb-1">GLITCH_VORTEX_PRO</h3>
+<div class="flex justify-between items-center">
+<span class="text-[10px] text-zinc-500 uppercase tracking-widest font-['Space_Grotesk']">Oct 22, 2023</span>
+<span class="text-[10px] text-tertiary font-code-sm">1080x1920</span>
+</div>
+<div class="mt-4 flex gap-2">
+<button class="flex-1 py-2 glass-panel hover:bg-white/10 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
+                                Reproducir
+                            </button>
+<button class="flex-1 py-2 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
+                                Descargar
+                            </button>
+</div>
+</div>
+</div>
+<!-- Video Card 5 -->
+<div class="glass-panel rounded-xl overflow-hidden group hover:border-purple-500/50 transition-all duration-300 relative">
+<div class="aspect-[9/16] relative bg-zinc-900">
+<img alt="3D Wireframe Landscape" class="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700" data-alt="A vertical video sequence portraying a 3D topographic wireframe landscape that pulses with light. The mesh glows with a subtle purple luminance against a pitch-black background, creating a technical and analytic visual style. The camera glides over the digital peaks, revealing intricate geometric patterns and high-detail line work characteristic of high-end motion graphics." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzNtIg4aC2fLkFobKU7gRMKmCF6yre4U0D1aqjgMkJAQa0xvbPvq8j8vHDkDsKCWKZm4dV7-z4qORUAKbMCfJNnX5fnW_2hnynmtPIc-3vDggywvUDNrOpUL6FfB-h4lvruDldDowxMYdnpO4BQbmHLla2OxlwqQ2Nf4ukmUNyQ52q0Xb03BCZ7D0442NrgGiauIFUn2z5oD6Cab-GaPReoyDhFZsIJtWTdFmN9yYe7JcIC4w7X5ZsoEFVshlpl4LbuTCWQCBDzf9t"/>
+<div class="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80"></div>
+<div class="absolute top-4 left-4 glass-panel px-2 py-1 rounded text-[10px] uppercase font-bold tracking-tighter text-primary border-primary/30">
+                            Nexus-01
+                        </div>
+<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-purple-950/20 backdrop-blur-[2px]">
+<button class="w-14 h-14 rounded-full bg-primary text-zinc-950 flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<div class="p-4 bg-zinc-950/40">
+<h3 class="font-headline-md text-sm text-on-surface truncate mb-1">GRID_SCAN_Z8</h3>
+<div class="flex justify-between items-center">
+<span class="text-[10px] text-zinc-500 uppercase tracking-widest font-['Space_Grotesk']">Oct 21, 2023</span>
+<span class="text-[10px] text-tertiary font-code-sm">1080x1920</span>
+</div>
+<div class="mt-4 flex gap-2">
+<button class="flex-1 py-2 glass-panel hover:bg-white/10 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
+                                Reproducir
+                            </button>
+<button class="flex-1 py-2 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
+                                Descargar
+                            </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Pagination/Load More -->
+<div class="mt-12 flex justify-center">
+<button class="px-8 py-3 glass-panel border-purple-500/20 text-primary rounded-lg font-headline-md text-sm uppercase tracking-widest hover:bg-purple-500/5 transition-all active:scale-95">
+                    Cargar más registros
+                </button>
+</div>
+</main>
+</div>
+<!-- Floating Action Button (Suppressed as per rules for Details/Library screens, but template allows it contextually. Here we prioritize the SideNav's CTA instead) -->
+</body></html>

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DiscontrolCreator | Unified Agents</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Barlow:wght@400;700&amp;family=DM+Mono:wght@400&amp;family=Space+Grotesk:wght@300;400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#353437",
+                        "primary": "#ddb7ff",
+                        "on-error": "#690005",
+                        "tertiary-container": "#00a392",
+                        "surface-container-high": "#2a2a2c",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary-container": "#b6b4b9",
+                        "secondary-fixed": "#e4e1e7",
+                        "surface-container-lowest": "#0e0e10",
+                        "outline": "#988d9f",
+                        "on-surface": "#e5e1e4",
+                        "outline-variant": "#4d4354",
+                        "on-primary-fixed": "#2c0051",
+                        "on-primary-container": "#400071",
+                        "on-primary-fixed-variant": "#6900b3",
+                        "on-secondary-fixed-variant": "#47464b",
+                        "inverse-primary": "#842bd2",
+                        "secondary-container": "#47464b",
+                        "inverse-surface": "#e5e1e4",
+                        "tertiary-fixed": "#62fae3",
+                        "on-surface-variant": "#cfc2d6",
+                        "inverse-on-surface": "#313032",
+                        "tertiary": "#3cddc7",
+                        "primary-fixed-dim": "#ddb7ff",
+                        "on-tertiary": "#003731",
+                        "on-tertiary-container": "#00302a",
+                        "on-secondary": "#303034",
+                        "on-secondary-fixed": "#1b1b1f",
+                        "on-tertiary-fixed-variant": "#005047",
+                        "error": "#ffb4ab",
+                        "error-container": "#93000a",
+                        "surface-variant": "#353437",
+                        "surface-container-low": "#1b1b1d",
+                        "secondary-fixed-dim": "#c8c5cb",
+                        "secondary": "#c8c5cb",
+                        "on-background": "#e5e1e4",
+                        "surface-bright": "#39393b",
+                        "tertiary-fixed-dim": "#3cddc7",
+                        "surface-dim": "#131315",
+                        "primary-container": "#b76dff",
+                        "surface": "#131315",
+                        "primary-fixed": "#f0dbff",
+                        "surface-tint": "#ddb7ff",
+                        "surface-container": "#201f21",
+                        "on-tertiary-fixed": "#00201c",
+                        "on-primary": "#490080",
+                        "background": "#131315"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "panel-padding": "1.25rem",
+                        "unit": "4px",
+                        "stage-gap": "2rem",
+                        "margin": "2rem",
+                        "gutter": "1.5rem"
+                    },
+                    "fontFamily": {
+                        "headline-xl": ["Barlow Condensed"],
+                        "body-lg": ["Barlow"],
+                        "label-caps": ["Barlow Condensed"],
+                        "code-sm": ["DM Mono"],
+                        "headline-md": ["Barlow Condensed"],
+                        "body-md": ["Barlow"]
+                    },
+                    "fontSize": {
+                        "headline-xl": ["48px", {"lineHeight": "1.1", "letterSpacing": "0.02em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                        "code-sm": ["13px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.2", "letterSpacing": "0.04em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .inner-glow-purple {
+            box-shadow: inset 0 0 15px rgba(168, 85, 247, 0.1);
+        }
+        .active-glow {
+            filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.4));
+        }
+        .glass-panel {
+            backdrop-filter: blur(12px) brightness(0.8);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #a855f7;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-hidden h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="bg-zinc-950/80 backdrop-blur-xl font-['Space_Grotesk'] tracking-tight border-b border-white/10 flex justify-between items-center px-8 h-16 w-full fixed top-0 z-50">
+<div class="flex items-center gap-12">
+<h1 class="text-2xl font-bold tracking-tighter text-white uppercase">DiscontrolCreator</h1>
+<nav class="hidden md:flex items-center gap-8 text-sm uppercase tracking-widest">
+<a class="text-zinc-500 hover:text-zinc-300 transition-colors" href="/studio">Studio</a>
+<a class="text-zinc-500 hover:text-zinc-300 transition-colors" href="/biblioteca">Library</a>
+<a class="text-purple-400 border-b-2 border-purple-500 pb-1" href="/agentes">Agents</a>
+<a class="text-zinc-500 hover:text-zinc-300 transition-colors" href="/estadisticas">Metrics</a>
+</nav>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center bg-white/5 border border-white/10 px-3 py-1 rounded-full">
+<span class="material-symbols-outlined text-zinc-500 text-lg mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs w-48 text-on-surface-variant placeholder:text-zinc-600" placeholder="CMD+K TO SEARCH" type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-zinc-400 hover:text-white transition-all active:scale-95 duration-150" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined text-zinc-400 hover:text-white transition-all active:scale-95 duration-150" data-icon="settings">settings</button>
+<img alt="Director Profile" class="w-8 h-8 rounded-full border border-purple-500/50" data-alt="A close-up portrait of a sophisticated tech director with a sharp gaze, set against a dark cinematic background with subtle purple lens flares. The lighting is moody and high-contrast, emphasizing professional authority and modern digital aesthetics." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVM3PiB_6_SbiCBl86D_hhyLx5kS4MQvolmw8BChludpYSk4D9Q1pCC716qu1hBRjSn_nigGRA_ge-rpHPXwvMb09y0eV_bglzrPoQcw2e0W7xvkVZK1c89cJ57YiKbYF-N33lxKtePXgKmL1wz8YjUYpAsOPS0j-oawACMSdnTWCeY14YoMmy9cqh047_-8p_H026Av7M7I1iUZOg48F-iQwcg634z69_qyw1x7SdLR05HjToPfikZRcweGu82Kt1YBGEvGPXS3_Q"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="bg-zinc-950/90 backdrop-blur-md font-['Space_Grotesk'] text-sm uppercase tracking-widest border-r border-white/10 fixed left-0 top-16 bottom-0 flex flex-col py-6 w-64 z-40">
+<div class="px-6 mb-8">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-purple-500" data-icon="psychology" data-weight="fill" style="font-variation-settings: 'FILL' 1;">psychology</span>
+</div>
+<div>
+<h3 class="text-white font-black text-xs">Agent Tools</h3>
+<p class="text-[10px] text-zinc-500">V.04.2 Online</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span>Visualizer</span>
+</a>
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="mic">mic</span>
+<span>Voice Synth</span>
+</a>
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span>Pipeline</span>
+</a>
+<a class="flex items-center gap-3 bg-purple-500/10 text-purple-400 border-l-4 border-purple-500 px-4 py-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span>Logic Flow</span>
+</a>
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="rocket_launch">rocket_launch</span>
+<span>Deploy</span>
+</a>
+</nav>
+<div class="px-4 mb-4">
+<button class="w-full bg-purple-500 text-black font-bold py-3 rounded text-[10px] uppercase tracking-[0.2em] hover:bg-purple-400 transition-colors">
+                New Pipeline
+            </button>
+</div>
+<div class="mt-auto border-t border-white/5 pt-4">
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 hover:bg-white/5 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 hover:bg-white/5 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span>Logs</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-64 mt-16 flex-1 overflow-y-auto bg-surface p-8">
+<div class="max-w-[1600px] mx-auto space-y-8">
+<!-- Header Stats -->
+<section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+<div class="glass-panel p-4 rounded-xl border border-white/10 inner-glow-purple">
+<p class="font-label-caps text-zinc-500 mb-1">TOTAL NODES</p>
+<h2 class="font-headline-md text-white">24 / 32 <span class="text-xs font-normal text-zinc-500 ml-2">86% LOAD</span></h2>
+</div>
+<div class="glass-panel p-4 rounded-xl border border-white/10">
+<p class="font-label-caps text-zinc-500 mb-1">CPU UTILIZATION</p>
+<div class="flex items-end gap-4">
+<h2 class="font-headline-md text-tertiary">42.8%</h2>
+<div class="flex-1 h-2 bg-white/5 rounded-full mb-2 overflow-hidden">
+<div class="h-full bg-tertiary w-[42%]"></div>
+</div>
+</div>
+</div>
+<div class="glass-panel p-4 rounded-xl border border-white/10">
+<p class="font-label-caps text-zinc-500 mb-1">MEMORY POOL</p>
+<div class="flex items-end gap-4">
+<h2 class="font-headline-md text-primary">89.2 GB</h2>
+<div class="flex-1 h-2 bg-white/5 rounded-full mb-2 overflow-hidden">
+<div class="h-full bg-primary w-[65%]"></div>
+</div>
+</div>
+</div>
+<div class="glass-panel p-4 rounded-xl border border-white/10">
+<p class="font-label-caps text-zinc-500 mb-1">NETWORK IO</p>
+<h2 class="font-headline-md text-white">1.2 GB/S <span class="text-xs text-primary-container font-normal ml-2">↑ 400MB ↑</span></h2>
+</div>
+</section>
+<!-- Agent Grid & Terminal Split -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Agent List (Left 8 Columns) -->
+<div class="col-span-12 lg:col-span-8 space-y-6">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-md text-on-surface flex items-center gap-3">
+<span class="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+                            ACTIVE AGENT CLUSTER
+                        </h3>
+<div class="flex gap-2">
+<button class="bg-white/5 border border-white/10 px-4 py-1 rounded font-label-caps text-zinc-400 hover:text-white">REBOOT ALL</button>
+<button class="bg-primary text-black px-4 py-1 rounded font-label-caps hover:bg-white transition-colors">ADD NODE</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Agent Card 1: Running -->
+<div class="glass-panel p-6 rounded-xl border border-purple-500/30 bg-purple-500/5 relative overflow-hidden">
+<div class="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 blur-3xl -mr-12 -mt-12"></div>
+<div class="flex items-start justify-between mb-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full border-2 border-purple-500 border-t-transparent animate-spin-slow flex items-center justify-center p-1">
+<div class="w-full h-full rounded-full bg-purple-500/20 flex items-center justify-center text-xl">🤖</div>
+</div>
+<div>
+<h4 class="font-headline-md text-sm text-white">NEURO_STATIC_01</h4>
+<p class="text-[10px] font-code-sm text-purple-400">STATUS: RUNNING</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-zinc-500">RUNTIME</p>
+<p class="font-code-sm text-white">12:44:02</p>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-[10px] font-label-caps text-zinc-500">
+<span>INFERENCE LOAD</span>
+<span class="text-purple-400">72%</span>
+</div>
+<div class="h-1 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-purple-500 w-[72%]"></div>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 bg-white/5 py-2 rounded text-[10px] font-label-caps text-zinc-300 hover:bg-white/10 transition-all">PAUSE</button>
+<button class="flex-1 bg-white/5 py-2 rounded text-[10px] font-label-caps text-zinc-300 hover:bg-white/10 transition-all">TERMINAL</button>
+</div>
+</div>
+</div>
+<!-- Agent Card 2: Idle -->
+<div class="glass-panel p-6 rounded-xl border border-white/10 hover:border-white/20 transition-all">
+<div class="flex items-start justify-between mb-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center p-1">
+<div class="w-full h-full rounded-full bg-white/5 flex items-center justify-center text-xl">🧠</div>
+</div>
+<div>
+<h4 class="font-headline-md text-sm text-white">LOGIC_CORE_V2</h4>
+<p class="text-[10px] font-code-sm text-zinc-500">STATUS: IDLE</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-zinc-500">STANDBY</p>
+<p class="font-code-sm text-white">00:12:15</p>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-[10px] font-label-caps text-zinc-500">
+<span>INFERENCE LOAD</span>
+<span class="text-zinc-500">0%</span>
+</div>
+<div class="h-1 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-zinc-700 w-0"></div>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 bg-primary text-black py-2 rounded text-[10px] font-label-caps hover:bg-white transition-all">WAKE</button>
+<button class="flex-1 bg-white/5 py-2 rounded text-[10px] font-label-caps text-zinc-300 hover:bg-white/10 transition-all">CONFIG</button>
+</div>
+</div>
+</div>
+<!-- Agent Card 3: Error -->
+<div class="glass-panel p-6 rounded-xl border border-error/30 bg-error-container/10">
+<div class="flex items-start justify-between mb-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full border border-error/50 flex items-center justify-center p-1">
+<div class="w-full h-full rounded-full bg-error-container/20 flex items-center justify-center text-xl">⚠️</div>
+</div>
+<div>
+<h4 class="font-headline-md text-sm text-white">STREAM_SYNC_ALPHA</h4>
+<p class="text-[10px] font-code-sm text-error">STATUS: OVERLOAD</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-zinc-500">LAST SYNC</p>
+<p class="font-code-sm text-error">CRASHED</p>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-[10px] font-label-caps text-zinc-500">
+<span>BUFFER OVERFLOW</span>
+<span class="text-error">100%</span>
+</div>
+<div class="h-1 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-error w-full"></div>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 bg-error-container text-white py-2 rounded text-[10px] font-label-caps hover:bg-error transition-all">DEBUG</button>
+<button class="flex-1 bg-white/5 py-2 rounded text-[10px] font-label-caps text-zinc-300 hover:bg-white/10 transition-all">RESTART</button>
+</div>
+</div>
+</div>
+<!-- Agent Card 4: Running -->
+<div class="glass-panel p-6 rounded-xl border border-white/10">
+<div class="flex items-start justify-between mb-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full border-2 border-tertiary border-t-transparent animate-spin-slow flex items-center justify-center p-1">
+<div class="w-full h-full rounded-full bg-tertiary/20 flex items-center justify-center text-xl">🎞️</div>
+</div>
+<div>
+<h4 class="font-headline-md text-sm text-white">VIDEO_SYNTH_PRO</h4>
+<p class="text-[10px] font-code-sm text-tertiary">STATUS: RENDERING</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-zinc-500">TASK ETA</p>
+<p class="font-code-sm text-white">04:12</p>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-[10px] font-label-caps text-zinc-500">
+<span>GPU COMPUTE</span>
+<span class="text-tertiary">88%</span>
+</div>
+<div class="h-1 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-[88%]"></div>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 bg-white/5 py-2 rounded text-[10px] font-label-caps text-zinc-300 hover:bg-white/10 transition-all">ABORT</button>
+<button class="flex-1 bg-white/5 py-2 rounded text-[10px] font-label-caps text-zinc-300 hover:bg-white/10 transition-all">LOGS</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Terminal / Logs (Right 4 Columns) -->
+<div class="col-span-12 lg:col-span-4 flex flex-col space-y-4">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-md text-zinc-400">GLOBAL LIVE LOGS</h3>
+<span class="material-symbols-outlined text-zinc-500 cursor-pointer" data-icon="filter_list">filter_list</span>
+</div>
+<div class="flex-1 glass-panel rounded-xl overflow-hidden flex flex-col min-h-[500px]">
+<div class="bg-white/5 border-b border-white/5 p-3 flex gap-2">
+<div class="w-2 h-2 rounded-full bg-red-500/50"></div>
+<div class="w-2 h-2 rounded-full bg-yellow-500/50"></div>
+<div class="w-2 h-2 rounded-full bg-green-500/50"></div>
+</div>
+<div class="flex-1 p-4 font-code-sm text-[12px] overflow-y-auto space-y-2">
+<div class="flex gap-3">
+<span class="text-tertiary">[14:22:01]</span>
+<span class="text-zinc-500">SYS:</span>
+<span class="text-on-surface">Initializing NEURO_STATIC_01 handshake...</span>
+</div>
+<div class="flex gap-3">
+<span class="text-tertiary">[14:22:04]</span>
+<span class="text-purple-400">AGENT:</span>
+<span class="text-on-surface">NEURO_STATIC_01 connected via Pipeline-X.</span>
+</div>
+<div class="flex gap-3">
+<span class="text-tertiary">[14:22:10]</span>
+<span class="text-zinc-500">SYS:</span>
+<span class="text-on-surface">Allocating 4.2GB VRAM to VIDEO_SYNTH_PRO.</span>
+</div>
+<div class="flex gap-3">
+<span class="text-tertiary">[14:22:15]</span>
+<span class="text-error">WARN:</span>
+<span class="text-error-container text-red-400">STREAM_SYNC_ALPHA dropped frame at offset 0x442.</span>
+</div>
+<div class="flex gap-3">
+<span class="text-tertiary">[14:23:02]</span>
+<span class="text-zinc-500">SYS:</span>
+<span class="text-on-surface">Re-routing logic flow to node LOGIC_CORE_V2.</span>
+</div>
+<div class="flex gap-3">
+<span class="text-tertiary">[14:23:05]</span>
+<span class="text-purple-400">AGENT:</span>
+<span class="text-on-surface">Task execution successful for Request ID #9921.</span>
+</div>
+<div class="flex gap-3">
+<span class="text-tertiary">[14:24:11]</span>
+<span class="text-zinc-500">SYS:</span>
+<span class="text-on-surface">Starting heartbeat check for all nodes...</span>
+</div>
+<div class="flex gap-3">
+<span class="text-tertiary">[14:24:15]</span>
+<span class="text-zinc-500">SYS:</span>
+<span class="text-on-surface">Ping: Cluster Alpha - 12ms | Cluster Beta - 45ms.</span>
+</div>
+</div>
+<div class="p-3 border-t border-white/5 bg-white/5 flex gap-2">
+<span class="text-purple-500 font-bold">$</span>
+<input class="bg-transparent border-none p-0 focus:ring-0 text-xs w-full placeholder:text-zinc-700 text-on-surface font-code-sm" placeholder="EXECUTE COMMAND..." type="text"/>
+</div>
+</div>
+<!-- Small Performance Chart -->
+<div class="glass-panel p-4 rounded-xl border border-white/10 h-40 flex flex-col">
+<p class="font-label-caps text-zinc-500 mb-2">CLUSTER THROUGHPUT (24H)</p>
+<div class="flex-1 flex items-end gap-1">
+<div class="w-full bg-purple-500/20 h-[30%] hover:bg-purple-500/40 transition-all rounded-t-sm"></div>
+<div class="w-full bg-purple-500/20 h-[45%] hover:bg-purple-500/40 transition-all rounded-t-sm"></div>
+<div class="w-full bg-purple-500/20 h-[65%] hover:bg-purple-500/40 transition-all rounded-t-sm"></div>
+<div class="w-full bg-purple-500/20 h-[40%] hover:bg-purple-500/40 transition-all rounded-t-sm"></div>
+<div class="w-full bg-purple-500/20 h-[85%] hover:bg-purple-500/40 transition-all rounded-t-sm"></div>
+<div class="w-full bg-purple-500/20 h-[95%] hover:bg-purple-500/40 transition-all rounded-t-sm"></div>
+<div class="w-full bg-purple-500/20 h-[70%] hover:bg-purple-500/40 transition-all rounded-t-sm"></div>
+<div class="w-full bg-purple-500/20 h-[50%] hover:bg-purple-500/40 transition-all rounded-t-sm"></div>
+<div class="w-full bg-purple-500/20 h-[60%] hover:bg-purple-500/40 transition-all rounded-t-sm"></div>
+<div class="w-full bg-purple-500/20 h-[80%] hover:bg-purple-500/40 transition-all rounded-t-sm"></div>
+<div class="w-full bg-primary h-[90%] active-glow rounded-t-sm"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Visual Polish: Letterbox Frame for UI depth -->
+<div class="fixed inset-0 pointer-events-none border-[1.5rem] border-zinc-950/20 mix-blend-overlay"></div>
+</body></html>
