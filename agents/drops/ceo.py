@@ -297,24 +297,75 @@ def main():
         post_issue_result("❌ Lead Qualifier no completó.")
         return
     qualifier_json = extract_json_block(qualifier_result, "qualified")
-    print(f"  📦 qualifier_json ({len(qualifier_json)} chars) starts_with_{{: {qualifier_json.strip().startswith('{')}", flush=True)
+    print(f"  📦 qualifier_json ({len(qualifier_json)} chars)", flush=True)
 
-    # Pasar el resultado completo del qualifier (markdown + JSON) para que
-    # extract_top_product encuentre el producto aunque el JSON esté parcialmente en markdown
-    qualifier_for_agents = qualifier_result[:8000]
+    # ── Extraer SOLO el producto ganador (LAUNCH) para Web Designer y Marketing ─
+    winner = {}
+    try:
+        data = json.loads(qualifier_json)
+        # Prioridad: top_pick > qualified[0] > products[0]
+        if data.get("top_pick"):
+            winner = data["top_pick"]
+        elif data.get("qualified"):
+            winner = data["qualified"][0]
+        elif data.get("products"):
+            winner = data["products"][0]
+    except Exception:
+        pass
+
+    # Fallback: extraer del markdown si no hay JSON limpio
+    if not winner.get("name"):
+        # Buscar el primer producto LAUNCH en el markdown
+        m_name = re.search(
+            r'(?:LAUNCH|🟢)[^\n]*?\n.*?(?:###\s*)?(?:🟢\s*)?'
+            r'([\w][\w\s\(\)/áéíóúüñÁÉÍÓÚÜÑ,\-\.]+?)\s*[—\-]\s*Score',
+            qualifier_result, re.DOTALL
+        )
+        if not m_name:
+            m_name = re.search(
+                r'###\s*🟢[^\n]*?\n\s*🟢\s*([\w][\w\s\(\)/áéíóúüñÁÉÍÓÚÜÑ,\-\.]+?)\s*[—\-]\s*Score',
+                qualifier_result
+            )
+        if m_name:
+            winner["name"] = m_name.group(1).strip()
+
+        # Extraer otros campos del markdown
+        for field, pattern in [
+            ("score",           r'Score[:\s]*\*{0,2}(\d+)'),
+            ("suggested_hook",  r'Hook[:\s]*["\*]*([^\n"*]{5,80})'),
+            ("key_strength",    r'Fortaleza[:\s]*([^\n]{5,120})'),
+            ("main_risk",       r'Riesgo[:\s]*([^\n]{5,120})'),
+            ("suggested_price_eur", r'€\s*([\d\.]+)'),
+            ("target_audience", r'(?:Audiencia|Público)[:\s]*([^\n]{5,80})'),
+        ]:
+            if not winner.get(field):
+                fm = re.search(pattern, qualifier_result, re.IGNORECASE)
+                if fm:
+                    val = fm.group(1).strip().strip('*"')
+                    winner[field] = int(val) if field == "score" and val.isdigit() else val
+
+    print(f"  🏆 Producto ganador: {winner.get('name','?')[:60]} (score={winner.get('score','?')})", flush=True)
+
+    # JSON limpio para Web Designer y Marketing Creator
+    winner_json = json.dumps(winner, ensure_ascii=False)
 
     # ── PASO 4: Web Designer ──────────────────────────────────────────────────
-    post_issue_comment("🎨 **Paso 4/5** — Generando landing Shopify...")
+    winner_name = winner.get("name", niche)
+    post_issue_comment(
+        f"🎨 **Paso 4/5** — Generando landing Shopify para: **{winner_name}**"
+    )
     web_id     = create_sub_issue(
-        f"Web Design: {niche}", qualifier_for_agents,
+        f"Web Design: {winner_name}", winner_json,
         "web_designer", issue_id, api_url, company_id, headers, project_id
     )
     web_result = wait_for_issue(web_id, api_url, headers, max_wait=300) if web_id else ""
 
     # ── PASO 5: Marketing Creator ─────────────────────────────────────────────
-    post_issue_comment("📣 **Paso 5/5** — Generando copy y assets...")
+    post_issue_comment(
+        f"📣 **Paso 5/5** — Generando assets de marketing para: **{winner_name}**"
+    )
     mkt_id     = create_sub_issue(
-        f"Marketing: {niche}", qualifier_for_agents,
+        f"Marketing: {winner_name}", winner_json,
         "marketing_creator", issue_id, api_url, company_id, headers, project_id
     )
     mkt_result = wait_for_issue(mkt_id, api_url, headers, max_wait=180) if mkt_id else ""
