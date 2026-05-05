@@ -1,398 +1,457 @@
 <!DOCTYPE html>
-
-<html class="dark" lang="es"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Barlow:wght@400;700&amp;family=DM+Mono&amp;family=Space+Grotesk:wght@300;400;500;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DiscontrolCreator | Biblioteca</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-        .glass-panel {
-            backdrop-filter: blur(12px) brightness(0.8);
-            background-color: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .active-glow {
-            box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);
-        }
-        ::-webkit-scrollbar {
-            width: 2px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #a855f7;
-        }
-    </style>
-<script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    "colors": {
-                        "surface-container-highest": "#353437",
-                        "primary": "#ddb7ff",
-                        "on-error": "#690005",
-                        "tertiary-container": "#00a392",
-                        "surface-container-high": "#2a2a2c",
-                        "on-error-container": "#ffdad6",
-                        "on-secondary-container": "#b6b4b9",
-                        "secondary-fixed": "#e4e1e7",
-                        "surface-container-lowest": "#0e0e10",
-                        "outline": "#988d9f",
-                        "on-surface": "#e5e1e4",
-                        "outline-variant": "#4d4354",
-                        "on-primary-fixed": "#2c0051",
-                        "on-primary-container": "#400071",
-                        "on-primary-fixed-variant": "#6900b3",
-                        "on-secondary-fixed-variant": "#47464b",
-                        "inverse-primary": "#842bd2",
-                        "secondary-container": "#47464b",
-                        "inverse-surface": "#e5e1e4",
-                        "tertiary-fixed": "#62fae3",
-                        "on-surface-variant": "#cfc2d6",
-                        "inverse-on-surface": "#313032",
-                        "tertiary": "#3cddc7",
-                        "primary-fixed-dim": "#ddb7ff",
-                        "on-tertiary": "#003731",
-                        "on-tertiary-container": "#00302a",
-                        "on-secondary": "#303034",
-                        "on-secondary-fixed": "#1b1b1f",
-                        "on-tertiary-fixed-variant": "#005047",
-                        "error": "#ffb4ab",
-                        "error-container": "#93000a",
-                        "surface-variant": "#353437",
-                        "surface-container-low": "#1b1b1d",
-                        "secondary-fixed-dim": "#c8c5cb",
-                        "secondary": "#c8c5cb",
-                        "on-background": "#e5e1e4",
-                        "surface-bright": "#39393b",
-                        "tertiary-fixed-dim": "#3cddc7",
-                        "surface-dim": "#131315",
-                        "primary-container": "#b76dff",
-                        "surface": "#131315",
-                        "primary-fixed": "#f0dbff",
-                        "surface-tint": "#ddb7ff",
-                        "surface-container": "#201f21",
-                        "on-tertiary-fixed": "#00201c",
-                        "on-primary": "#490080",
-                        "background": "#131315"
-                    },
-                    "borderRadius": {
-                        "DEFAULT": "0.125rem",
-                        "lg": "0.25rem",
-                        "xl": "0.5rem",
-                        "full": "0.75rem"
-                    },
-                    "fontFamily": {
-                        "headline-xl": ["Barlow Condensed"],
-                        "body-lg": ["Barlow"],
-                        "label-caps": ["Barlow Condensed"],
-                        "code-sm": ["DM Mono"],
-                        "headline-md": ["Barlow Condensed"],
-                        "body-md": ["Barlow"]
-                    }
-                }
-            }
-        }
-    </script>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#0d0d0f;--surface:#161618;--border:#222226;--muted:#3a3a40;--text:#e8e8ec;--sub:#7a7a90;--accent:#a855f7;--accent2:#7c3aed;--green:#22c55e;--teal:#3cddc7}
+  body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+  .material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 24}
+  .bg-blobs{position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden}
+  .bg-blob{position:absolute;border-radius:50%;filter:blur(100px)}
+  .b1{width:600px;height:600px;background:rgba(120,40,220,.07);top:-100px;left:-100px;animation:blobDrift 18s ease-in-out infinite alternate}
+  .b2{width:500px;height:500px;background:rgba(80,20,180,.05);bottom:-80px;right:-80px;animation:blobDrift 22s ease-in-out infinite alternate-reverse}
+  @keyframes blobDrift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-20px) scale(1.06)}100%{transform:translate(-20px,30px) scale(.96)}}
+  @keyframes dotPulse{0%,100%{box-shadow:0 0 6px var(--accent)}50%{box-shadow:0 0 14px var(--accent),0 0 28px rgba(168,85,247,.35)}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  header{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:56px;background:linear-gradient(90deg,rgba(13,13,15,.97) 0%,rgba(22,10,38,.97) 50%,rgba(13,13,15,.97) 100%);border-bottom:1px solid rgba(168,85,247,.2);backdrop-filter:blur(12px)}
+  .logo{display:flex;align-items:center;gap:12px}
+  .logo-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:dotPulse 2.5s ease-in-out infinite}
+  .logo-brand{font-family:'Space Grotesk',sans-serif;font-weight:900;font-size:16px;letter-spacing:-.02em;color:#fff}
+  .logo-brand span{color:var(--accent)}
+  .header-nav{display:flex;gap:4px}
+  .nav-link{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);text-decoration:none;padding:5px 12px;border-radius:6px;transition:color .15s,background .15s}
+  .nav-link:hover{color:var(--text);background:rgba(255,255,255,.05)}
+  .nav-link.active{color:var(--accent);background:rgba(168,85,247,.1)}
+  .header-right{display:flex;align-items:center;gap:8px}
+  .h-icon{font-size:18px!important;color:var(--sub);cursor:pointer;transition:color .15s}
+  .h-icon:hover{color:var(--text)}
+  .vbadge{font-size:11px;color:var(--sub);background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:20px;font-family:'DM Mono',monospace}
+
+  .layout{display:flex;min-height:100vh;padding-top:56px}
+  aside{width:220px;flex-shrink:0;background:rgba(13,13,15,.9);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 12px;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto}
+  .aside-brand{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+  .aside-brand-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;color:var(--accent)}
+  .aside-brand-sub{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin-top:2px;opacity:.6}
+  .aside-label{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin:14px 4px 6px;opacity:.5}
+  .aside-link{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;text-decoration:none;color:var(--sub);font-size:12.5px;font-weight:500;transition:color .15s,background .15s;margin-bottom:2px}
+  .aside-link:hover{color:var(--text);background:rgba(255,255,255,.04)}
+  .aside-link.active{color:var(--accent);background:rgba(168,85,247,.1)}
+  .aside-link .material-symbols-outlined{font-size:16px!important}
+  .aside-bottom{margin-top:auto;padding-top:14px;border-top:1px solid var(--border)}
+  .btn-pipeline{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;border-radius:8px;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;transition:box-shadow .2s,transform .1s;box-shadow:0 2px 16px rgba(168,85,247,.2)}
+  .btn-pipeline:hover{box-shadow:0 4px 24px rgba(168,85,247,.4);transform:translateY(-1px)}
+
+  main{flex:1;padding:28px 36px;min-width:0}
+
+  /* Page header */
+  .page-top{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:20px}
+  .page-h1{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:#fff;margin-bottom:4px}
+  .page-sub{font-size:13px;color:var(--sub);line-height:1.5}
+  .stats-pills{display:flex;gap:10px;flex-wrap:wrap}
+  .stat-pill{padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:8px;font-size:12.5px}
+  .stat-val{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:var(--accent)}
+  .stat-label{color:var(--sub);font-size:11px}
+
+  /* Toolbar */
+  .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:22px;flex-wrap:wrap}
+  .filter-btn{display:flex;align-items:center;gap:5px;padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--sub);font-size:12px;font-weight:500;cursor:pointer;transition:color .15s,border-color .15s}
+  .filter-btn:hover,.filter-btn.active{color:var(--text);border-color:rgba(168,85,247,.4);background:rgba(168,85,247,.08)}
+  .filter-btn.active{color:var(--accent)}
+  .filter-btn .material-symbols-outlined{font-size:14px!important}
+  .search-wrap{margin-left:auto;display:flex;align-items:center;gap:7px;padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:7px;min-width:200px}
+  .search-wrap .material-symbols-outlined{font-size:15px!important;color:var(--sub)}
+  #searchInput{background:none;border:none;outline:none;color:var(--text);font-size:12px;flex:1;font-family:'Barlow',sans-serif}
+  #searchInput::placeholder{color:var(--muted)}
+
+  /* Content grid */
+  .content-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+
+  /* Video card */
+  .video-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .2s,transform .2s,box-shadow .2s;animation:fadeIn .3s ease both}
+  .video-card:hover{border-color:rgba(168,85,247,.4);transform:translateY(-3px);box-shadow:0 8px 30px rgba(168,85,247,.1)}
+  .card-thumb{aspect-ratio:9/16;background:var(--muted);position:relative;overflow:hidden}
+  .card-thumb img,.card-thumb video{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .2s}
+  .card-thumb .no-thumb{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--sub)}
+  .card-thumb .no-thumb span{font-size:32px;opacity:.3}
+  .card-thumb .no-thumb div{font-size:11px}
+  .card-thumb-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 50%);opacity:0;transition:opacity .2s;display:flex;align-items:center;justify-content:center}
+  .video-card:hover .card-thumb-overlay{opacity:1}
+  .play-btn{width:44px;height:44px;border-radius:50%;background:rgba(168,85,247,.9);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 1,'wght' 300,'GRAD' 0,'opsz' 24}
+  .card-type-badge{position:absolute;top:8px;left:8px;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;backdrop-filter:blur(4px)}
+  .badge-video{background:rgba(168,85,247,.7);color:#fff}
+  .badge-images{background:rgba(34,197,94,.6);color:#fff}
+  .badge-audio{background:rgba(60,221,199,.6);color:#000}
+  .card-body{padding:10px 12px}
+  .card-tema{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+  .card-meta{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--sub)}
+  .card-date{font-family:'DM Mono',monospace}
+  .card-actions{display:flex;gap:6px;margin-top:8px}
+  .btn-card{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 0;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;transition:background .15s}
+  .btn-card-play{background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.2);color:var(--accent)}
+  .btn-card-play:hover{background:rgba(168,85,247,.2)}
+  .btn-card-dl{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--sub)}
+  .btn-card-dl:hover{color:var(--text);border-color:var(--muted)}
+  .btn-card .material-symbols-outlined{font-size:12px!important}
+
+  /* Empty / loading */
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px;text-align:center;gap:12px;color:var(--sub);grid-column:1/-1}
+  .empty-icon{font-size:40px;opacity:.25}
+  .empty-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.04em}
+  .empty-sub{font-size:12.5px;max-width:280px;line-height:1.6}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(168,85,247,.3);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s}
+  .modal-overlay.open{opacity:1;visibility:visible}
+  .modal{background:var(--surface);border:1px solid rgba(168,85,247,.25);border-radius:14px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:24px;position:relative;animation:fadeIn .2s ease}
+  .modal-close{position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;color:var(--sub);font-size:20px;transition:color .15s}
+  .modal-close:hover{color:var(--text)}
+  .modal-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;letter-spacing:.03em;color:#fff;margin-bottom:16px;padding-right:32px}
+  .modal-video-wrap{background:#000;border-radius:8px;overflow:hidden;max-width:240px;margin:0 auto 16px;aspect-ratio:9/16}
+  .modal-video-wrap video{width:100%;height:100%;object-fit:contain;display:block}
+  .modal-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-bottom:16px}
+  .modal-img{aspect-ratio:9/16;border-radius:6px;overflow:hidden;background:var(--muted)}
+  .modal-img img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;transition:opacity .2s}
+  .modal-img img:hover{opacity:.85}
+  .modal-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .btn-modal{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;transition:background .15s}
+  .btn-modal-primary{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff}
+  .btn-modal-primary:hover{box-shadow:0 4px 16px rgba(168,85,247,.4)}
+  .btn-modal-secondary{background:var(--muted);color:var(--text)}
+  .btn-modal-secondary:hover{background:rgba(255,255,255,.1)}
+
+  /* Load more */
+  .load-more-wrap{display:flex;justify-content:center;margin-top:28px}
+  .btn-load-more{padding:10px 28px;background:var(--surface);border:1px solid rgba(168,85,247,.25);border-radius:8px;color:var(--accent);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s,border-color .15s}
+  .btn-load-more:hover{background:rgba(168,85,247,.08);border-color:rgba(168,85,247,.4)}
+  .btn-load-more:disabled{opacity:.4;cursor:not-allowed}
+</style>
 </head>
-<body class="bg-background text-on-surface font-body-md overflow-hidden">
-<!-- TopAppBar -->
-<header class="fixed top-0 z-50 w-full h-16 flex justify-between items-center px-8 bg-zinc-950/80 backdrop-blur-xl border-b border-white/10 font-['Space_Grotesk'] tracking-tight">
-<div class="flex items-center gap-8">
-<span class="text-2xl font-bold tracking-tighter text-white uppercase">DiscontrolCreator</span>
-<nav class="hidden md:flex gap-6 items-center">
-<a class="text-zinc-500 hover:text-zinc-300 transition-colors uppercase text-sm tracking-widest" href="/studio">Studio</a>
-<a class="text-purple-400 border-b-2 border-purple-500 pb-1 uppercase text-sm tracking-widest" href="/biblioteca">Library</a>
-<a class="text-zinc-500 hover:text-zinc-300 transition-colors uppercase text-sm tracking-widest" href="/agentes">Agents</a>
-<a class="text-zinc-500 hover:text-zinc-300 transition-colors uppercase text-sm tracking-widest" href="/estadisticas">Metrics</a>
-</nav>
+<body>
+
+<div class="bg-blobs" aria-hidden="true">
+  <div class="bg-blob b1"></div>
+  <div class="bg-blob b2"></div>
 </div>
-<div class="flex items-center gap-4">
-<button class="p-2 text-zinc-500 hover:bg-white/5 transition-all duration-300 active:scale-95">
-<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
-</button>
-<button class="p-2 text-zinc-500 hover:bg-white/5 transition-all duration-300 active:scale-95">
-<span class="material-symbols-outlined" data-icon="settings">settings</span>
-</button>
-<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden border border-white/10">
-<img alt="Director Profile" data-alt="A professional close-up portrait of a digital creator in a dimly lit, high-tech studio environment. The lighting is cinematic with subtle purple rim light, emphasizing a sharp, authoritative presence. The background features blurred interface elements and glowing server racks, maintaining a sophisticated cinematic technical aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBflX8-FfrrNn4_INiq3F9xak5Olv9HiF9coZfeAxZ3Ug4TcSCahzOQtlr-kchUYNgoaWjs9LnmGtWTFoOAqa91SSeRlVe1-_xQsnbVOILx-crtQ0QYDBdyC5ERfclB_uxBpgFLO8WfQAB4kOWOykoGQ34q0NzE_pt45kYAXZ6SpFGKQ5Dy_Gujc9jm7wH5pYjC5smNMbdEzp1kDURVl6aLusigWRa-BibIWAy_o_c7oGloevefNRnWQptT_0W8G4okz-KQv2u162dp"/>
-</div>
-</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <span class="logo-brand">DISCONTROL<span>CREATOR</span></span>
+  </div>
+  <nav class="header-nav">
+    <a class="nav-link" href="/studio">Studio</a>
+    <a class="nav-link active" href="/biblioteca">Biblioteca</a>
+    <a class="nav-link" href="/agentes">Agentes</a>
+    <a class="nav-link" href="/estadisticas">Métricas</a>
+  </nav>
+  <div class="header-right">
+    <span class="material-symbols-outlined h-icon">notifications</span>
+    <span class="material-symbols-outlined h-icon">settings</span>
+    <div class="vbadge">V.04.2</div>
+  </div>
 </header>
-<div class="flex h-screen pt-16">
-<!-- SideNavBar -->
-<aside class="fixed left-0 top-16 bottom-0 w-64 bg-zinc-950/90 backdrop-blur-md border-r border-white/10 flex flex-col py-6 z-40">
-<div class="px-6 mb-8">
-<div class="flex items-center gap-3 mb-1">
-<div class="w-2 h-2 rounded-full bg-tertiary"></div>
-<span class="font-['Space_Grotesk'] text-sm uppercase tracking-widest text-purple-500 font-black">Agent Tools</span>
+
+<div class="layout">
+  <aside>
+    <div class="aside-brand">
+      <div class="aside-brand-name">historias.en.sombra</div>
+      <div class="aside-brand-sub">V.04.2 · Control Engine</div>
+    </div>
+    <div class="aside-label">Navegación</div>
+    <a class="aside-link" href="/studio"><span class="material-symbols-outlined">movie</span>Studio</a>
+    <a class="aside-link active" href="/biblioteca"><span class="material-symbols-outlined">video_library</span>Biblioteca</a>
+    <a class="aside-link" href="/agentes"><span class="material-symbols-outlined">smart_toy</span>Agentes</a>
+    <a class="aside-link" href="/estadisticas"><span class="material-symbols-outlined">bar_chart</span>Métricas</a>
+    <div class="aside-bottom">
+      <a class="btn-pipeline" href="/studio">
+        <span class="material-symbols-outlined" style="font-size:15px!important">add</span>Nuevo Pipeline
+      </a>
+    </div>
+  </aside>
+
+  <main>
+    <div class="page-top">
+      <div>
+        <h1 class="page-h1">Biblioteca</h1>
+        <p class="page-sub">Contenido generado para @Discontrolhistorys. Todos los vídeos, imágenes y audios del pipeline.</p>
+      </div>
+      <div class="stats-pills">
+        <div class="stat-pill">
+          <span class="stat-val" id="statTotal"><span class="spinner"></span></span>
+          <span class="stat-label">Generaciones</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-val" id="statVideos" style="color:var(--green)"><span class="spinner"></span></span>
+          <span class="stat-label">Con vídeo</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">
+        <span class="material-symbols-outlined">grid_view</span>Todo
+      </button>
+      <button class="filter-btn" data-filter="video" onclick="setFilter('video',this)">
+        <span class="material-symbols-outlined">videocam</span>Vídeos
+      </button>
+      <button class="filter-btn" data-filter="images" onclick="setFilter('images',this)">
+        <span class="material-symbols-outlined">image</span>Imágenes
+      </button>
+      <div class="search-wrap">
+        <span class="material-symbols-outlined">search</span>
+        <input type="text" id="searchInput" placeholder="Buscar por tema…" oninput="filterCards()"/>
+      </div>
+    </div>
+
+    <!-- Grid -->
+    <div class="content-grid" id="contentGrid">
+      <div class="empty-state">
+        <span class="spinner" style="width:24px;height:24px;border-width:3px"></span>
+        <div class="empty-title">Cargando biblioteca…</div>
+      </div>
+    </div>
+
+    <div class="load-more-wrap" id="loadMoreWrap" style="display:none">
+      <button class="btn-load-more" id="btnLoadMore" onclick="loadMore()">Cargar más</button>
+    </div>
+  </main>
 </div>
-<span class="text-[10px] text-zinc-500 uppercase tracking-tighter">V.04.2 Online</span>
+
+<!-- Modal de detalle -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <button class="modal-close" onclick="closeModalDirect()">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+    <div id="modalContent"></div>
+  </div>
 </div>
-<nav class="flex-1 space-y-1">
-<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 font-['Space_Grotesk'] text-sm uppercase tracking-widest hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
-<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
-<span>Visualizer</span>
-</a>
-<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 font-['Space_Grotesk'] text-sm uppercase tracking-widest hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
-<span class="material-symbols-outlined" data-icon="mic">mic</span>
-<span>Voice Synth</span>
-</a>
-<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 font-['Space_Grotesk'] text-sm uppercase tracking-widest hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
-<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
-<span>Pipeline</span>
-</a>
-<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 font-['Space_Grotesk'] text-sm uppercase tracking-widest hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
-<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
-<span>Logic Flow</span>
-</a>
-<a class="flex items-center gap-3 text-zinc-500 px-4 py-3 font-['Space_Grotesk'] text-sm uppercase tracking-widest hover:bg-white/5 transition-all duration-200 hover:translate-x-1" href="#">
-<span class="material-symbols-outlined" data-icon="rocket_launch">rocket_launch</span>
-<span>Deploy</span>
-</a>
-</nav>
-<div class="px-4 mt-auto space-y-4">
-<button class="w-full bg-purple-500 text-zinc-950 font-bold py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-purple-400 transition-colors">
-<span class="material-symbols-outlined" data-icon="add">add</span>
-<span>New Pipeline</span>
-</button>
-<div class="pt-4 border-t border-white/5">
-<a class="flex items-center gap-3 text-zinc-500 px-4 py-2 font-['Space_Grotesk'] text-xs uppercase tracking-widest hover:text-white transition-colors" href="#">
-<span class="material-symbols-outlined text-sm" data-icon="help">help</span>
-<span>Support</span>
-</a>
-<a class="flex items-center gap-3 text-zinc-500 px-4 py-2 font-['Space_Grotesk'] text-xs uppercase tracking-widest hover:text-white transition-colors" href="#">
-<span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span>
-<span>Logs</span>
-</a>
-</div>
-</div>
-</aside>
-<!-- Main Content Area -->
-<main class="ml-64 flex-1 overflow-y-auto bg-surface p-8">
-<!-- Header & Filter Bar -->
-<div class="mb-10">
-<div class="flex justify-between items-end mb-8">
-<div>
-<h1 class="font-headline-xl text-headline-xl text-primary uppercase">Biblioteca</h1>
-<p class="font-body-md text-zinc-500 max-w-xl mt-2">Gestión centralizada de activos multimedia generados. Monitoreo de producción y despliegue multiplataforma.</p>
-</div>
-<div class="flex gap-4">
-<div class="glass-panel px-4 py-2 rounded-lg flex items-center gap-3">
-<span class="text-purple-500 font-bold">248</span>
-<span class="text-xs uppercase tracking-widest text-zinc-400">Total Shorts</span>
-</div>
-<div class="glass-panel px-4 py-2 rounded-lg flex items-center gap-3 border-tertiary/20">
-<span class="text-tertiary font-bold">12</span>
-<span class="text-xs uppercase tracking-widest text-zinc-400">Rendering</span>
-</div>
-</div>
-</div>
-<!-- Filters -->
-<div class="glass-panel p-4 rounded-xl flex flex-wrap gap-6 items-center">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-zinc-500" data-icon="filter_list">filter_list</span>
-<span class="font-label-caps text-label-caps text-zinc-400">Filtrar por:</span>
-</div>
-<div class="flex items-center gap-2">
-<select class="bg-transparent border-b border-white/20 text-sm text-on-surface focus:border-primary outline-none py-1 px-2 appearance-none cursor-pointer font-['Space_Grotesk']">
-<option>Todos los Agentes</option>
-<option>Nexus Prime</option>
-<option>Void Echo</option>
-<option>Synthetix</option>
-</select>
-<span class="material-symbols-outlined text-xs text-zinc-500" data-icon="expand_more">expand_more</span>
-</div>
-<div class="flex items-center gap-2">
-<select class="bg-transparent border-b border-white/20 text-sm text-on-surface focus:border-primary outline-none py-1 px-2 appearance-none cursor-pointer font-['Space_Grotesk']">
-<option>Cualquier fecha</option>
-<option>Hoy</option>
-<option>Última semana</option>
-<option>Último mes</option>
-</select>
-<span class="material-symbols-outlined text-xs text-zinc-500" data-icon="calendar_today">calendar_today</span>
-</div>
-<div class="flex items-center gap-2 ml-auto glass-panel px-4 py-1.5 rounded-full border-white/5 bg-white/5">
-<span class="material-symbols-outlined text-zinc-400 text-sm" data-icon="search">search</span>
-<input class="bg-transparent border-none focus:ring-0 text-sm text-zinc-300 w-48 font-body-md" placeholder="Buscar proyecto..." type="text"/>
-</div>
-</div>
-</div>
-<!-- Content Grid -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-<!-- Video Card 1 -->
-<div class="glass-panel rounded-xl overflow-hidden group hover:border-purple-500/50 transition-all duration-300 relative">
-<div class="aspect-[9/16] relative bg-zinc-900">
-<img alt="Cyberpunk Aesthetic Video Thumbnail" class="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700" data-alt="A vertical 9:16 video thumbnail showcasing a high-contrast cyberpunk cityscape. Vivid neon signs in purple and cyan reflect off wet asphalt streets. The scene is shrouded in a cinematic mist with deep, crushed blacks and glowing volumetric lighting, creating a futuristic, moody atmosphere typical of advanced AI-generated short-form content." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDJfNFnvuFHdiXtGZTVG-ApDnXzSacMdiu5iHG0pBzgKWWn8ZdN0fz4aKxBYi5TaxalarPYEj-GH0-btO6ggwU-ZNfZjHIlUa6z79Vg9j7ohE-YoN5JkKuvOJkem8jdX_Xy0gL_A-Aq-vof5X9YAxjzFR5uPstcKUgQVA51U_ameUqmf9EN9b10zBVV94VzQLXChpzdzbm4sUrh4vvsxDLz3dYvPiKvXcNmtoyTuZArMYXQ33hqowOXG-2PYAJLvbQ7fJlw1aza3CK"/>
-<div class="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80"></div>
-<!-- Card Badge -->
-<div class="absolute top-4 left-4 glass-panel px-2 py-1 rounded text-[10px] uppercase font-bold tracking-tighter text-primary border-primary/30">
-                            Nexus-01
-                        </div>
-<!-- Hover Play Action -->
-<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-purple-950/20 backdrop-blur-[2px]">
-<button class="w-14 h-14 rounded-full bg-primary text-zinc-950 flex items-center justify-center shadow-lg transform group-hover:scale-100 scale-75 transition-transform duration-300">
-<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
-</button>
-</div>
-</div>
-<div class="p-4 bg-zinc-950/40">
-<h3 class="font-headline-md text-sm text-on-surface truncate mb-1">CYBERPUNK_DREAM_SQ_04</h3>
-<div class="flex justify-between items-center">
-<span class="text-[10px] text-zinc-500 uppercase tracking-widest font-['Space_Grotesk']">Oct 24, 2023</span>
-<span class="text-[10px] text-tertiary font-code-sm">1080x1920</span>
-</div>
-<div class="mt-4 flex gap-2">
-<button class="flex-1 py-2 glass-panel hover:bg-white/10 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
-                                Reproducir
-                            </button>
-<button class="flex-1 py-2 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
-                                Descargar
-                            </button>
-</div>
-</div>
-</div>
-<!-- Video Card 2 -->
-<div class="glass-panel rounded-xl overflow-hidden group hover:border-purple-500/50 transition-all duration-300 relative">
-<div class="aspect-[9/16] relative bg-zinc-900">
-<img alt="Abstract Liquid Metal Visualization" class="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700" data-alt="A vertical video thumbnail featuring abstract liquid metal flows in a dark, infinite void. The fluid surfaces ripple with iridescent purple and silver highlights, catching a dramatic spotlight from above. The aesthetic is ultra-modern and technical, reflecting high-fidelity procedural generation with sharp details and smooth gradients." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSM-VxA9OvAkyG6bDsFze6sqQ0hUJjsZvOxR2CvsxaPc8QFqWAHPRIj3vuf8_W90LC6tKxYL9AuiYCq2IKMbkfWggvX3LpLDdIici7bjTxP8VmQH-dBoNeApRTqksjj9YNXJgSiTRY_LcreSYLs9wtlLBBJjywKejuQ7xWwoLtLv15a_rviFt6HHUEcW-pzPCnGD0PLj9tHPuV8d3DhxdZyr1XbjeYzdhRODswtF0KqbO3NvWLvgFu0yxLDNw5Lr8vlnx8hUI-SUiL"/>
-<div class="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80"></div>
-<div class="absolute top-4 left-4 glass-panel px-2 py-1 rounded text-[10px] uppercase font-bold tracking-tighter text-primary border-primary/30">
-                            Echo-V
-                        </div>
-<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-purple-950/20 backdrop-blur-[2px]">
-<button class="w-14 h-14 rounded-full bg-primary text-zinc-950 flex items-center justify-center shadow-lg">
-<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
-</button>
-</div>
-</div>
-<div class="p-4 bg-zinc-950/40">
-<h3 class="font-headline-md text-sm text-on-surface truncate mb-1">LIQUID_DYNAMICS_012</h3>
-<div class="flex justify-between items-center">
-<span class="text-[10px] text-zinc-500 uppercase tracking-widest font-['Space_Grotesk']">Oct 23, 2023</span>
-<span class="text-[10px] text-tertiary font-code-sm">1080x1920</span>
-</div>
-<div class="mt-4 flex gap-2">
-<button class="flex-1 py-2 glass-panel hover:bg-white/10 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
-                                Reproducir
-                            </button>
-<button class="flex-1 py-2 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
-                                Descargar
-                            </button>
-</div>
-</div>
-</div>
-<!-- Video Card 3 (Status: Rendering) -->
-<div class="glass-panel rounded-xl overflow-hidden group border-tertiary/20 relative">
-<div class="aspect-[9/16] relative bg-zinc-900/50 flex flex-col items-center justify-center gap-4">
-<div class="w-16 h-16 rounded-full border-2 border-dashed border-tertiary/40 flex items-center justify-center">
-<span class="material-symbols-outlined text-tertiary animate-pulse" data-icon="data_exploration">data_exploration</span>
-</div>
-<div class="text-center">
-<div class="text-xs uppercase tracking-widest font-bold text-tertiary mb-1">Procesando</div>
-<div class="w-32 h-1 bg-white/5 rounded-full overflow-hidden">
-<div class="w-2/3 h-full bg-tertiary"></div>
-</div>
-<div class="text-[10px] text-zinc-500 mt-2 font-code-sm">67% COMPLETADO</div>
-</div>
-</div>
-<div class="p-4 bg-zinc-950/40">
-<h3 class="font-headline-md text-sm text-zinc-500 truncate mb-1">URBAN_EXPLORER_X</h3>
-<div class="flex justify-between items-center">
-<span class="text-[10px] text-zinc-600 uppercase tracking-widest font-['Space_Grotesk']">Oct 24, 2023</span>
-<span class="text-[10px] text-zinc-600 font-code-sm">QUEUE: #4</span>
-</div>
-<div class="mt-4 flex gap-2">
-<button class="flex-1 py-2 glass-panel opacity-20 rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2 cursor-not-allowed" disabled="">
-<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
-                                Reproducir
-                            </button>
-<button class="flex-1 py-2 border border-white/5 text-zinc-500 hover:bg-white/5 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="cancel">cancel</span>
-                                Cancelar
-                            </button>
-</div>
-</div>
-</div>
-<!-- Video Card 4 -->
-<div class="glass-panel rounded-xl overflow-hidden group hover:border-purple-500/50 transition-all duration-300 relative">
-<div class="aspect-[9/16] relative bg-zinc-900">
-<img alt="Glitch Art Visual" class="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700" data-alt="A vertical video frame showing a distorted, glitch-art portrait of a digital avatar. The image is fragmented with scanlines, chromatic aberration, and digital noise in shades of purple, magenta, and deep black. The overall look is aggressive and high-energy, designed for high-impact social media short videos in a dark, technological visual style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvsFtozMepC5X8N_zMoTGjQeaZGn4qQ3rcPUIJbSu2f44FDPzPabgKhrE7Ei83KUCFsA563OB2yAzza_P_ApCQZUDk5vOXmI42uiNqIzcRp50EkdCuppmdf1C-PcIzoBKLQ_cpFrdWNFUCCOXBKhRd5RjzIDC0Ckp_DXTcYz8EiEq6sxrPjBIvYALo-SXXYXrQNpv8INvdaB4dD07rWlgUg4U4ZhMCigQkug2A6hQEL5AaOJuh4hQBpeLZg3AtbodTWQ5HPA3GeifZ"/>
-<div class="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80"></div>
-<div class="absolute top-4 left-4 glass-panel px-2 py-1 rounded text-[10px] uppercase font-bold tracking-tighter text-primary border-primary/30">
-                            Synth-M
-                        </div>
-<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-purple-950/20 backdrop-blur-[2px]">
-<button class="w-14 h-14 rounded-full bg-primary text-zinc-950 flex items-center justify-center shadow-lg">
-<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
-</button>
-</div>
-</div>
-<div class="p-4 bg-zinc-950/40">
-<h3 class="font-headline-md text-sm text-on-surface truncate mb-1">GLITCH_VORTEX_PRO</h3>
-<div class="flex justify-between items-center">
-<span class="text-[10px] text-zinc-500 uppercase tracking-widest font-['Space_Grotesk']">Oct 22, 2023</span>
-<span class="text-[10px] text-tertiary font-code-sm">1080x1920</span>
-</div>
-<div class="mt-4 flex gap-2">
-<button class="flex-1 py-2 glass-panel hover:bg-white/10 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
-                                Reproducir
-                            </button>
-<button class="flex-1 py-2 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
-                                Descargar
-                            </button>
-</div>
-</div>
-</div>
-<!-- Video Card 5 -->
-<div class="glass-panel rounded-xl overflow-hidden group hover:border-purple-500/50 transition-all duration-300 relative">
-<div class="aspect-[9/16] relative bg-zinc-900">
-<img alt="3D Wireframe Landscape" class="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700" data-alt="A vertical video sequence portraying a 3D topographic wireframe landscape that pulses with light. The mesh glows with a subtle purple luminance against a pitch-black background, creating a technical and analytic visual style. The camera glides over the digital peaks, revealing intricate geometric patterns and high-detail line work characteristic of high-end motion graphics." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzNtIg4aC2fLkFobKU7gRMKmCF6yre4U0D1aqjgMkJAQa0xvbPvq8j8vHDkDsKCWKZm4dV7-z4qORUAKbMCfJNnX5fnW_2hnynmtPIc-3vDggywvUDNrOpUL6FfB-h4lvruDldDowxMYdnpO4BQbmHLla2OxlwqQ2Nf4ukmUNyQ52q0Xb03BCZ7D0442NrgGiauIFUn2z5oD6Cab-GaPReoyDhFZsIJtWTdFmN9yYe7JcIC4w7X5ZsoEFVshlpl4LbuTCWQCBDzf9t"/>
-<div class="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80"></div>
-<div class="absolute top-4 left-4 glass-panel px-2 py-1 rounded text-[10px] uppercase font-bold tracking-tighter text-primary border-primary/30">
-                            Nexus-01
-                        </div>
-<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-purple-950/20 backdrop-blur-[2px]">
-<button class="w-14 h-14 rounded-full bg-primary text-zinc-950 flex items-center justify-center shadow-lg">
-<span class="material-symbols-outlined text-3xl" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
-</button>
-</div>
-</div>
-<div class="p-4 bg-zinc-950/40">
-<h3 class="font-headline-md text-sm text-on-surface truncate mb-1">GRID_SCAN_Z8</h3>
-<div class="flex justify-between items-center">
-<span class="text-[10px] text-zinc-500 uppercase tracking-widest font-['Space_Grotesk']">Oct 21, 2023</span>
-<span class="text-[10px] text-tertiary font-code-sm">1080x1920</span>
-</div>
-<div class="mt-4 flex gap-2">
-<button class="flex-1 py-2 glass-panel hover:bg-white/10 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="play_circle">play_circle</span>
-                                Reproducir
-                            </button>
-<button class="flex-1 py-2 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-colors rounded text-[10px] uppercase font-bold flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
-                                Descargar
-                            </button>
-</div>
-</div>
-</div>
-</div>
-<!-- Pagination/Load More -->
-<div class="mt-12 flex justify-center">
-<button class="px-8 py-3 glass-panel border-purple-500/20 text-primary rounded-lg font-headline-md text-sm uppercase tracking-widest hover:bg-purple-500/5 transition-all active:scale-95">
-                    Cargar más registros
-                </button>
-</div>
-</main>
-</div>
-<!-- Floating Action Button (Suppressed as per rules for Details/Library screens, but template allows it contextually. Here we prioritize the SideNav's CTA instead) -->
-</body></html>
+
+<script>
+const API = 'https://spirited-charm-production.up.railway.app';
+let allRows   = [];
+let displayed = 0;
+let activeFilter = 'all';
+const PAGE = 30;
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function fmtDate(iso){
+  if(!iso) return '—';
+  return new Date(iso).toLocaleDateString('es',{day:'2-digit',month:'short'});
+}
+
+async function init() {
+  try {
+    // Carga stats + vídeos en paralelo
+    const [statsR, videosR] = await Promise.all([
+      fetch(`${API}/api/content/stats`),
+      fetch(`${API}/api/content/videos?limit=100`),
+    ]);
+
+    if (statsR.ok) {
+      const s = await statsR.json();
+      document.getElementById('statTotal').textContent  = s.total  ?? '0';
+      document.getElementById('statVideos').textContent = s.withVideo ?? '0';
+    }
+
+    if (!videosR.ok) throw new Error(`HTTP ${videosR.status}`);
+    allRows = await videosR.json();
+    if (!Array.isArray(allRows)) allRows = [];
+
+    renderGrid(true);
+  } catch(e) {
+    document.getElementById('contentGrid').innerHTML = `
+      <div class="empty-state">
+        <span class="empty-icon">⚠️</span>
+        <div class="empty-title">Error al cargar</div>
+        <div class="empty-sub">${esc(e.message)}</div>
+      </div>`;
+    document.getElementById('statTotal').textContent  = '—';
+    document.getElementById('statVideos').textContent = '—';
+  }
+}
+
+function getFiltered() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  return allRows.filter(r => {
+    const matchFilter =
+      activeFilter === 'all'    ? true :
+      activeFilter === 'video'  ? !!r.video_url :
+      activeFilter === 'images' ? !!(r.image_urls?.length) : true;
+    const matchSearch = !q || (r.tema || '').toLowerCase().includes(q);
+    return matchFilter && matchSearch;
+  });
+}
+
+function renderGrid(reset) {
+  const filtered = getFiltered();
+  const grid = document.getElementById('contentGrid');
+
+  if (reset) {
+    displayed = 0;
+    grid.innerHTML = '';
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-icon">🎬</span>
+        <div class="empty-title">${allRows.length === 0 ? 'Sin generaciones aún' : 'Sin resultados'}</div>
+        <div class="empty-sub">${allRows.length === 0
+          ? 'Ejecuta el Director en el Studio para crear tu primer vídeo.'
+          : 'Prueba con otro filtro o término de búsqueda.'}</div>
+      </div>`;
+    document.getElementById('loadMoreWrap').style.display = 'none';
+    return;
+  }
+
+  const slice = filtered.slice(displayed, displayed + PAGE);
+  slice.forEach((r, i) => {
+    const card = buildCard(r, displayed + i);
+    grid.insertAdjacentHTML('beforeend', card);
+  });
+  displayed += slice.length;
+
+  const loadMoreWrap = document.getElementById('loadMoreWrap');
+  loadMoreWrap.style.display = displayed < filtered.length ? 'flex' : 'none';
+}
+
+function buildCard(r, i) {
+  const hasVideo  = !!r.video_url;
+  const hasImages = !!(r.image_urls?.length);
+  const hasAudio  = !!r.audio_url;
+  const thumb     = (r.image_urls?.[0]) || '';
+  const tema      = (r.tema || 'Sin título').slice(0, 50);
+  const safeR     = esc(JSON.stringify(r).replace(/'/g, "\\'"));
+
+  let badge = '';
+  if (hasVideo)       badge = '<span class="card-type-badge badge-video">🎬 Vídeo</span>';
+  else if (hasImages) badge = '<span class="card-type-badge badge-images">🖼️ Imágenes</span>';
+  else if (hasAudio)  badge = '<span class="card-type-badge badge-audio">🎙️ Audio</span>';
+
+  const thumbHtml = thumb
+    ? `<img src="${esc(thumb)}" loading="lazy" alt="${esc(tema)}" onerror="this.parentElement.innerHTML='<div class=no-thumb><span>🎬</span><div>Sin previsualización</div></div>'">`
+    : `<div class="no-thumb"><span>🎬</span><div>Sin previsualización</div></div>`;
+
+  const actionPlay = hasVideo
+    ? `<a href="${esc(r.video_url)}" target="_blank" rel="noopener" class="btn-card btn-card-play"><span class="material-symbols-outlined">play_arrow</span>Ver</a>`
+    : hasImages
+    ? `<button class="btn-card btn-card-play" onclick="openModal(event,${i})"><span class="material-symbols-outlined">photo_library</span>Galería</button>`
+    : '';
+  const actionDl = hasVideo
+    ? `<a href="${esc(r.video_url)}" download class="btn-card btn-card-dl"><span class="material-symbols-outlined">download</span>MP4</a>`
+    : '';
+
+  return `<div class="video-card" onclick="openModal(event,${i})" data-idx="${i}" style="animation-delay:${(i%PAGE)*0.03}s">
+    <div class="card-thumb">
+      ${thumbHtml}
+      ${badge}
+      <div class="card-thumb-overlay">
+        <div class="play-btn">play_arrow</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-tema" title="${esc(r.tema)}">${esc(tema)}</div>
+      <div class="card-meta">
+        <span class="card-date">${fmtDate(r.created_at)}</span>
+        <span>${hasImages ? r.image_urls.length + ' imgs' : ''}</span>
+      </div>
+      <div class="card-actions" onclick="event.stopPropagation()">
+        ${actionPlay}${actionDl}
+      </div>
+    </div>
+  </div>`;
+}
+
+function openModal(event, idx) {
+  const filtered = getFiltered();
+  const r = filtered[idx] ?? allRows[idx];
+  if (!r) return;
+
+  const hasVideo  = !!r.video_url;
+  const hasImages = !!(r.image_urls?.length);
+  const hasAudio  = !!r.audio_url;
+  const tema = (r.tema || 'Sin título').slice(0, 80);
+
+  let content = `<div class="modal-title">${esc(tema)}</div>`;
+
+  if (hasVideo) {
+    content += `<div class="modal-video-wrap">
+      <video controls playsinline preload="metadata">
+        <source src="${esc(r.video_url)}" type="video/mp4">
+      </video>
+    </div>`;
+  }
+
+  if (hasImages && r.image_urls.length) {
+    content += `<div class="modal-imgs">
+      ${r.image_urls.slice(0,16).map((u,i) => `
+        <div class="modal-img">
+          <img src="${esc(u)}" loading="lazy" alt="Escena ${i+1}" onclick="window.open('${esc(u)}','_blank')" onerror="this.style.display='none'">
+        </div>`).join('')}
+    </div>`;
+  }
+
+  content += `<div class="modal-actions">`;
+  if (hasVideo) {
+    content += `<a href="${esc(r.video_url)}" target="_blank" rel="noopener" class="btn-modal btn-modal-primary">
+      <span class="material-symbols-outlined" style="font-size:14px">play_arrow</span>Ver vídeo
+    </a>
+    <a href="${esc(r.video_url)}" download class="btn-modal btn-modal-secondary">
+      <span class="material-symbols-outlined" style="font-size:14px">download</span>MP4
+    </a>`;
+  }
+  if (hasAudio) {
+    content += `<a href="${esc(r.audio_url)}" download class="btn-modal btn-modal-secondary">
+      <span class="material-symbols-outlined" style="font-size:14px">download</span>MP3
+    </a>`;
+  }
+  content += `</div>`;
+
+  document.getElementById('modalContent').innerHTML = content;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModalDirect();
+}
+function closeModalDirect() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  // Detener vídeo si había uno reproduciendo
+  const v = document.querySelector('.modal-video-wrap video');
+  if (v) { v.pause(); v.currentTime = 0; }
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderGrid(true);
+}
+
+function filterCards() {
+  renderGrid(true);
+}
+
+function loadMore() {
+  renderGrid(false);
+}
+
+// Cerrar modal con Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModalDirect();
+});
+
+init();
+</script>
+</body>
+</html>

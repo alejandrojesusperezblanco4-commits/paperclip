@@ -376,6 +376,56 @@ export async function createApp(
     res.send(html);
   });
 
+  // ── Supabase proxy — expone datos de vídeos sin revelar la clave secreta ──────
+  // GET /api/content/videos?limit=30&offset=0
+  // GET /api/content/stats
+  app.get("/api/content/videos", async (req, res) => {
+    const supabaseUrl = process.env.SUPABASE_URL || "https://nuaajypknpjbsyhssclm.supabase.co";
+    const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
+    const limit  = Math.min(Number(req.query.limit)  || 30, 100);
+    const offset = Number(req.query.offset) || 0;
+    try {
+      const r = await fetch(
+        `${supabaseUrl}/rest/v1/videos?select=id,created_at,tema,video_url,audio_url,image_urls,status&order=created_at.desc&limit=${limit}&offset=${offset}`,
+        { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+      );
+      if (!r.ok) { res.status(r.status).json({ error: "Supabase error", status: r.status }); return; }
+      const rows = await r.json();
+      res.setHeader("Cache-Control", "no-store");
+      res.json(rows);
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.get("/api/content/stats", async (req, res) => {
+    const supabaseUrl = process.env.SUPABASE_URL || "https://nuaajypknpjbsyhssclm.supabase.co";
+    const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
+    try {
+      // Contar total y los que tienen vídeo final
+      const [totalR, withVideoR] = await Promise.all([
+        fetch(`${supabaseUrl}/rest/v1/videos?select=id&limit=1`, {
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}`, Prefer: "count=exact" }
+        }),
+        fetch(`${supabaseUrl}/rest/v1/videos?select=id,created_at,tema,video_url,image_urls&order=created_at.desc&limit=100`, {
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
+        }),
+      ]);
+      const total     = parseInt(totalR.headers.get("content-range")?.split("/")[1] || "0", 10);
+      const videos    = withVideoR.ok ? await withVideoR.json() : [];
+      const withVideo = Array.isArray(videos) ? videos.filter((v: any) => v.video_url).length : 0;
+      const withImages= Array.isArray(videos) ? videos.filter((v: any) => v.image_urls?.length).length : 0;
+      const recent    = Array.isArray(videos) ? videos.slice(0, 5).map((v: any) => ({
+        id: v.id, tema: v.tema, created_at: v.created_at,
+        has_video: !!v.video_url, has_images: !!(v.image_urls?.length),
+      })) : [];
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ total, withVideo, withImages, recent, costPerVideo: 2.30 });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
   // ── Studio sound effects ─────────────────────────────────────────────────────
   app.get("/sounds/:file", (req, res) => {
     const allowed = ["success.m4a", "error.m4a"];
