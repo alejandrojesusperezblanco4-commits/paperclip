@@ -5,8 +5,10 @@ El preview se puede ver, editar y luego publicar en Shopify.
 """
 import os, sys, json, re, urllib.request, urllib.parse
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent))
-from api_client import post_issue_result, post_issue_comment, resolve_issue_context, call_llm
+from api_client import post_issue_result, post_issue_comment, resolve_issue_context, call_llm, fetch_skill
 sys.stdout.reconfigure(encoding="utf-8")
+
+DROPS_COMPANY = "0b4751e7-24e7-4e8b-98e0-5b5ed73b6d7c"
 
 STRUCTURE_SYSTEM = """Eres experto en CRO para Shopify en el mercado español.
 Generas landing pages de alto rendimiento para dropshipping.
@@ -252,9 +254,30 @@ Responde SOLO con JSON:
     audience = product.get("target_audience", "adultos 25-45")
 
     post_issue_comment(
-        f"🎨 Web Designer analizando competidores y generando landing para: **{name}**\n\n"
-        f"Paso 0: Scraping competidores → Paso 1: Estructura copy → Paso 2: HTML preview"
+        f"🎨 Web Designer cargando skills + analizando competidores para: **{name}**\n\n"
+        f"Paso 0: Skills + Competidores → Paso 1: Estructura copy → Paso 2: HTML preview"
     )
+
+    # ── Fetch skills desde Paperclip ──────────────────────────────────────────
+    print("📚 Cargando skills desde Paperclip...", flush=True)
+    skill_lp  = fetch_skill("landing-page-copywriter", company_id=DROPS_COMPANY)
+    skill_wd  = fetch_skill("web-designer",            company_id=DROPS_COMPANY)
+
+    skill_context = ""
+    if skill_lp:
+        # Extraer sección de frameworks (después del frontmatter)
+        lp_content = skill_lp
+        if "## Instructions" in lp_content:
+            lp_content = lp_content.split("## Instructions")[1][:2500]
+        skill_context += f"\n\n--- LANDING PAGE FRAMEWORKS (skill) ---\n{lp_content}"
+    if skill_wd:
+        wd_content = skill_wd
+        if "---" in wd_content:
+            parts = wd_content.split("---")
+            wd_content = "---".join(parts[2:])[:1500] if len(parts) > 2 else wd_content[:1500]
+        skill_context += f"\n\n--- WEB DESIGNER GUIDELINES (skill) ---\n{wd_content}"
+
+    print(f"  ✅ Skill context: {len(skill_context)} chars", flush=True)
 
     # ── PASO 0: Scraping de competidores ─────────────────────────────────────
     print(f"\n🔍 Buscando competidores para: {name}", flush=True)
@@ -274,6 +297,7 @@ Fortaleza: {strength}
 Riesgo a superar: {risk}
 Hook: {hook}
 {competitor_context}
+{skill_context}
 
 INSTRUCCIONES:
 - Si hay datos de competidores, analiza qué está funcionando (precios, CTAs, headlines)

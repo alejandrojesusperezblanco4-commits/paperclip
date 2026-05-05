@@ -257,6 +257,78 @@ def post_parent_update(agent_name: str, output: str) -> None:
               file=__import__("sys").stderr, flush=True)
 
 
+def fetch_skill(skill_name: str, company_id: str = "", file_path: str = "SKILL.md") -> str:
+    """
+    Fetches a skill's SKILL.md content from the Paperclip API at runtime.
+    Use this at agent startup to inject skill knowledge into LLM prompts.
+
+    Args:
+        skill_name: name of the skill as shown in Paperclip UI (e.g. "ads-copywriter")
+        company_id: override company ID (defaults to PAPERCLIP_COMPANY_ID env var)
+        file_path:  file to fetch inside the skill (default: SKILL.md)
+
+    Returns:
+        Skill content as string, or "" if not found / error.
+
+    Usage in agent:
+        skill = fetch_skill("ads-copywriter")
+        prompt = f"...{skill}..."
+    """
+    api_url    = os.environ.get("PAPERCLIP_API_URL", "http://localhost:3100").strip().rstrip("/")
+    company_id = company_id or os.environ.get("PAPERCLIP_COMPANY_ID", "").strip()
+    agent_id   = os.environ.get("PAPERCLIP_AGENT_ID", "").strip()
+    run_id     = os.environ.get("PAPERCLIP_RUN_ID", "skill-fetch").strip()
+    secret     = (os.environ.get("PAPERCLIP_AGENT_JWT_SECRET") or
+                  os.environ.get("BETTER_AUTH_SECRET", "")).strip()
+
+    if not company_id or not api_url:
+        return ""
+
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    api_key = os.environ.get("PAPERCLIP_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    elif secret and agent_id:
+        try:
+            token = _make_jwt(agent_id, company_id, run_id, secret)
+            headers["Authorization"] = f"Bearer {token}"
+        except Exception:
+            return ""
+
+    def _get(url: str):
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read().decode("utf-8"))
+
+    try:
+        # 1. Listar skills de la empresa para encontrar el ID por nombre
+        skills = _get(f"{api_url}/api/companies/{company_id}/skills")
+        skill_id = None
+        for s in (skills if isinstance(skills, list) else skills.get("skills", [])):
+            key = s.get("key", "") or s.get("name", "") or s.get("id", "")
+            if skill_name.lower() in key.lower():
+                skill_id = s.get("id", "")
+                break
+
+        if not skill_id:
+            print(f"  ⚠️  Skill '{skill_name}' no encontrada en la empresa", flush=True)
+            return ""
+
+        # 2. Fetch el archivo de la skill
+        import urllib.parse as _up
+        encoded_path = _up.quote(file_path, safe="")
+        result = _get(f"{api_url}/api/companies/{company_id}/skills/{skill_id}/files?path={encoded_path}")
+
+        content = result if isinstance(result, str) else result.get("content", "")
+        if content:
+            print(f"  ✅ Skill '{skill_name}' cargada ({len(content)} chars)", flush=True)
+        return content or ""
+
+    except Exception as e:
+        print(f"  ⚠️  fetch_skill('{skill_name}'): {e}", flush=True)
+        return ""
+
+
 def post_issue_result(output: str) -> None:
     """Cierra el issue de Paperclip y publica el output como comentario.
     Lee las variables de entorno que Paperclip inyecta automáticamente.
