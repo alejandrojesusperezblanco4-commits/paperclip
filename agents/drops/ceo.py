@@ -1,14 +1,20 @@
 """
 Agente: CEO — DiscontrolDrops Orchestrator
 Coordina el pipeline de investigación y lanzamiento de productos.
-Mismo patrón que el Director de DiscontrolCreator.
+
+ARQUITECTURA: CEO como traductor estricto.
+Cada agente recibe un JSON pequeño con SOLO los campos que necesita.
+No se pasa nunca texto crudo ni outputs completos entre agentes.
 
 Flujo:
-1. Product Hunter  → busca productos ganadores
-2. Ad Spy          → valida demanda con Facebook Ads Library
-3. Lead Qualifier  → puntúa y filtra (LAUNCH/TEST/SKIP)
-4. Web Designer    → genera estructura de landing Shopify
-5. Marketing Creator → genera copy, scripts y emails
+1. Product Hunter  → input: {niche, region}
+                   → output parsed: lista de productos slim
+2. Ad Spy          → input: {products: [{name}], niche}
+                   → output parsed: lista de ad_results
+3. Lead Qualifier  → input: {products, ad_results, niche}
+                   → output parsed: producto ganador (LAUNCH/TEST) normalizado
+4. Web Designer    → input: winner JSON exacto
+5. Marketing Creator → input: winner JSON exacto (mismo que Web Designer)
 """
 import os
 import sys
@@ -21,29 +27,6 @@ import base64
 import urllib.request
 import urllib.error
 from pathlib import Path
-
-
-def extract_json_block(text: str, key: str = "") -> str:
-    """Extrae el primer bloque JSON válido de un texto markdown."""
-    if "```json" in text:
-        for block in text.split("```json")[1:]:
-            candidate = block.split("```")[0].strip()
-            try:
-                data = json.loads(candidate)
-                if not key or key in data:
-                    return candidate
-            except Exception:
-                continue
-    # Buscar JSON con la clave buscada
-    pattern = r'\{[\s\S]*?"' + (key or r'\w+') + r'"[\s\S]*?\}'
-    m = re.search(pattern, text)
-    if m:
-        try:
-            json.loads(m.group(0))
-            return m.group(0)
-        except Exception:
-            pass
-    return text[:3000]
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from api_client import post_issue_result, post_issue_comment, resolve_issue_context
@@ -61,7 +44,7 @@ AGENT_IDS = {
 }
 
 
-# ── Auth — igual que el Director ─────────────────────────────────────────────
+# ── Auth ──────────────────────────────────────────────────────────────────────
 
 def b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
@@ -98,17 +81,19 @@ def api_request(method: str, url: str, payload, headers: dict):
         return None
 
 
+# ── Issue helpers ─────────────────────────────────────────────────────────────
+
 def get_project_id(api_url: str, company_id: str, headers: dict,
                    name: str = "product 1") -> str:
-    """Busca el ID de un proyecto por nombre."""
     try:
-        result = api_request("GET", f"{api_url}/api/companies/{company_id}/projects", None, headers)
+        result   = api_request("GET", f"{api_url}/api/companies/{company_id}/projects",
+                               None, headers)
         projects = result if isinstance(result, list) else (result or {}).get("projects", [])
         for p in projects:
             if isinstance(p, dict) and name.lower() in p.get("name", "").lower():
                 return p.get("id", "")
     except Exception as e:
-        print(f"  ⚠️  get_project_id error: {e}", flush=True)
+        print(f"  ⚠️  get_project_id: {e}", flush=True)
     return ""
 
 
@@ -116,20 +101,15 @@ def create_sub_issue(title: str, description: str, agent_key: str,
                      parent_id: str, api_url: str, company_id: str,
                      headers: dict, project_id: str = "") -> str | None:
     agent_id = AGENT_IDS.get(agent_key, "")
-    payload: dict  = {
-        "title":    title,
-        "status":   "todo",
-        "parentId": parent_id,
-    }
+    payload: dict = {"title": title, "status": "todo", "parentId": parent_id}
     if project_id:
         payload["projectId"] = project_id
     if description:
         payload["description"] = description[:8000]
     if agent_id:
         payload["assigneeAgentId"] = agent_id
-
-    url    = f"{api_url}/api/companies/{company_id}/issues"
-    result = api_request("POST", url, payload, headers)
+    result = api_request("POST", f"{api_url}/api/companies/{company_id}/issues",
+                         payload, headers)
     if result:
         sub_id = result.get("id") or result.get("issue", {}).get("id")
         if sub_id:
@@ -148,22 +128,19 @@ def wait_for_issue(sub_id: str, api_url: str, headers: dict,
         status = (data or {}).get("status", "")
         print(f"  ⏳ {sub_id[:8]}… → {status}", flush=True)
         if status == "done":
-            # Pequeña pausa para asegurar que el comentario ya fue escrito
             time.sleep(2)
-            comments = api_request("GET", f"{api_url}/api/issues/{sub_id}/comments?limit=20", None, headers)
-            print(f"  📨 Comments type: {type(comments).__name__} | value: {str(comments)[:200]}", flush=True)
+            comments = api_request(
+                "GET", f"{api_url}/api/issues/{sub_id}/comments?limit=20", None, headers
+            )
             if comments:
                 items = (comments if isinstance(comments, list)
                          else comments.get("comments") or comments.get("items") or [])
-                print(f"  📨 {len(items)} comentarios encontrados", flush=True)
                 if items:
-                    # Tomar el comentario más reciente que sea resultado real (no solo progreso)
-                    # Los comentarios vienen en desc order (más reciente primero)
-                    # Filtrar el que tenga más contenido útil
                     result_comments = [c for c in items if len(c.get("body", "") or "") > 200]
-                    best = result_comments[0] if result_comments else max(items, key=lambda c: len(c.get("body", "") or ""))
+                    best = (result_comments[0] if result_comments
+                            else max(items, key=lambda c: len(c.get("body", "") or "")))
                     body = best.get("body", "") or ""
-                    print(f"  📨 Mejor comentario: {len(body)} chars — {body[:100]}", flush=True)
+                    print(f"  📨 Resultado: {len(body)} chars", flush=True)
                     return body
             return ""
         if status in ("cancelled", "failed"):
@@ -173,55 +150,188 @@ def wait_for_issue(sub_id: str, api_url: str, headers: dict,
     return ""
 
 
+# ── Input/Output parsers (traducción estricta) ────────────────────────────────
+
 def parse_niche(raw: str) -> str:
+    """Extrae solo el nicho limpio del input del usuario."""
     try:
         data = json.loads(raw)
         return data.get("niche", data.get("query", raw.strip()))
     except Exception:
-        return raw.strip() or "trending products"
+        pass
+    for line in raw.strip().splitlines():
+        line = line.strip()
+        if line.lower().startswith("nicho:"):
+            return line.split(":", 1)[1].strip()
+        if line and not line.lower().startswith((
+            "region", "región", "precio", "temporada", "presupuesto",
+            "busca", "queremos", "nicho de", "#", "---"
+        )):
+            # Limpiar descriptores adicionales después de em dash o paréntesis
+            clean = line.split("—")[0].split("(")[0].split("-")[0].strip()
+            if len(clean) > 3:
+                return clean
+    return raw.strip()[:80] or "trending products"
 
+
+def parse_hunter_output(result: str) -> list:
+    """Extrae lista limpia de productos del Product Hunter."""
+    try:
+        # Buscar bloque JSON con "products"
+        if "```json" in result:
+            for block in reversed(result.split("```json")[1:]):
+                candidate = block.split("```")[0].strip()
+                try:
+                    data = json.loads(candidate)
+                    if "products" in data:
+                        return _slim_products(data["products"])
+                except Exception:
+                    continue
+        # Buscar JSON crudo
+        m = re.search(r'\{"products"[\s\S]*?\}(?=\s*$|\s*```)', result)
+        if m:
+            data = json.loads(m.group(0))
+            return _slim_products(data.get("products", []))
+    except Exception as e:
+        print(f"  ⚠️  parse_hunter_output: {e}", flush=True)
+    return []
+
+
+def _slim_products(prods: list) -> list:
+    """Reduce productos a campos esenciales para el pipeline."""
+    result = []
+    for p in prods[:10]:
+        name = p.get("name", "")
+        if not name:
+            continue
+        result.append({
+            "name":                  name,
+            "score":                 int(p.get("score", 0) or 0),
+            "est_margin_pct":        p.get("est_margin_pct", 0),
+            "competition":           p.get("competition", "Med"),
+            "suggested_price_eur":   p.get("suggested_price_eur", 0),
+            "supplier_est_cost_eur": p.get("supplier_est_cost_eur", 0),
+            "why":                   str(p.get("why", ""))[:100],
+            "target_audience":       str(p.get("target_audience", ""))[:80],
+            "yt_demand":             p.get("yt_demand", "unknown"),
+        })
+    return result
+
+
+def parse_spy_output(result: str) -> list:
+    """Extrae resultados del Ad Spy (solo campos relevantes)."""
+    try:
+        if "```json" in result:
+            for block in reversed(result.split("```json")[1:]):
+                candidate = block.split("```")[0].strip()
+                try:
+                    data = json.loads(candidate)
+                    if "results" in data:
+                        return [
+                            {
+                                "product":    r.get("product", ""),
+                                "total_ads":  r.get("total_ads", 0),
+                                "validated":  r.get("validated", False),
+                                "score":      r.get("evidence_score", 0),
+                            }
+                            for r in data["results"][:6]
+                        ]
+                except Exception:
+                    continue
+    except Exception as e:
+        print(f"  ⚠️  parse_spy_output: {e}", flush=True)
+    return []
+
+
+def parse_qualifier_output(result: str) -> dict | None:
+    """
+    Extrae el producto ganador (LAUNCH > TEST, nunca SKIP).
+    Devuelve dict normalizado con todos los campos que necesitan
+    Web Designer y Marketing Creator.
+    """
+    candidates = []
+    try:
+        if "```json" in result:
+            for block in reversed(result.split("```json")[1:]):
+                candidate_str = block.split("```")[0].strip()
+                try:
+                    data = json.loads(candidate_str)
+                    if "qualified" in data:
+                        candidates = data["qualified"]
+                        break
+                    if "products" in data:
+                        candidates = data["products"]
+                        break
+                except Exception:
+                    continue
+        if not candidates:
+            m = re.search(r'\{"qualified"[\s\S]*?\}(?=\s*$)', result)
+            if m:
+                data = json.loads(m.group(0))
+                candidates = data.get("qualified", [])
+    except Exception as e:
+        print(f"  ⚠️  parse_qualifier_output JSON: {e}", flush=True)
+
+    # Ordenar: LAUNCH primero, TEST después, SKIP rechazado
+    def priority(p):
+        rec = str(p.get("recommendation", "")).upper()
+        if rec == "LAUNCH": return 0
+        if rec == "TEST":   return 1
+        return 99
+
+    candidates.sort(key=priority)
+
+    for p in candidates:
+        rec   = str(p.get("recommendation", "")).upper()
+        score = int(p.get("final_score", p.get("score", 0)) or 0)
+        if rec == "SKIP" or score < 10:
+            continue
+        name = p.get("name", "")
+        if not name:
+            continue
+        return {
+            "name":                name,
+            "score":               score,
+            "recommendation":      rec,
+            "suggested_price_eur": float(p.get("suggested_price_eur", 29.99) or 29.99),
+            "est_margin_pct":      p.get("est_margin_pct", 60),
+            "key_strength":        str(p.get("key_strength", ""))[:150],
+            "main_risk":           str(p.get("main_risk", ""))[:150],
+            "suggested_hook":      str(p.get("suggested_hook", ""))[:100],
+            "target_audience":     str(p.get("target_audience", "adultos 25-45"))[:100],
+        }
+    return None
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    # ── Usar env vars de Paperclip (igual que el Director) ────────────────────
     api_url    = os.environ.get("PAPERCLIP_API_URL", "http://localhost:3100").rstrip("/")
     agent_id   = os.environ.get("PAPERCLIP_AGENT_ID", "")
     company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
-    run_id     = os.environ.get("PAPERCLIP_RUN_ID", "")  # ← FK a heartbeatRuns, crítico
+    run_id     = os.environ.get("PAPERCLIP_RUN_ID", "")
     issue_id   = os.environ.get("PAPERCLIP_ISSUE_ID", "")
     api_key    = os.environ.get("PAPERCLIP_API_KEY", "")
     jwt_secret = (os.environ.get("PAPERCLIP_AGENT_JWT_SECRET") or
                   os.environ.get("BETTER_AUTH_SECRET", "")).strip()
 
-    print(f"🔍 agent_id={agent_id!r} company_id={company_id!r} run_id={run_id!r}", flush=True)
-
-    # Construir headers de auth — run_id debe ser el PAPERCLIP_RUN_ID real
     headers: dict = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     elif jwt_secret and agent_id and run_id:
         token = make_jwt(agent_id, company_id, run_id, jwt_secret)
         headers["Authorization"] = f"Bearer {token}"
-        print("🔑 JWT generado con BETTER_AUTH_SECRET", flush=True)
     elif jwt_secret and agent_id:
-        # Sin run_id válido — intentar con string vacío (puede fallar en logActivity)
         token = make_jwt(agent_id, company_id, "", jwt_secret)
         headers["Authorization"] = f"Bearer {token}"
-        print("⚠️  JWT sin run_id válido", flush=True)
-    else:
-        print("⚠️  Sin credenciales", flush=True)
 
     issue_title, issue_body = resolve_issue_context()
     raw   = issue_body if issue_body else (issue_title or "")
     niche = parse_niche(raw)
 
-    # Buscar proyecto "product 1"
     project_id = get_project_id(api_url, company_id, headers, "product 1")
-    if project_id:
-        print(f"  📁 Proyecto: product 1 → {project_id}", flush=True)
-    else:
-        print("  ⚠️  Proyecto 'product 1' no encontrado — sin projectId", flush=True)
 
-    print(f"🚀 CEO DROPS — Nicho: {niche}", flush=True)
+    print(f"🚀 CEO DROPS — Nicho: '{niche}'", flush=True)
     post_issue_comment(
         f"🚀 **CEO DiscontrolDrops** iniciando para: **{niche}**\n\n"
         f"Pipeline: Product Hunter → Ad Spy → Lead Qualifier → Web Designer → Marketing Creator"
@@ -229,9 +339,10 @@ def main():
 
     # ── PASO 1: Product Hunter ────────────────────────────────────────────────
     post_issue_comment("🔍 **Paso 1/5** — Buscando productos ganadores...")
-    hunter_desc = json.dumps({"niche": niche, "region": "ES", "limit": 15})
-    hunter_id   = create_sub_issue(
-        f"Product Hunt: {niche}", hunter_desc,
+    hunter_input = json.dumps({"niche": niche, "region": "ES", "limit": 10},
+                              ensure_ascii=False)
+    hunter_id = create_sub_issue(
+        f"Product Hunt: {niche}", hunter_input,
         "product_hunter", issue_id, api_url, company_id, headers, project_id
     )
     if not hunter_id:
@@ -242,51 +353,36 @@ def main():
         post_issue_result("❌ Product Hunter no completó.")
         return
 
-    # Extraer JSON del Product Hunter para pasar a los siguientes agentes
-    hunter_json = extract_json_block(hunter_result, "products")
-    print(f"  📦 hunter_json: {hunter_json[:100]}...", flush=True)
+    products = parse_hunter_output(hunter_result)
+    print(f"  📦 Productos extraídos: {len(products)} | {[p['name'][:30] for p in products[:3]]}",
+          flush=True)
+    if not products:
+        post_issue_result(f"❌ Product Hunter no devolvió productos para: {niche}")
+        return
 
     # ── PASO 2: Ad Spy ────────────────────────────────────────────────────────
-    post_issue_comment("🕵️ **Paso 2/5** — Validando demanda en Facebook Ads...")
-    spy_id = create_sub_issue(
-        f"Ad Spy: {niche}", hunter_json,
+    post_issue_comment("🕵️ **Paso 2/5** — Validando demanda...")
+    spy_input = json.dumps({
+        "products": [{"name": p["name"]} for p in products[:6]],
+        "niche":    niche,
+    }, ensure_ascii=False)
+    spy_id     = create_sub_issue(
+        f"Ad Spy: {niche}", spy_input,
         "ad_spy", issue_id, api_url, company_id, headers, project_id
     )
-    spy_result     = wait_for_issue(spy_id, api_url, headers, max_wait=180) if spy_id else ""
-    spy_json       = extract_json_block(spy_result, "results") if spy_result else ""
-
-    # Combinar hunter + spy — reducir a campos esenciales para caber en 4000 chars
-    try:
-        h = json.loads(hunter_json)
-        s = json.loads(spy_json) if spy_json else {}
-        # Reducir cada producto a campos clave solamente
-        slim_products = [
-            {
-                "name":               p.get("name", ""),
-                "score":              p.get("score", 0),
-                "est_margin_pct":     p.get("est_margin_pct", 0),
-                "competition":        p.get("competition", ""),
-                "suggested_price_eur": p.get("suggested_price_eur", 0),
-                "supplier_est_cost_eur": p.get("supplier_est_cost_eur", 0),
-                "why":                p.get("why", "")[:80],
-                "target_audience":    p.get("target_audience", "")[:60],
-            }
-            for p in h.get("products", [])[:10]
-        ]
-        combined_json = json.dumps({
-            "products":   slim_products,
-            "ad_results": s.get("results", [])[:3],
-            "niche":      h.get("niche", niche),
-        }, ensure_ascii=False)
-        print(f"  📦 combined_json: {len(combined_json)} chars", flush=True)
-    except Exception as e:
-        print(f"  ⚠️  combine error: {e}", flush=True)
-        combined_json = hunter_json
+    spy_result = wait_for_issue(spy_id, api_url, headers, max_wait=180) if spy_id else ""
+    ad_results = parse_spy_output(spy_result) if spy_result else []
+    print(f"  📦 Ad results: {len(ad_results)}", flush=True)
 
     # ── PASO 3: Lead Qualifier ────────────────────────────────────────────────
     post_issue_comment("🎯 **Paso 3/5** — Calificando productos...")
+    qualifier_input = json.dumps({
+        "products":   products,
+        "ad_results": ad_results,
+        "niche":      niche,
+    }, ensure_ascii=False)
     qualifier_id = create_sub_issue(
-        f"Qualify: {niche}", combined_json,
+        f"Qualify: {niche}", qualifier_input,
         "lead_qualifier", issue_id, api_url, company_id, headers, project_id
     )
     if not qualifier_id:
@@ -296,82 +392,28 @@ def main():
     if not qualifier_result:
         post_issue_result("❌ Lead Qualifier no completó.")
         return
-    qualifier_json = extract_json_block(qualifier_result, "qualified")
-    print(f"  📦 qualifier_json ({len(qualifier_json)} chars)", flush=True)
 
-    # ── Extraer SOLO el producto ganador (LAUNCH) para Web Designer y Marketing ─
-    winner = {}
-    try:
-        data = json.loads(qualifier_json)
-        # Prioridad: top_pick > qualified[0] > products[0]
-        if data.get("top_pick"):
-            winner = data["top_pick"]
-        elif data.get("qualified"):
-            winner = data["qualified"][0]
-        elif data.get("products"):
-            winner = data["products"][0]
-    except Exception:
-        pass
-
-    # Fallback: extraer del markdown si no hay JSON limpio
-    if not winner.get("name"):
-        # Buscar el primer producto LAUNCH en el markdown
-        m_name = re.search(
-            r'(?:LAUNCH|🟢)[^\n]*?\n.*?(?:###\s*)?(?:🟢\s*)?'
-            r'([\w][\w\s\(\)/áéíóúüñÁÉÍÓÚÜÑ,\-\.]+?)\s*[—\-]\s*Score',
-            qualifier_result, re.DOTALL
-        )
-        if not m_name:
-            m_name = re.search(
-                r'###\s*🟢[^\n]*?\n\s*🟢\s*([\w][\w\s\(\)/áéíóúüñÁÉÍÓÚÜÑ,\-\.]+?)\s*[—\-]\s*Score',
-                qualifier_result
-            )
-        if m_name:
-            winner["name"] = m_name.group(1).strip()
-
-        # Extraer otros campos del markdown
-        for field, pattern in [
-            ("score",           r'Score[:\s]*\*{0,2}(\d+)'),
-            ("suggested_hook",  r'Hook[:\s]*["\*]*([^\n"*]{5,80})'),
-            ("key_strength",    r'Fortaleza[:\s]*([^\n]{5,120})'),
-            ("main_risk",       r'Riesgo[:\s]*([^\n]{5,120})'),
-            ("suggested_price_eur", r'€\s*([\d\.]+)'),
-            ("target_audience", r'(?:Audiencia|Público)[:\s]*([^\n]{5,80})'),
-        ]:
-            if not winner.get(field):
-                fm = re.search(pattern, qualifier_result, re.IGNORECASE)
-                if fm:
-                    val = fm.group(1).strip().strip('*"')
-                    winner[field] = int(val) if field == "score" and val.isdigit() else val
-
-    # Rechazar productos fuera del nicho (SKIP con score=0)
-    rec   = str(winner.get("recommendation", winner.get("final_score", ""))).upper()
-    score = int(winner.get("score", winner.get("final_score", 0)) or 0)
-
-    if rec == "SKIP" or score == 0:
+    winner = parse_qualifier_output(qualifier_result)
+    if not winner:
         post_issue_result(
-            f"# ⚠️ Sin producto ganador para: {niche}\n\n"
-            f"El Lead Qualifier descartó todos los productos del nicho.\n"
-            f"**Causa probable:** Las fuentes externas (Amazon, Perplexity) no devolvieron "
-            f"productos relevantes para **{niche}**.\n\n"
-            f"**Solución:** Reformula el nicho con términos más específicos, por ejemplo:\n"
-            f"- ✅ `pelador de verduras eléctrico`\n"
-            f"- ✅ `dispensador de agua fría portátil`\n"
-            f"- ❌ `gadgets de cocina viral` (demasiado genérico)\n\n"
-            f"Calificación recibida: `{rec}` score={score}"
+            f"# ⚠️ Sin producto ganador para: **{niche}**\n\n"
+            f"El Lead Qualifier descartó todos los productos.\n\n"
+            f"Prueba un nicho más específico como:\n"
+            f"- `{niche} eléctrico portátil`\n"
+            f"- `{niche} para verano España`\n\n"
+            f"Output del qualifier:\n```\n{qualifier_result[:400]}\n```"
         )
         return
 
-    print(f"  🏆 Producto ganador: {winner.get('name','?')[:60]} (score={score}, rec={rec})", flush=True)
+    winner_name = winner["name"]
+    print(f"  🏆 Ganador: {winner_name} (score={winner['score']}, rec={winner['recommendation']})",
+          flush=True)
 
-    # JSON limpio para Web Designer y Marketing Creator
+    # winner_json = input exacto para Web Designer y Marketing Creator
     winner_json = json.dumps(winner, ensure_ascii=False)
 
     # ── PASO 4: Web Designer ──────────────────────────────────────────────────
-    winner_name = winner.get("name", niche)
-    post_issue_comment(
-        f"🎨 **Paso 4/5** — Generando landing Shopify para: **{winner_name}**"
-    )
+    post_issue_comment(f"🎨 **Paso 4/5** — Generando landing para: **{winner_name}**")
     web_id     = create_sub_issue(
         f"Web Design: {winner_name}", winner_json,
         "web_designer", issue_id, api_url, company_id, headers, project_id
@@ -379,9 +421,7 @@ def main():
     web_result = wait_for_issue(web_id, api_url, headers, max_wait=300) if web_id else ""
 
     # ── PASO 5: Marketing Creator ─────────────────────────────────────────────
-    post_issue_comment(
-        f"📣 **Paso 5/5** — Generando assets de marketing para: **{winner_name}**"
-    )
+    post_issue_comment(f"📣 **Paso 5/5** — Generando assets para: **{winner_name}**")
     mkt_id     = create_sub_issue(
         f"Marketing: {winner_name}", winner_json,
         "marketing_creator", issue_id, api_url, company_id, headers, project_id
@@ -389,12 +429,22 @@ def main():
     mkt_result = wait_for_issue(mkt_id, api_url, headers, max_wait=180) if mkt_id else ""
 
     # ── Resumen ───────────────────────────────────────────────────────────────
+    preview_url = ""
+    m_preview   = re.search(r'https://[^\s\]]+/preview/\w+', web_result or "")
+    if m_preview:
+        preview_url = m_preview.group(0)
+
     post_issue_result(
         f"# ✅ DiscontrolDrops — Pipeline Completado\n\n"
-        f"**Nicho:** {niche}\n\n"
-        f"## 🎯 Calificación\n{qualifier_result[:1500]}\n\n"
-        f"## 🎨 Landing\n{(web_result or '_No generada_')[:800]}\n\n"
-        f"## 📣 Marketing\n{(mkt_result or '_No generado_')[:800]}"
+        f"**Producto:** {winner_name}\n"
+        f"**Score:** {winner['score']} | **{winner['recommendation']}**\n"
+        f"**Precio:** €{winner.get('suggested_price_eur','?')} | "
+        f"Margen: {winner.get('est_margin_pct','?')}%\n"
+        f"**Hook:** _{winner.get('suggested_hook','')}_\n\n"
+        + (f"## 🌐 Preview Landing\n**[Ver → {preview_url}]({preview_url})**\n\n"
+           if preview_url else "") +
+        f"## 🎯 Calificación\n{qualifier_result[:600]}\n\n"
+        f"## 📣 Marketing\n{(mkt_result or '_No generado_')[:500]}"
     )
 
 
